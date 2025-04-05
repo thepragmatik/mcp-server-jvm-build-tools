@@ -28,14 +28,14 @@
 
     <groupId>com.thepragmatik.ai</groupId>
     <artifactId>mcp-server-jvm-build-tools</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <description>MCP Server - Build tools for the JVM.</description>
 
     <scm>
         <connection>scm:git:git@github.com:thepragmatik/mcp-server-jvm-build-tools.git</connection>
         <developerConnection>scm:git:git@github.com:thepragmatik/mcp-server-jvm-build-tools.git</developerConnection>
         <url>https://github.com/thepragmatik/mcp-server-jvm-build-tools</url>
-        <tag>HEAD</tag>
+        <tag>v0.0.1</tag>
     </scm>
 
     <properties>
