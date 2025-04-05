@@ -87,7 +87,7 @@
     </dependencyManagement>
 
     <build>
-        <finalName>mcp-maven-server</finalName>
+        <finalName>mcp-server-build-tools-jvm</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

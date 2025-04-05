@@ -14,6 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.ServerParameters;
@@ -27,10 +28,19 @@ import java.util.Map;
 public class TestClient {
 
     private static final String userHome = System.getProperty("user.home");
-    private static final String mavenHome = new File(userHome, "/.sdkman/candidates/maven/current").getAbsolutePath();
+
+    // XXX: May need to update Maven Home path according to your system.
+    private static final String mavenHome = new File(userHome,
+            "/.sdkman/candidates/maven/current").getAbsolutePath();
+
     private static final String currentProjectDir = new File(".").getAbsolutePath();
-    private static final File serverJarFile = new File("target/maven-mcp-server.jar");
+
+    public static final String TARGET_MCP_SERVER__JAR = "target/mcp-server-build-tools-jvm.jar";
+
+    private static final File serverJarFile = new File(TARGET_MCP_SERVER__JAR);
+
     private static final String serverJarPath = serverJarFile.getAbsolutePath();
+
     private static McpSyncClient mcpClient;
 
     public static void main(String[] args) {
