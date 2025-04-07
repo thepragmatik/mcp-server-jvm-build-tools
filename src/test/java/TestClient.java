@@ -35,7 +35,7 @@ public class TestClient {
 
     private static final String currentProjectDir = new File(".").getAbsolutePath();
 
-    public static final String TARGET_MCP_SERVER__JAR = "target/mcp-server-build-tools-jvm.jar";
+    public static final String TARGET_MCP_SERVER__JAR = "target/mcp-server-jvm-build-tools.jar";
 
     private static final File serverJarFile = new File(TARGET_MCP_SERVER__JAR);
 
@@ -55,9 +55,6 @@ public class TestClient {
         var stdioTransport = new StdioClientTransport(stdioParams);
         mcpClient = McpClient.sync(stdioTransport).build();
         mcpClient.initialize();
-
-//        McpSchema.ListToolsResult toolsList = mcpClient.listTools();
-//        System.out.println("Available Build tools: " + toolsList);
 
         String[][] toolCalls = new String[][]{
                 {"get_maven_version", ""},
