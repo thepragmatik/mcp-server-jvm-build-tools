@@ -26,15 +26,16 @@
         <relativePath />
     </parent>
 
+    <name>mcp-server-jvm-build-tools</name>
     <groupId>com.thepragmatik.ai</groupId>
     <artifactId>mcp-server-jvm-build-tools</artifactId>
     <version>0.0.2-SNAPSHOT</version>
     <description>MCP Server - Build tools for the JVM.</description>
 
     <scm>
-        <connection>scm:git:git@github.com:thepragmatik/mcp-server-jvm-build-tools.git</connection>
-        <developerConnection>scm:git:git@github.com:thepragmatik/mcp-server-jvm-build-tools.git</developerConnection>
-        <url>https://github.com/thepragmatik/mcp-server-jvm-build-tools</url>
+        <connection>scm:git:git@github.com:thepragmatik/${project.name}.git</connection>
+        <developerConnection>scm:git:git@github.com:thepragmatik/${project.name}.git</developerConnection>
+        <url>https://github.com/thepragmatik/${project.name}</url>
         <tag>HEAD</tag>
     </scm>
 
@@ -87,7 +88,7 @@
     </dependencyManagement>
 
     <build>
-        <finalName>mcp-server-build-tools-jvm</finalName>
+        <finalName>${project.name}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
