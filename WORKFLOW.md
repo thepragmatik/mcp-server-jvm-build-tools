@@ -70,6 +70,28 @@ Every PR must pass:
 3. **License headers** — mvn license:format runs (non-blocking)
 4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
 
+### Cross-Review Workflow
+
+Every PR must pass a security review by `worker-adversarial` before merging.
+Cross-reviews are dispatched via the shared filesystem:
+
+```
+/shared/inputs/worker-adversarial/task-N.md  ← review task
+/shared/outputs/worker-adversarial/prN-review.md  ← review output
+```
+
+**Review process:**
+1. Write task to `/shared/inputs/worker-adversarial/task-N.md`
+2. Worker picks up task (~5 min) and writes output to `/shared/outputs/`
+3. Review output: PASS → merge, FAIL → fix, NEEDS_FIX → address issues
+
+**Cross-dispatch protocol:** When one worker produces output, another reviews it:
+- `worker-build` output → `worker-mcp` reviews protocol compliance
+- `worker-mcp` output → `worker-quality` reviews testability
+- `worker-quality` output → `worker-adversarial` reviews security
+- `worker-adversarial` output → `worker-build` reviews build feasibility
+- `worker-cicd` output → `worker-adversarial` reviews pipeline security
+
 ### Current State
 
 | Component          | Status                                                    |
