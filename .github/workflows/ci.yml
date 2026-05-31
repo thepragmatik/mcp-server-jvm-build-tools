@@ -67,5 +67,5 @@ jobs:
         run: mvn -B license:format --file pom.xml --no-transfer-progress
         continue-on-error: true
 
-      - name: Compile with lint warnings
-        run: mvn -B compile -Xlint:all --file pom.xml --no-transfer-progress
+      - name: Compile with warnings
+        run: mvn -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
