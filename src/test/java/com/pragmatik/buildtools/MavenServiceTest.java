@@ -49,11 +49,7 @@ class MavenServiceTest {
         void setUp() throws IOException {
             // Security hardening: executeCommand now requires pom.xml in projectDir
             Files.createFile(tempDir.resolve("pom.xml"));
-            // Resolve symlinks (macOS /var → /private/var) for consistent comparisons
-            this.realPath = tempDir.toRealPath().toString();
         }
-
-        private String realPath;
 
         @Test
         @DisplayName("throws when mavenHome is null")
@@ -136,7 +132,7 @@ class MavenServiceTest {
 
                 service.executeCommand(tempDir.toString(), tempDir.toString(), "clean");
 
-                assertThat(System.getProperty("maven.home")).isEqualTo(realPath);
+                assertThat(System.getProperty("maven.home")).isEqualTo(tempDir.toString());
             }
         }
 
@@ -152,7 +148,7 @@ class MavenServiceTest {
                 service.executeCommand(tempDir.toString(), tempDir.toString(), "compile");
 
                 assertThat(System.getProperty("maven.multiModuleProjectDirectory"))
-                        .isEqualTo(realPath);
+                        .isEqualTo(tempDir.toString());
             }
         }
     }
@@ -165,11 +161,7 @@ class MavenServiceTest {
         void setUp() throws IOException {
             // Security hardening: executeCommand now requires pom.xml in projectDir
             Files.createFile(tempDir.resolve("pom.xml"));
-            // Resolve symlinks (macOS /var → /private/var) for consistent comparisons
-            this.realPath = tempDir.toRealPath().toString();
         }
-
-        private String realPath;
 
         @Test
         @DisplayName("passes parsed commands to MavenInvoker")
@@ -180,7 +172,7 @@ class MavenServiceTest {
                 mocked.when(() -> MavenInvoker.executeCommandUsingMavenInvoker(
                         eq(tempDir.toString()),
                         eq(new String[]{"clean", "install"}),
-                        eq(realPath)))
+                        eq(tempDir.toString())))
                         .thenReturn("BUILD SUCCESS");
 
                 String result = service.executeCommand(
@@ -191,7 +183,7 @@ class MavenServiceTest {
                 mocked.verify(() -> MavenInvoker.executeCommandUsingMavenInvoker(
                         eq(tempDir.toString()),
                         eq(new String[]{"clean", "install"}),
-                        eq(realPath)));
+                        eq(tempDir.toString())));
             }
         }
 
