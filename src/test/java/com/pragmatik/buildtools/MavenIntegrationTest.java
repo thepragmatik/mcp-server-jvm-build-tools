@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 @DisplayName("Maven application integration tests")
 class MavenIntegrationTest {
 
-    private static final String MAVEN_HOME = "/opt/maven";
+    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
 
     @Autowired
     private ToolCallbackProvider toolCallbackProvider;
@@ -99,7 +99,7 @@ class MavenIntegrationTest {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> mavenService.executeCommand(
                             MAVEN_HOME, nonexistent.toString(), "clean"))
-                    .withMessageContaining("does not exist");
+                    .withMessageContaining("Cannot resolve project directory");
         }
 
         @Test
