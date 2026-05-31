@@ -73,17 +73,24 @@ Every PR must pass:
 ### Cross-Review Workflow
 
 Every PR must pass a security review by `worker-adversarial` before merging.
-Cross-reviews are dispatched via the shared filesystem:
+Reviews are posted to GitHub for a permanent audit trail.
 
-```
-/shared/inputs/worker-adversarial/task-N.md  ← review task
-/shared/outputs/worker-adversarial/prN-review.md  ← review output
-```
+**Protocol (strict — do not deviate):**
 
-**Review process:**
-1. Write task to `/shared/inputs/worker-adversarial/task-N.md`
-2. Worker picks up task (~5 min) and writes output to `/shared/outputs/`
-3. Review output: PASS → merge, FAIL → fix, NEEDS_FIX → address issues
+1. Write review task to shared filesystem:
+   ```
+   /shared/inputs/worker-adversarial/task-N.md
+   ```
+2. Wait for worker output (~2-5 minutes):
+   ```
+   /shared/outputs/worker-adversarial/prN-review.md
+   ```
+3. Verify review exists, then post to GitHub:
+   ```
+   gh pr review N --comment --body "$(cat /shared/outputs/worker-adversarial/prN-review.md)"
+   ```
+4. Address any issues, push fixes, comment on PR with resolution.
+5. Only merge when review verdict is PASS (no blocking issues remain).
 
 **Cross-dispatch protocol:** When one worker produces output, another reviews it:
 - `worker-build` output → `worker-mcp` reviews protocol compliance
