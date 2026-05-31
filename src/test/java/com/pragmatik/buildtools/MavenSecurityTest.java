@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class MavenSecurityTest {
 
     private final MavenService service = new MavenService();
-    private static final String MAVEN_HOME = "/opt/maven";
+    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
 
     @TempDir
     Path tempDir;
