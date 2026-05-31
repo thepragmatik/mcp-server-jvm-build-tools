@@ -100,7 +100,8 @@ public class MavenInvoker {
     // Allowed Maven lifecycle phases and version flags
     private static final Set<String> ALLOWED_COMMANDS = Set.of(
             "clean", "compile", "test", "package", "install", "deploy", "validate",
-            "--version", "-v", "-version"
+            "--version", "-v", "-version",
+            "dependency:tree"  // read-only analysis, commonly needed
     );
 
     // Dangerous plugin goals that can execute arbitrary code
