@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 @DisplayName("Maven application integration tests")
 class MavenIntegrationTest {
 
+    private static final String MAVEN_HOME = "/opt/maven";
+
     @Autowired
     private ToolCallbackProvider toolCallbackProvider;
 
@@ -40,7 +42,7 @@ class MavenIntegrationTest {
         assertThat(toolCallbacks).isNotEmpty();
 
         boolean hasVersionTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "get_maven_version".equals(tc.getToolDefinition().name()));
+                .anyMatch(tc -> "get_maven_version".equals(tc.getName()));
         assertThat(hasVersionTool).isTrue();
     }
 
@@ -49,7 +51,7 @@ class MavenIntegrationTest {
     void resolvesExecuteMavenCommandTool() {
         FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
         boolean hasExecTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "execute_maven_command".equals(tc.getToolDefinition().name()));
+                .anyMatch(tc -> "execute_maven_command".equals(tc.getName()));
         assertThat(hasExecTool).isTrue();
     }
 
@@ -85,8 +87,7 @@ class MavenIntegrationTest {
                     "</project>"
             );
 
-            String mavenHome = System.getProperty("maven.home", "/opt/maven");
-            String result = mavenService.executeCommand(mavenHome, tempDir.toString(), "mvn --version");
+            String result = mavenService.executeCommand(MAVEN_HOME, tempDir.toString(), "mvn --version");
             assertThat(result).isNotNull();
             assertThat(result).isNotEmpty();
         }
@@ -94,20 +95,18 @@ class MavenIntegrationTest {
         @Test
         @DisplayName("execute with nonexistent projectDir throws")
         void executeWithNonexistentProjectDirThrows() {
-            String mavenHome = System.getProperty("maven.home", "/opt/maven");
             Path nonexistent = tempDir.resolve("nonexistent-project");
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> mavenService.executeCommand(
-                            mavenHome, nonexistent.toString(), "clean"))
+                            MAVEN_HOME, nonexistent.toString(), "clean"))
                     .withMessageContaining("does not exist");
         }
 
         @Test
         @DisplayName("execute with null projectDir throws")
         void executeWithNullProjectDirThrows() {
-            String mavenHome = System.getProperty("maven.home", "/opt/maven");
             assertThatIllegalArgumentException()
-                    .isThrownBy(() -> mavenService.executeCommand(mavenHome, null, "clean"))
+                    .isThrownBy(() -> mavenService.executeCommand(MAVEN_HOME, null, "clean"))
                     .withMessageContaining("cannot be null");
         }
     }

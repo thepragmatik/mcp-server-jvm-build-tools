@@ -106,7 +106,7 @@ public class MavenInvoker {
         if (cmd.isEmpty()) {
             return new String[0];
         }
-        return cmd.split("\\s");
+        return cmd.split("\\s+");
     }
 
     static boolean invocationResultedInError(InvocationResult result) {

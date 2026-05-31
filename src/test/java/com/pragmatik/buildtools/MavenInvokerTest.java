@@ -45,36 +45,36 @@ class MavenInvokerTest {
         }
 
         @Test
-        @DisplayName("handles command with only mvn and trailing whitespace")
+        @DisplayName("handles command with only mvn prefix")
         void handlesOnlyMvnPrefix() {
             assertThat(MavenInvoker.getCommands("mvn ")).isEmpty();
         }
 
         @Test
-        @DisplayName("handles mvn without trailing space")
-        void handlesMvnWithoutTrailingSpace() {
-            assertThat(MavenInvoker.getCommands("mvn")).containsExactly("mvn");
+        @DisplayName("handles bare mvn without arguments")
+        void handlesBareMvn() {
+            assertThat(MavenInvoker.getCommands("mvn")).isEmpty();
         }
 
         @Test
-        @DisplayName("handles extra whitespace between tokens")
+        @DisplayName("collapses extra whitespace between tokens via split regex")
         void handlesExtraWhitespace() {
             assertThat(MavenInvoker.getCommands("mvn   clean    compile"))
-                    .containsExactly("clean", "", "", "", "compile");
+                    .containsExactly("clean", "compile");
         }
 
         @Test
-        @DisplayName("handles leading and trailing whitespace")
+        @DisplayName("trims leading and trailing whitespace")
         void handlesLeadingTrailingWhitespace() {
-            assertThat(MavenInvoker.getCommands("mvn clean "))
+            assertThat(MavenInvoker.getCommands("  mvn clean  "))
                     .containsExactly("clean");
         }
 
         @Test
-        @DisplayName("preserves Unicode characters in commands")
-        void preservesUnicodeCharacters() {
-            assertThat(MavenInvoker.getCommands("mvn clean -Dmessage=cafe-test"))
-                    .containsExactly("clean", "-Dmessage=cafe-test");
+        @DisplayName("preserves parameter values with equals signs")
+        void preservesParamValues() {
+            assertThat(MavenInvoker.getCommands("mvn clean -Dmessage=hello-world"))
+                    .containsExactly("clean", "-Dmessage=hello-world");
         }
 
         @Test
@@ -102,17 +102,18 @@ class MavenInvokerTest {
                 try {
                     MavenInvoker.getCommands(null);
                 } catch (NullPointerException e) {
+                    // expected behavior for null input
                 }
             } else {
                 String[] result = MavenInvoker.getCommands(input);
                 assertThat(result).isNotNull();
-                assertThat(result).containsExactly("");
+                assertThat(result).isEmpty();
             }
         }
 
         @Test
-        @DisplayName("handles command with shell special characters")
-        void handlesSpecialShellCharacters() {
+        @DisplayName("handles command with quoted arguments (split naively)")
+        void handlesQuotedArguments() {
             String[] result = MavenInvoker.getCommands("mvn clean -Dcmd=echo hello");
             assertThat(result).containsExactly("clean", "-Dcmd=echo", "hello");
         }
