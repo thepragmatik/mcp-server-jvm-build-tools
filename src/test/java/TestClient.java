@@ -60,8 +60,7 @@ public class TestClient {
 
         String[][] toolCalls = new String[][]{
                 {"get_maven_version", ""},
-                {"execute_maven_command", "mvn clean compile test package"},
-                {"execute_maven_command", "exec:exec -Dexec.executable=/bin/pwd"}   // without explicit "mvn"
+                {"execute_maven_command", "mvn clean compile test package"}     // without explicit "mvn"
         };
 
         Arrays.stream(toolCalls).forEach(toolCall -> {

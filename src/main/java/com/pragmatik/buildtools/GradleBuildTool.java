@@ -22,9 +22,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Gradle implementation of the {@link BuildTool} SPI.
@@ -34,6 +33,10 @@ import java.util.List;
  * Commands are executed with {@code --no-daemon --console=plain} for clean,
  * machine-readable output suitable for MCP server contexts.
  * <p>
+ * <b>Security:</b> All Gradle commands are validated against an allowlist of
+ * safe tasks, a blocklist of dangerous flags, and a safe-argument pattern —
+ * mirroring the same security model as {@link MavenInvoker}.
+ * <p>
  * <b>Upgrade path:</b> When the Gradle Tooling API becomes available as a dependency,
  * switch {@link #executeCommand} to use {@code GradleConnector.newConnector()}
  * for in-process execution with richer error reporting. The CLI fallback in
@@ -41,15 +44,32 @@ import java.util.List;
  */
 public class GradleBuildTool implements BuildTool {
 
-    private static final List<String> SUPPORTED_COMMANDS = List.of(
+    private static final Set<String> ALLOWED_TASKS = Set.of(
             "clean", "build", "test", "compileJava", "compileTestJava",
             "jar", "assemble", "check", "publishToMavenLocal",
             "dependencies", "projects", "tasks"
     );
 
+    private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
+
     private static final List<String> MARKER_FILES = List.of(
             "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"
     );
+
+    // Dangerous Gradle flags that enable code execution or arbitrary file access
+    private static final Set<String> BLOCKED_GRADLE_FLAGS = Set.of(
+            "--init-script", "-I",
+            "--build-file", "-b",
+            "--project-dir", "-p",
+            "--include-build",
+            "--system-prop", "-D"
+    );
+
+    // Safe Gradle flag pattern: --flag or -X (single letters for standard options)
+    private static final Pattern SAFE_ARG_PATTERN =
+            Pattern.compile("^-{1,2}[A-Za-z0-9][A-Za-z0-9._-]*(=[A-Za-z0-9._/:@\\\\-]*)?$");
+
+    private static final int MAX_COMMAND_LENGTH = 500;
 
     private static final String EXECUTION_PROMPT = """
             You are an assistant for executing Gradle build commands. Follow these rules:
@@ -169,6 +189,10 @@ public class GradleBuildTool implements BuildTool {
      *   <li>{@code projectDir}/gradlew (Gradle wrapper)</li>
      *   <li>{@code "gradle"} on system PATH (fallback)</li>
      * </ol>
+     * <p>
+     * <b>Security:</b> Rejects bare executables (not ending in /gradle or /gradlew)
+     * to prevent arbitrary binary execution. Only accepts directory paths or
+     * well-known Gradle executable names.
      */
     static String resolveGradleExecutable(String buildToolHome, String projectDir) {
         if (buildToolHome != null && !buildToolHome.isEmpty()) {
@@ -177,7 +201,13 @@ public class GradleBuildTool implements BuildTool {
             if (Files.isExecutable(gradleBin)) return gradleBin.toString();
             Path gradlew = home.resolve("gradlew");
             if (Files.isExecutable(gradlew)) return gradlew.toString();
-            if (Files.isExecutable(home)) return home.toString();
+            // Only accept the path if it's a Gradle binary or wrapper, otherwise fall through
+            if (Files.isExecutable(home)) {
+                String name = home.getFileName().toString();
+                if (name.equals("gradle") || name.equals("gradlew")) {
+                    return home.toString();
+                }
+            }
         }
         if (projectDir != null && !projectDir.isEmpty()) {
             Path gradlew = Path.of(projectDir).resolve("gradlew");
@@ -187,12 +217,20 @@ public class GradleBuildTool implements BuildTool {
     }
 
     /**
-     * Parses a command string into Gradle task tokens.
+     * Parses a command string into validated Gradle task tokens.
      * Strips leading "gradle " or "gradlew " prefix, then splits on whitespace.
+     * <p>
+     * <b>Security:</b> Every token is validated against: (1) the ALLOWED_TASKS set,
+     * (2) the BLOCKED_GRADLE_FLAGS blocklist, and (3) the SAFE_ARG_PATTERN regex.
+     * This mirrors the same security model as {@link MavenInvoker#getCommands(String)}.
      */
     static String[] parseCommandTokens(String command) {
         if (command == null || command.trim().isEmpty()) {
             throw new IllegalArgumentException("Gradle command cannot be null or empty");
+        }
+        if (command.length() > MAX_COMMAND_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
         }
         var cmd = command.trim();
         if (cmd.startsWith("gradle ")) {
@@ -205,6 +243,43 @@ public class GradleBuildTool implements BuildTool {
         if (cmd.isEmpty()) {
             return new String[0];
         }
-        return cmd.split("\\s+");
+
+        String[] tokens = cmd.split("\\s+");
+        List<String> validated = new ArrayList<>();
+
+        for (String token : tokens) {
+            // Non-flag tokens must be in allowed list.
+            // For colon-separated Gradle project paths (e.g., ":app:build"), extract
+            // the task name (last colon-separated segment) for validation.
+            if (!token.startsWith("-")) {
+                String taskName = token.contains(":")
+                        ? token.substring(token.lastIndexOf(':') + 1)
+                        : token;
+                if (!ALLOWED_TASKS.contains(taskName)) {
+                    throw new IllegalArgumentException(
+                            "Gradle task not allowed: " + taskName +
+                                    ". Allowed: " + ALLOWED_TASKS);
+                }
+                validated.add(token);
+                continue;
+            }
+
+            // Block dangerous flags
+            for (String blocked : BLOCKED_GRADLE_FLAGS) {
+                if (token.startsWith(blocked)) {
+                    throw new IllegalArgumentException(
+                            "Blocked Gradle flag: " + token);
+                }
+            }
+
+            // Validate safe flags against pattern
+            if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
+                throw new IllegalArgumentException(
+                        "Invalid flag/argument: " + token);
+            }
+            validated.add(token);
+        }
+
+        return validated.toArray(new String[0]);
     }
 }

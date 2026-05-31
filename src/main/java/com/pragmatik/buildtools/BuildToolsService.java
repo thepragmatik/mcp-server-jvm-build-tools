@@ -20,7 +20,10 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +45,10 @@ import java.util.stream.Collectors;
  */
 @Service
 public class BuildToolsService {
+
+    private static final int MAX_COMMAND_LENGTH = 500;
+    private static final Pattern COMMAND_PATTERN =
+            Pattern.compile("^(gradle\\\\w*\\\\s+)?[a-zA-Z0-9\\\\s._=/:@\\\\-]+$");
 
     private final BuildToolProvider provider;
 
@@ -82,9 +89,36 @@ public class BuildToolsService {
             String projectDir,
             @ToolParam(required = true, description = "Build command to execute (e.g., 'clean compile' for Maven, 'build' for Gradle)")
             String command) {
-        Path projectPath = Path.of(projectDir);
-        BuildTool tool = provider.resolve(buildToolName, projectPath);
-        return tool.executeCommand(buildToolHome, projectDir, command);
+        // Validate command length and character content
+        if (command == null || command.trim().isEmpty()) {
+            throw new IllegalArgumentException("Command cannot be null or empty.");
+        }
+        if (command.length() > MAX_COMMAND_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
+        }
+        if (!COMMAND_PATTERN.matcher(command).matches()) {
+            throw new IllegalArgumentException("Command contains disallowed characters.");
+        }
+
+        // Canonicalize paths to prevent traversal attacks
+        Path validatedHome;
+        Path validatedProject;
+        try {
+            validatedHome = Path.of(buildToolHome).toRealPath();
+            validatedProject = Path.of(projectDir).toRealPath();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot resolve path: " + e.getMessage(), e);
+        }
+        if (!Files.isDirectory(validatedHome)) {
+            throw new IllegalArgumentException("Build tool home is not a valid directory: " + buildToolHome);
+        }
+        if (!Files.isDirectory(validatedProject)) {
+            throw new IllegalArgumentException("Project directory is not valid: " + projectDir);
+        }
+
+        BuildTool tool = provider.resolve(buildToolName, validatedProject);
+        return tool.executeCommand(validatedHome.toString(), validatedProject.toString(), command);
     }
 
     /**
