@@ -101,9 +101,16 @@ public class BuildToolsService {
             throw new IllegalArgumentException("Command contains disallowed characters.");
         }
 
-        // Canonicalize projectDir; buildToolHome is optional (Gradle uses wrapper/PATH)
-        String validatedHome = (buildToolHome != null && !buildToolHome.isBlank())
-                ? buildToolHome : null;
+        // Canonicalize paths; buildToolHome is optional (Gradle uses wrapper/PATH)
+        String validatedHome = null;
+        if (buildToolHome != null && !buildToolHome.isBlank()) {
+            try {
+                validatedHome = Path.of(buildToolHome).toRealPath().toString();
+            } catch (IOException e) {
+                throw new IllegalArgumentException(
+                        "Cannot resolve build tool home: " + buildToolHome, e);
+            }
+        }
         Path validatedProject;
         try {
             validatedProject = Path.of(projectDir).toRealPath();
