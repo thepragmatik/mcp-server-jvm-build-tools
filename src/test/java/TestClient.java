@@ -29,15 +29,17 @@ public class TestClient {
 
     private static final String userHome = System.getProperty("user.home");
 
-    // XXX: May need to update Maven Home path according to your system.
-    private static final String mavenHome = new File(userHome,
-            "/.sdkman/candidates/maven/current").getAbsolutePath();
+    // Maven home path: set via -Dmaven.home system property, or defaults to MAVEN_HOME env var,
+    // or falls back to SDKMAN path for backward compatibility.
+    private static final String mavenHome = System.getProperty("maven.home",
+            System.getenv().getOrDefault("MAVEN_HOME",
+                    new File(userHome, "/.sdkman/candidates/maven/current").getAbsolutePath()));
 
     private static final String currentProjectDir = new File(".").getAbsolutePath();
 
-    public static final String TARGET_MCP_SERVER__JAR = "target/mcp-server-jvm-build-tools.jar";
+    public static final String TARGET_MCP_SERVER_JAR = "target/mcp-server-jvm-build-tools.jar";
 
-    private static final File serverJarFile = new File(TARGET_MCP_SERVER__JAR);
+    private static final File serverJarFile = new File(TARGET_MCP_SERVER_JAR);
 
     private static final String serverJarPath = serverJarFile.getAbsolutePath();
 
