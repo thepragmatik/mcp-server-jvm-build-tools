@@ -83,7 +83,7 @@ public class BuildToolsService {
     public String executeBuildCommand(
             @ToolParam(required = false, description = "Name of the build tool ('maven' or 'gradle'). Omit to auto-detect from project directory.")
             String buildToolName,
-            @ToolParam(required = true, description = "Path to the build tool installation directory")
+            @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
             String buildToolHome,
             @ToolParam(required = true, description = "Path to the project directory containing build files")
             String projectDir,
@@ -101,24 +101,21 @@ public class BuildToolsService {
             throw new IllegalArgumentException("Command contains disallowed characters.");
         }
 
-        // Canonicalize paths to prevent traversal attacks
-        Path validatedHome;
+        // Canonicalize projectDir; buildToolHome is optional (Gradle uses wrapper/PATH)
+        String validatedHome = (buildToolHome != null && !buildToolHome.isBlank())
+                ? buildToolHome : null;
         Path validatedProject;
         try {
-            validatedHome = Path.of(buildToolHome).toRealPath();
             validatedProject = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot resolve path: " + e.getMessage(), e);
-        }
-        if (!Files.isDirectory(validatedHome)) {
-            throw new IllegalArgumentException("Build tool home is not a valid directory: " + buildToolHome);
         }
         if (!Files.isDirectory(validatedProject)) {
             throw new IllegalArgumentException("Project directory is not valid: " + projectDir);
         }
 
         BuildTool tool = provider.resolve(buildToolName, validatedProject);
-        return tool.executeCommand(validatedHome.toString(), validatedProject.toString(), command);
+        return tool.executeCommand(validatedHome, validatedProject.toString(), command);
     }
 
     /**
