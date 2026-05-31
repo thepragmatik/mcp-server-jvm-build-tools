@@ -58,6 +58,102 @@ List the software and tools needed before installing the project:
 
 3. You should now be ready to interact with Maven via the MCP server using the Claude desktop. Go ahead submit a task in natural language to build a project.
 
+## Docker
+
+A multi-stage Docker image is available. Build it:
+
+```bash
+docker build -t mcp-server-jvm-build-tools .
+```
+
+Run the server (stdio-based, so stdin must be connected):
+
+```bash
+docker run -i --rm \
+  -v /path/to/maven/home:/opt/maven \
+  -v /path/to/project:/workspace \
+  -e MAVEN_HOME=/opt/maven \
+  mcp-server-jvm-build-tools
+```
+
+The image bundles a minimal Maven installation at `/usr/share/java/maven-3`,
+but for production use you should volume-mount your actual Maven home and
+override `MAVEN_HOME`.
+
+### Docker with Claude Desktop
+
+If running via Claude Desktop, configure the MCP server entry to use Docker:
+
+```json
+{
+    "mcpServers": {
+        "maven-tools": {
+            "command": "docker",
+            "args": [
+                "run", "-i", "--rm",
+                "-v", "/path/to/maven:/opt/maven",
+                "-e", "MAVEN_HOME=/opt/maven",
+                "mcp-server-jvm-build-tools"
+            ]
+        }
+    }
+}
+```
+
+## Release Process
+
+### Versioning
+
+This project uses semantic versioning (`MAJOR.MINOR.PATCH`).
+The version is defined in `pom.xml`:
+
+```xml
+<version>0.0.3-SNAPSHOT</version>
+```
+
+### Cutting a Release
+
+1. **Ensure all tests pass on main:**
+
+   ```bash
+   mvn verify
+   ```
+
+2. **Prepare and perform the release** (uses `maven-release-plugin`):
+
+   ```bash
+   mvn release:prepare release:perform
+   ```
+
+   This will:
+   - Remove `-SNAPSHOT` from the version
+   - Create a git tag (`vX.Y.Z`)
+   - Bump the version to the next snapshot
+   - Push changes and tags to GitHub
+
+3. **The tag push triggers the release workflow** (`.github/workflows/maven-publish.yml`),
+   which runs tests, packages the JAR, and creates a GitHub Release.
+
+### Manual Release
+
+If you prefer to release manually:
+
+```bash
+# 1. Update version in pom.xml (remove -SNAPSHOT)
+# 2. Commit and tag
+git tag -a v0.0.3 -m "Release v0.0.3"
+git push origin v0.0.3
+# 3. GitHub Actions picks up the tag and creates the release
+```
+
+After the release, bump the version back to a snapshot:
+
+```bash
+# Update pom.xml version to next development iteration, e.g. 0.0.4-SNAPSHOT
+git commit -am "[release] Bump to next snapshot"
+git push
+```
+
 
 ## Contributing
 1. Use Github Issues to open issues or feature requests.

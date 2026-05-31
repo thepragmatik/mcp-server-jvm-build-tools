@@ -20,7 +20,8 @@ import org.apache.maven.cli.MavenCli;
 import org.apache.maven.shared.invoker.*;
 
 import java.io.*;
-import java.util.Arrays;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class MavenInvoker {
 
@@ -89,19 +90,80 @@ public class MavenInvoker {
 
         if (exitCode != 0) {
             finalResult = errors.toString();
+            throw new RuntimeException("Maven embedder exited with code " + exitCode + ": " + finalResult);
         } else {
             finalResult = output.toString();
         }
         return finalResult;
     }
 
-    static String[] getCommands(String command) {
-        var cmd = command;
+    // Allowed Maven lifecycle phases and version flags
+    private static final Set<String> ALLOWED_COMMANDS = Set.of(
+            "clean", "compile", "test", "package", "install", "deploy", "validate",
+            "--version", "-v", "-version"
+    );
 
-        if (command.startsWith("mvn ")) {
+    // Dangerous plugin goals that can execute arbitrary code
+    private static final Set<String> BLOCKED_PLUGIN_PREFIXES = Set.of(
+            "exec:", "ant:", "antrun:", "sql:", "groovy:", "shell:", "help:",
+            "dependency:", "resources:", "plugin:", "archetype:", "release:"
+    );
+
+    // Safe Maven flag pattern: -Dkey=value, -f file, -P profile, -q, -X, -T4, -B, -U, etc.
+    // Also accepts --long-flags like --batch-mode, --non-recursive
+    private static final Pattern SAFE_ARG_PATTERN =
+            Pattern.compile("^-{1,2}[A-Za-z0-9][A-Za-z0-9._-]*(=[A-Za-z0-9._/:@\\-]*)?$");
+
+    static String[] getCommands(String command) {
+        Objects.requireNonNull(command, "command must not be null");
+
+        var cmd = command.trim();
+        if (cmd.startsWith("mvn ")) {
             cmd = cmd.substring("mvn ".length()).trim();
+        } else if (cmd.equals("mvn")) {
+            cmd = "";
         }
-        return cmd.split("\\s");
+        if (cmd.isEmpty()) {
+            return new String[0];
+        }
+
+        String[] tokens = cmd.split("\\s+");
+        List<String> validated = new ArrayList<>();
+
+        for (String token : tokens) {
+            // Check allowed commands first (includes --version, -v, -version)
+            if (ALLOWED_COMMANDS.contains(token)) {
+                validated.add(token);
+                continue;
+            }
+
+            // Block dangerous plugin goals (contains ':' and is not a flag)
+            if (token.contains(":")) {
+                for (String prefix : BLOCKED_PLUGIN_PREFIXES) {
+                    if (token.toLowerCase().startsWith(prefix)) {
+                        throw new IllegalArgumentException(
+                                "Blocked plugin goal: " + token +
+                                        ". Allowed commands: " + ALLOWED_COMMANDS);
+                    }
+                }
+            }
+
+            // Non-flag tokens must be in the allowed list
+            if (!token.startsWith("-")) {
+                throw new IllegalArgumentException(
+                        "Command not allowed: " + token +
+                                ". Allowed: " + ALLOWED_COMMANDS);
+            }
+
+            // Validate flags against safe pattern
+            if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
+                throw new IllegalArgumentException(
+                        "Invalid flag/argument: " + token);
+            }
+            validated.add(token);
+        }
+
+        return validated.toArray(new String[0]);
     }
 
     static boolean invocationResultedInError(InvocationResult result) {
