@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 @DisplayName("Maven application integration tests")
 class MavenIntegrationTest {
 
-    private static final String MAVEN_HOME = "/opt/maven";
+    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
 
     @Autowired
     private ToolCallbackProvider toolCallbackProvider;
