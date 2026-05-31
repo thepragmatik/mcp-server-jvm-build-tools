@@ -99,7 +99,7 @@ class MavenIntegrationTest {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> mavenService.executeCommand(
                             MAVEN_HOME, nonexistent.toString(), "clean"))
-                    .withMessageContaining("does not exist");
+                    .withMessageContaining("Cannot resolve project directory");
         }
 
         @Test

@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -112,10 +113,12 @@ class MavenInvokerTest {
         }
 
         @Test
-        @DisplayName("handles command with quoted arguments (split naively)")
-        void handlesQuotedArguments() {
-            String[] result = MavenInvoker.getCommands("mvn clean -Dcmd=echo hello");
-            assertThat(result).containsExactly("clean", "-Dcmd=echo", "hello");
+        @DisplayName("rejects unallowlisted bare tokens after flag arguments")
+        void rejectsUnallowlistedTokensAfterFlags() {
+            // "hello" is not in ALLOWED_COMMANDS — security hardening rejects it
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean -Dcmd=echo hello"))
+                    .withMessageContaining("Command not allowed");
         }
     }
 

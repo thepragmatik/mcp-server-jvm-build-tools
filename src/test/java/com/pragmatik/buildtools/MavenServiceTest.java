@@ -29,6 +29,12 @@ class MavenServiceTest {
     @DisplayName("executeCommand() validation")
     class ExecuteCommandValidation {
 
+        @org.junit.jupiter.api.BeforeEach
+        void setUp() throws IOException {
+            // Security hardening: executeCommand now requires pom.xml in projectDir
+            Files.createFile(tempDir.resolve("pom.xml"));
+        }
+
         @Test
         @DisplayName("throws when mavenHome is null")
         void throwsWhenMavenHomeIsNull() {
@@ -43,7 +49,7 @@ class MavenServiceTest {
             Path nonexistent = tempDir.resolve("nonexistent-maven");
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> service.executeCommand(nonexistent.toString(), tempDir.toString(), "clean"))
-                    .withMessageContaining("Invalid maven home directory");
+                    .withMessageContaining("Cannot resolve maven home path");
         }
 
         @Test
@@ -70,7 +76,7 @@ class MavenServiceTest {
             Path nonexistent = tempDir.resolve("nonexistent-project");
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> service.executeCommand(tempDir.toString(), nonexistent.toString(), "clean"))
-                    .withMessageContaining("does not exist");
+                    .withMessageContaining("Cannot resolve project directory");
         }
 
         @Test
@@ -134,6 +140,12 @@ class MavenServiceTest {
     @Nested
     @DisplayName("executeCommand() delegation")
     class ExecuteCommandDelegation {
+
+        @org.junit.jupiter.api.BeforeEach
+        void setUp() throws IOException {
+            // Security hardening: executeCommand now requires pom.xml in projectDir
+            Files.createFile(tempDir.resolve("pom.xml"));
+        }
 
         @Test
         @DisplayName("passes parsed commands to MavenInvoker")
