@@ -25,6 +25,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
+/**
+ * Legacy Maven-only service. Replaced by {@link BuildToolsService} which provides
+ * equivalent functionality via {@code get_build_tool_version("maven")} and
+ * {@code execute_build_command("maven", ...)} along with multi-build-tool support.
+ *
+ * @deprecated Use {@link BuildToolsService} instead. This class is retained for
+ *             reference and will be removed in a future release.
+ */
+@Deprecated
 @Service
 public class MavenService {
 

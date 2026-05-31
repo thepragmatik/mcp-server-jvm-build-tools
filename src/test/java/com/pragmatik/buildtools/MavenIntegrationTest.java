@@ -51,24 +51,33 @@ class MavenIntegrationTest {
     }
 
     @Test
-    @DisplayName("ToolCallbackProvider resolves get_maven_version tool")
-    void resolvesGetMavenVersionTool() {
+    @DisplayName("ToolCallbackProvider resolves get_build_tool_version tool")
+    void resolvesGetBuildToolVersionTool() {
         FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
         assertThat(toolCallbacks).isNotNull();
         assertThat(toolCallbacks).isNotEmpty();
 
         boolean hasVersionTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "get_maven_version".equals(tc.getName()));
+                .anyMatch(tc -> "get_build_tool_version".equals(tc.getName()));
         assertThat(hasVersionTool).isTrue();
     }
 
     @Test
-    @DisplayName("ToolCallbackProvider resolves execute_maven_command tool")
-    void resolvesExecuteMavenCommandTool() {
+    @DisplayName("ToolCallbackProvider resolves execute_build_command tool")
+    void resolvesExecuteBuildCommandTool() {
         FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
         boolean hasExecTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "execute_maven_command".equals(tc.getName()));
+                .anyMatch(tc -> "execute_build_command".equals(tc.getName()));
         assertThat(hasExecTool).isTrue();
+    }
+
+    @Test
+    @DisplayName("ToolCallbackProvider resolves list_build_tools tool")
+    void resolvesListBuildToolsTool() {
+        FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+        boolean hasListTool = Arrays.stream(toolCallbacks)
+                .anyMatch(tc -> "list_build_tools".equals(tc.getName()));
+        assertThat(hasListTool).isTrue();
     }
 
     @Test

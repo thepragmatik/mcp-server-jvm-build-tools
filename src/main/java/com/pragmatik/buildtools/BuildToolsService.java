@@ -28,8 +28,17 @@ import java.util.stream.Collectors;
  * <p>
  * Delegates to {@link BuildToolProvider} for tool resolution, supporting
  * both explicit tool selection (by name) and auto-detection from project
- * directories. Maintains backward compatibility with existing MCP clients
- * via the {@code get_maven_version} and {@code execute_maven_command} tools.
+ * directories.
+ * <p>
+ * Registered MCP tools:
+ * <ul>
+ *   <li>{@code get_build_tool_version} — version of any registered build tool</li>
+ *   <li>{@code execute_build_command} — execute a build command with auto-detection</li>
+ *   <li>{@code list_build_tools} — list all registered tools and their commands</li>
+ * </ul>
+ * The legacy {@code get_maven_version} and {@code execute_maven_command} tools
+ * have been consolidated into the generic equivalents (specify {@code "maven"}
+ * as the build tool name).
  */
 @Service
 public class BuildToolsService {
@@ -38,36 +47,6 @@ public class BuildToolsService {
 
     public BuildToolsService(BuildToolProvider provider) {
         this.provider = provider;
-    }
-
-    /**
-     * Get the installed Maven version.
-     * Maintains backward compatibility with existing MCP clients.
-     */
-    @Tool(name = "get_maven_version", description = "Gets the version for Apache Maven")
-    public String getMavenVersion() {
-        return provider.getTool("maven")
-                .orElseThrow(() -> new IllegalStateException("Maven build tool not registered"))
-                .version();
-    }
-
-    /**
-     * Execute a Maven build command.
-     * Maintains backward compatibility with existing MCP clients.
-     */
-    @Tool(name = "execute_maven_command",
-          description = "Execute a Maven build command in a specified project directory. " +
-                        "Supports: clean, compile, test, package, install, deploy, validate.")
-    public String executeMavenCommand(
-            @ToolParam(required = true, description = "Path to the Maven installation directory (e.g., /usr/share/maven)")
-            String mavenHome,
-            @ToolParam(required = true, description = "Path to the Maven project directory containing pom.xml")
-            String projectDir,
-            @ToolParam(required = true, description = "Maven command to execute (e.g., 'clean compile', 'test', 'package'). Can optionally include 'mvn' prefix.")
-            String command) {
-        BuildTool maven = provider.getTool("maven")
-                .orElseThrow(() -> new IllegalStateException("Maven build tool not registered"));
-        return maven.executeCommand(mavenHome, projectDir, command);
     }
 
     /**
@@ -109,7 +88,7 @@ public class BuildToolsService {
     }
 
     /**
-     * List all registered build tools.
+     * List all registered build tools with their supported commands.
      */
     @Tool(name = "list_build_tools",
           description = "List all registered build tools with their supported commands.")
