@@ -69,3 +69,4 @@ jobs:
 
       - name: Compile with warnings
         run: mvn -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
+
