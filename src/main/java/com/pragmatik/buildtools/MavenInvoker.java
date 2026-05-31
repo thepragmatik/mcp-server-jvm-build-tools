@@ -96,10 +96,15 @@ public class MavenInvoker {
     }
 
     static String[] getCommands(String command) {
-        var cmd = command;
+        var cmd = command.trim();
 
-        if (command.startsWith("mvn ")) {
+        if (cmd.startsWith("mvn ")) {
             cmd = cmd.substring("mvn ".length()).trim();
+        } else if (cmd.equals("mvn")) {
+            cmd = "";
+        }
+        if (cmd.isEmpty()) {
+            return new String[0];
         }
         return cmd.split("\\s");
     }
