@@ -86,7 +86,7 @@ public class BuildToolsService {
     public String executeBuildCommand(
             @ToolParam(required = false, description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
             String buildToolName,
-            @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle and SBT (uses wrapper or PATH fallback).")
+            @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
             String buildToolHome,
             @ToolParam(required = true, description = "Path to the project directory containing build files")
             String projectDir,
@@ -104,7 +104,7 @@ public class BuildToolsService {
             throw new IllegalArgumentException("Command contains disallowed characters.");
         }
 
-        // Canonicalize paths; buildToolHome is optional (Gradle/SBT uses wrapper/PATH)
+        // Canonicalize paths; buildToolHome is optional (Gradle uses wrapper/PATH)
         String validatedHome = null;
         if (buildToolHome != null && !buildToolHome.isBlank()) {
             try {
