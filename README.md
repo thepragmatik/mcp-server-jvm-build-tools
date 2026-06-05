@@ -44,17 +44,19 @@ An agent equipped with build tools can:
 - **Inspect dependency versions** to suggest upgrades or resolve conflicts
 - **Package artifacts** for deployment, all from within the agent conversation
 
-### Supported AI Clients
+### MCP Client Compatibility
 
-| Client | MCP Support | Notes |
-|---|---|---|
-| **Claude Desktop** | Native | Full MCP support via `claude_desktop_config.json` |
-| **Cursor** | Native | MCP via `.cursor/mcp.json` in project root |
-| **Cline / Roo Code** | Native | VS Code extensions with `cline_mcp_settings.json` |
-| **Windsurf** | Native | MCP support in Cascade settings |
-| **Goose** | Native | Full MCP stdio transport support |
-| **Continue** | Native | MCP config in `~/.continue/config.json` |
-| **GitHub Copilot** | Agent mode | MCP support in VS Code Insiders / agent mode |
+This server uses standard MCP stdio transport and has been verified via automated protocol compliance testing:
+
+| Test | Result |
+|---|---|
+| `initialize` handshake | ✅ PASS |
+| `tools/list` discovery (7 tools) | ✅ PASS |
+| `tools/call` get_build_tool_version | ✅ PASS |
+| `tools/call` list_build_tools | ✅ PASS |
+| `tools/call` detect_build_tool | ✅ PASS |
+
+**Status: MCP stdio compliant.** Compatible with any MCP client supporting stdio transport (Claude Desktop, Cursor, Cline, Windsurf, Goose, Continue, GitHub Copilot agent mode, and others).
 
 ### MCP Client Configuration
 
@@ -228,7 +230,7 @@ The agent detected the project type, ran the build, parsed the error, checked th
 | **Gradle wrapper support** | ✓ Auto-detects and uses gradlew | ✗ (Maven only) | ✓ |
 | **SBT support** | ✓ SBT support | ✗ | ✗ |
 | **Project scaffolding** | Coming soon | ✗ | ✗ |
-| **Structured output** | Coming soon | ✗ | ✗ |
+| **Structured output** | ✓ analyze_build_output | ✗ | ✗ |
 
 > **💡 Honest Take**
 >
@@ -293,23 +295,25 @@ Auto-detect which build tool a project uses by scanning for build files in the p
 |---|---|---|---|
 | `projectDir` | string | Yes | Path to the project directory to scan for build files. |
 
-**Returns:** The detected build tool name (`"maven"`, `"gradle"`, or `"sbt"`) and the file that triggered detection (e.g., `"maven (pom.xml found)"`). If no recognized build file is found, returns `"unknown"`.
+**Returns:** JSON object with detected tools, matched marker files, wrapper availability, and project structure hints. Example: `{"status":"success","projectDir":"/path/to/project","detections":[{"tool":"maven","matchedFiles":["pom.xml"],"wrapperFiles":[],"hints":["POM-based project"]}]}`
 
 **Detection order:** Checks for `pom.xml` first (Maven), then `build.gradle`/`build.gradle.kts` (Gradle), then `build.sbt` (SBT).
 
 ### `check_dependency_version`
-Look up the version of a specific dependency used in your project.
+Look up the latest version of a Maven Central dependency.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `projectDir` | string | Yes | Path to the project directory. |
-| `dependency` | string | Yes | Dependency coordinates. Maven: `groupId:artifactId` (e.g., `com.google.guava:guava`). Gradle: group:name notation. |
-| `buildToolName` | string | No | `"maven"`, `"gradle"`, or `"sbt"`. Omit to auto-detect from project files. |
+| `groupId` | string | Yes | Maven group ID (e.g., `com.google.guava`) |
+| `artifactId` | string | Yes | Maven artifact ID (e.g., `guava`) |
+| `currentVersion` | string | No | Current version to compare against |
+| `stabilityFilter` | string | No | `ALL`, `STABLE_ONLY` (default), or `PREFER_STABLE` |
+| `projectDir` | string | No | Project directory for build-tool context |
 
 **Example:**
 ```
-check_dependency_version(projectDir="/home/dev/my-app", dependency="com.google.guava:guava")
-→ com.google.guava:guava:33.3.1-jre (compile scope)
+check_dependency_version(groupId="com.google.guava", artifactId="guava")
+→ {"groupId":"com.google.guava","artifactId":"guava","latestVersion":"33.4.0","stability":"STABLE"}
 ```
 User:   "Build all my projects"
 LLM:    list_build_tools()
@@ -368,8 +372,6 @@ docker run -i --rm \
 ```
 
 The image includes Maven out of the box. Mount your project directories and Maven installation as volumes.
-
-Docker Hub: `thepragmatik/mcp-server-jvm-build-tools` (see [Docker Hub](https://hub.docker.com/r/thepragmatik/mcp-server-jvm-build-tools))
 
 ### Option 3: Other MCP Clients (Goose, Continue, Cursor, Cline, Windsurf)
 
@@ -464,7 +466,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-202 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, and `SbtBuildToolTest.java` for the full adversarial test suite.
+239 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `BuildOutputParserTest.java`, and `BuildConfigurationValidationTest.java`.
 
 ## Comparison: Honest Take on Competitors
 
