@@ -23,10 +23,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
-public class MavenApplication {
+public class BuildToolsApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(MavenApplication.class, args);
+        SpringApplication.run(BuildToolsApplication.class, args);
+        // Block main thread to keep JVM alive for stdio MCP transport
+        try { Thread.currentThread().join(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
     @Bean
