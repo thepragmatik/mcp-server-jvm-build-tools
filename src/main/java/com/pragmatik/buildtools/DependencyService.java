@@ -52,7 +52,10 @@ public class DependencyService {
     private final BuildToolProvider buildToolProvider;
 
     public DependencyService(BuildToolProvider buildToolProvider) {
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(5))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
         this.buildToolProvider = buildToolProvider;
     }
 
