@@ -107,10 +107,13 @@ public class SbtBuildTool implements BuildTool {
                         "sbt --version failed with exit code " + exitCode + ": " + errors);
             }
             return output.toString().trim();
-        } catch (IOException | InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (IOException e) {
             throw new RuntimeException(
                     "Unable to determine SBT version: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(
+                    "SBT version check interrupted", e);
         }
     }
 
