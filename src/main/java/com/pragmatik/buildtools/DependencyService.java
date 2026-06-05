@@ -88,7 +88,7 @@ public class DependencyService {
                        description = "Current version to compare against. Omit to just get the latest version.")
             String currentVersion,
             @ToolParam(required = false,
-                       description = "Version preference: ALL, RELEASES_ONLY (default), or INCLUDE_PRERELEASES")
+                       description = "Version preference: ALL, RELEASE (default), or LATEST")
             String versionPreference,
             @ToolParam(required = false,
                        description = "Project directory path. When provided, auto-detects build tool and includes project context.")
@@ -198,7 +198,7 @@ public class DependencyService {
         int totalVersions = allVersions.size();
 
         switch (filter) {
-            case RELEASES_ONLY:
+            case RELEASE:
                 result.put("versionCount", stableVersions.size());
                 result.put("totalVersions", totalVersions);
                 result.put("filteredVersions", stableVersions);
@@ -206,7 +206,7 @@ public class DependencyService {
                     result.put("latestStable", stableVersions.get(stableVersions.size() - 1));
                 }
                 break;
-            case INCLUDE_PRERELEASES:
+            case LATEST:
                 result.put("versionCount", allVersions.size());
                 result.put("totalVersions", totalVersions);
                 result.put("stableVersions", stableVersions);
@@ -240,7 +240,7 @@ public class DependencyService {
         Object stableObj = result.get("latestStable");
 
         String compareTarget = null;
-        if (filter == VersionPreference.RELEASES_ONLY || filter == VersionPreference.INCLUDE_PRERELEASES) {
+        if (filter == VersionPreference.RELEASE || filter == VersionPreference.LATEST) {
             compareTarget = stableObj != null ? stableObj.toString() : null;
         }
         if (compareTarget == null) {
@@ -340,11 +340,11 @@ public class DependencyService {
     }
 
     static VersionPreference parseVersionPreference(String filter) {
-        if (filter == null || filter.isBlank()) return VersionPreference.RELEASES_ONLY;
+        if (filter == null || filter.isBlank()) return VersionPreference.RELEASE;
         try {
             return VersionPreference.valueOf(filter.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
-            return VersionPreference.RELEASES_ONLY;
+            return VersionPreference.RELEASE;
         }
     }
 
@@ -479,7 +479,12 @@ public class DependencyService {
     // ─── Supporting enums ───────────────────────────────────────────────
 
     public enum VersionPreference {
-        RELEASES_ONLY, INCLUDE_PRERELEASES, ALL
+        /** Stable releases only — matches Maven\'s &lt;release&gt; tag */
+        RELEASE,
+        /** Latest version including pre-releases — matches Maven\'s &lt;latest&gt; tag */
+        LATEST,
+        /** Every published version */
+        ALL
     }
 
     public enum Stability {

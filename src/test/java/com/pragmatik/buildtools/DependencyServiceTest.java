@@ -75,7 +75,7 @@ class DependencyServiceTest {
 
             Map<String, Object> result = service.parseMetadata(
                     "com.example", "test-lib", xml,
-                    DependencyService.VersionPreference.RELEASES_ONLY);
+                    DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("groupId")).isEqualTo("com.example");
             assertThat(result.get("artifactId")).isEqualTo("test-lib");
@@ -106,7 +106,7 @@ class DependencyServiceTest {
 
             Map<String, Object> result = service.parseMetadata(
                     "com.example", "no-release", xml,
-                    DependencyService.VersionPreference.RELEASES_ONLY);
+                    DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("latestVersion")).isEqualTo("1.0.0");
             assertThat(result.get("releaseVersion")).isNull();
@@ -317,24 +317,24 @@ class DependencyServiceTest {
     class VersionPreferenceParsing {
 
         @Test
-        @DisplayName("null filter defaults to RELEASES_ONLY")
+        @DisplayName("null filter defaults to RELEASE (Maven's stable release)")
         void nullFilterDefaultsToStableOnly() {
             assertThat(DependencyService.parseVersionPreference(null))
-                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
+                    .isEqualTo(DependencyService.VersionPreference.RELEASE);
         }
 
         @Test
-        @DisplayName("empty filter defaults to RELEASES_ONLY")
+        @DisplayName("empty filter defaults to RELEASE (Maven's stable release)")
         void emptyFilterDefaultsToStableOnly() {
             assertThat(DependencyService.parseVersionPreference(""))
-                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
+                    .isEqualTo(DependencyService.VersionPreference.RELEASE);
         }
 
         @Test
-        @DisplayName("blank filter defaults to RELEASES_ONLY")
+        @DisplayName("blank filter defaults to RELEASE (Maven's stable release)")
         void blankFilterDefaultsToStableOnly() {
             assertThat(DependencyService.parseVersionPreference("   "))
-                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
+                    .isEqualTo(DependencyService.VersionPreference.RELEASE);
         }
 
         @Test
@@ -345,24 +345,24 @@ class DependencyServiceTest {
         }
 
         @Test
-        @DisplayName("parses 'RELEASES_ONLY' filter")
+        @DisplayName("parses 'RELEASE' preference")
         void parsesStableOnlyFilter() {
-            assertThat(DependencyService.parseVersionPreference("RELEASES_ONLY"))
-                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
+            assertThat(DependencyService.parseVersionPreference("RELEASE"))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASE);
         }
 
         @Test
-        @DisplayName("parses 'INCLUDE_PRERELEASES' filter")
+        @DisplayName("parses 'LATEST' filter")
         void parsesPreferStableFilter() {
-            assertThat(DependencyService.parseVersionPreference("INCLUDE_PRERELEASES"))
-                    .isEqualTo(DependencyService.VersionPreference.INCLUDE_PRERELEASES);
+            assertThat(DependencyService.parseVersionPreference("LATEST"))
+                    .isEqualTo(DependencyService.VersionPreference.LATEST);
         }
 
         @Test
-        @DisplayName("unknown filter defaults to RELEASES_ONLY")
+        @DisplayName("unknown filter defaults to RELEASE (Maven's stable release)")
         void unknownFilterDefaultsToStableOnly() {
             assertThat(DependencyService.parseVersionPreference("BANANA"))
-                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
+                    .isEqualTo(DependencyService.VersionPreference.RELEASE);
         }
     }
 
@@ -384,7 +384,7 @@ class DependencyServiceTest {
             result.put("latestStable", "2.5.0");
 
             service.enrichWithVersionComparison(result, "2.0.0",
-                    DependencyService.VersionPreference.RELEASES_ONLY);
+                    DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("currentVersion")).isEqualTo("2.0.0");
             assertThat(result.get("upgradeAvailable")).isEqualTo(true);
@@ -402,7 +402,7 @@ class DependencyServiceTest {
             result.put("latestStable", "2.5.0");
 
             service.enrichWithVersionComparison(result, "2.5.0",
-                    DependencyService.VersionPreference.RELEASES_ONLY);
+                    DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }
@@ -415,7 +415,7 @@ class DependencyServiceTest {
             result.put("artifactId", "test-lib");
 
             service.enrichWithVersionComparison(result, "1.0.0",
-                    DependencyService.VersionPreference.RELEASES_ONLY);
+                    DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }
