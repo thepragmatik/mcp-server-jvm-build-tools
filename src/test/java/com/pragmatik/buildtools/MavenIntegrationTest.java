@@ -40,8 +40,7 @@ class MavenIntegrationTest {
     @Autowired
     private ToolCallbackProvider toolCallbackProvider;
 
-    @Autowired
-    private MavenService mavenService;
+    private final MavenService mavenService = new MavenService();
 
     @Test
     @DisplayName("Spring context loads successfully")

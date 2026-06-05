@@ -178,7 +178,7 @@ class MavenServiceTest {
                 mocked.when(() -> MavenInvoker.getCommands("mvn clean install"))
                         .thenReturn(new String[]{"clean", "install"});
                 mocked.when(() -> MavenInvoker.executeCommandUsingMavenInvoker(
-                        eq(tempDir.toString()),
+                        eq(realPath),
                         eq(new String[]{"clean", "install"}),
                         eq(realPath)))
                         .thenReturn("BUILD SUCCESS");
@@ -189,7 +189,7 @@ class MavenServiceTest {
                 assertThat(result).isEqualTo("BUILD SUCCESS");
                 mocked.verify(() -> MavenInvoker.getCommands("mvn clean install"));
                 mocked.verify(() -> MavenInvoker.executeCommandUsingMavenInvoker(
-                        eq(tempDir.toString()),
+                        eq(realPath),
                         eq(new String[]{"clean", "install"}),
                         eq(realPath)));
             }

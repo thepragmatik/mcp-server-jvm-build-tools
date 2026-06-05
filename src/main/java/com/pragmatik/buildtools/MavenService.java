@@ -16,8 +16,6 @@
  */
 package com.pragmatik.buildtools;
 
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -29,6 +27,10 @@ import java.util.regex.Pattern;
  * Legacy Maven-only service. Replaced by {@link BuildToolsService} which provides
  * equivalent functionality via {@code get_build_tool_version("maven")} and
  * {@code execute_build_command("maven", ...)} along with multi-build-tool support.
+ * <p>
+ * This class retains {@code @Service} for test compatibility but
+ * {@code @Tool} annotations have been removed — tools are no longer exposed
+ * to MCP clients. Use {@link BuildToolsService} instead.
  *
  * @deprecated Use {@link BuildToolsService} instead. This class is retained for
  *             reference and will be removed in a future release.
@@ -41,21 +43,14 @@ public class MavenService {
     private static final Pattern COMMAND_PATTERN =
             Pattern.compile("^(mvn\\s+)?[a-zA-Z0-9\\s._=/:@\\-]+$");
 
-    @Tool(name = "get_maven_version", description = "Gets the version for Apache Maven")
     public String version() {
         System.setProperty("maven.multiModuleProjectDirectory", new java.io.File(".").getAbsolutePath());
         return MavenInvoker.executeUsingMavenEmbedder(new String[]{"--version"}, ".");
     }
 
-    @Tool(name = "execute_maven_command",
-          description = "Execute a Maven build command in a specified project directory. " +
-                        "Supports: clean, compile, test, package, install, deploy, validate.")
     public String executeCommand(
-            @ToolParam(required = true, description = "Path to the Maven installation directory (e.g., /usr/share/maven)")
             String mavenHome,
-            @ToolParam(required = true, description = "Path to the Maven project directory containing pom.xml")
             String projectDir,
-            @ToolParam(required = true, description = "Maven command to execute (e.g., 'clean compile', 'test', 'package'). Can optionally include 'mvn' prefix.")
             String command) {
         String finalResult;
 
@@ -73,18 +68,19 @@ public class MavenService {
         }
 
         // Validate and canonicalize mavenHome
+        Path mavenHomePath;
         if (mavenHome != null) {
             Path path = Path.of(mavenHome);
             try {
-                path = path.toRealPath();
+                mavenHomePath = path.toRealPath();
             } catch (IOException e) {
                 throw new IllegalArgumentException(
                         "Cannot resolve maven home path: " + mavenHome, e);
             }
-            if (!Files.isDirectory(path)) {
+            if (!Files.isDirectory(mavenHomePath)) {
                 throw new IllegalArgumentException("Invalid maven home directory: " + mavenHome);
             }
-            System.setProperty("maven.home", path.toString());
+            System.setProperty("maven.home", mavenHomePath.toString());
         } else {
             throw new IllegalArgumentException("Maven home cannot be null.");
         }
@@ -114,8 +110,9 @@ public class MavenService {
             throw new IllegalArgumentException("Maven project directory cannot be null.");
         }
 
+        // FIX: pass canonicalized mavenHomePath.toString() instead of raw mavenHome
         finalResult = MavenInvoker.executeCommandUsingMavenInvoker(
-                mavenHome, MavenInvoker.getCommands(command), currentProjectDirectory);
+                mavenHomePath.toString(), MavenInvoker.getCommands(command), currentProjectDirectory);
         return finalResult;
     }
 
