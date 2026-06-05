@@ -291,8 +291,9 @@ public class DependencyService {
             if (!syntax.isEmpty()) {
                 result.put("dependencySyntax", syntax);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // If project context can't be determined, just omit it
+            System.err.println("[DependencyService] Could not enrich project context: " + e.getMessage());
         }
     }
 

@@ -50,7 +50,7 @@ public class BuildToolsService {
 
     private static final int MAX_COMMAND_LENGTH = 500;
     private static final Pattern COMMAND_PATTERN =
-            Pattern.compile("^(gradle\\\\w*\\\\s+)?[a-zA-Z0-9\\\\s._=/:@\\\\-]+$");
+            Pattern.compile("^(gradle\\\\w*\\\\s+)?[a-zA-Z0-9\\\\s._=/:@;\\\\-]+$");
 
     private final BuildToolProvider provider;
 
@@ -193,9 +193,6 @@ public class BuildToolsService {
             switch (tool.getName()) {
                 case "maven":
                     checkFile(dir, "pom.xml", matchedFiles);
-                    if (matchedFiles.isEmpty()) {
-                        checkFile(dir, "pom.xml", matchedFiles); // just once
-                    }
                     checkWrapper(dir, "mvnw", wrapperFiles);
                     if (Files.exists(dir.resolve("pom.xml"))) {
                         hints.add("POM-based project");
