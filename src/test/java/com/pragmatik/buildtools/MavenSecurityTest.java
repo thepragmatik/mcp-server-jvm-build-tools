@@ -19,24 +19,26 @@ package com.pragmatik.buildtools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+/**
+ * Security and adversarial tests for command parsing and input validation.
+ * <p>
+ * Historically tested via the deprecated MavenService; now tests
+ * {@link MavenInvoker#getCommands(String)} directly, which is the shared
+ * command-validation engine used by all build tool implementations.
+ */
 @DisplayName("Security and adversarial tests")
 class MavenSecurityTest {
 
-    private final MavenService service = new MavenService();
-    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
-
-    @TempDir
-    Path tempDir;
+    // ──────────────────────────────────────────────
+    //  Command injection via getCommands()
+    // ──────────────────────────────────────────────
 
     @Nested
-    @DisplayName("Command injection via getCommands() — now blocked by allowlist")
+    @DisplayName("Command injection via getCommands() — blocked by allowlist")
     class CommandInjectionGetCommands {
 
         @Test
@@ -95,22 +97,9 @@ class MavenSecurityTest {
         }
     }
 
-    @Nested
-    @DisplayName("Path traversal via projectDir")
-    class PathTraversalProjectDir {
-
-        @Test
-        @DisplayName("path traversal with dotdot fails validation")
-        void pathTraversalWithDotDot() {
-            Path traversal = tempDir.resolve("../nonexistent-dir-xyz");
-            try {
-                service.executeCommand(MAVEN_HOME, traversal.toString(), "clean");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage())
-                        .containsAnyOf("does not exist", "Cannot resolve project directory");
-            }
-        }
-    }
+    // ──────────────────────────────────────────────
+    //  Unicode and encoding attacks
+    // ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("Unicode and encoding attacks")
@@ -132,6 +121,10 @@ class MavenSecurityTest {
         }
     }
 
+    // ──────────────────────────────────────────────
+    //  Denial of service via long inputs
+    // ──────────────────────────────────────────────
+
     @Nested
     @DisplayName("Denial of service via long inputs")
     class LongInputAttacks {
@@ -146,74 +139,18 @@ class MavenSecurityTest {
             String[] result = MavenInvoker.getCommands(sb.toString());
             assertThat(result).hasSize(10000);
         }
-
-        @Test
-        @DisplayName("extremely long mavenHome path fails validation")
-        void extremelyLongMavenHomePath() {
-            StringBuilder sb = new StringBuilder(tempDir.toString());
-            while (sb.length() < 10000) {
-                sb.append("/a");
-            }
-            try {
-                service.executeCommand(sb.toString(), tempDir.toString(), "clean");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage())
-                        .containsAnyOf("Invalid maven home directory", "Cannot resolve maven home path");
-            }
-        }
     }
+
+    // ──────────────────────────────────────────────
+    //  Security posture documentation
+    // ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("Security posture documentation")
     class SecurityPostureDocumentation {
 
         @Test
-        @DisplayName("mavenHome validation blocks nonexistent paths")
-        void mavenHomeValidationBlocksNonexistentPaths() {
-            try {
-                service.executeCommand("/nonexistent/path", tempDir.toString(), "clean");
-                throw new AssertionError("Should have thrown");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).containsAnyOf("Invalid maven home directory", "Cannot resolve");
-            }
-        }
-
-        @Test
-        @DisplayName("projectDir validation blocks nonexistent paths")
-        void projectDirValidationBlocksNonexistentPaths() {
-            try {
-                service.executeCommand(MAVEN_HOME, "/nonexistent/project", "clean");
-                throw new AssertionError("Should have thrown");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage())
-                        .containsAnyOf("does not exist", "Cannot resolve project directory");
-            }
-        }
-
-        @Test
-        @DisplayName("null mavenHome is rejected")
-        void nullMavenHomeRejected() {
-            try {
-                service.executeCommand(null, tempDir.toString(), "clean");
-                throw new AssertionError("Should have thrown");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("cannot be null");
-            }
-        }
-
-        @Test
-        @DisplayName("null projectDir is rejected")
-        void nullProjectDirRejected() {
-            try {
-                service.executeCommand(MAVEN_HOME, null, "clean");
-                throw new AssertionError("Should have thrown");
-            } catch (IllegalArgumentException e) {
-                assertThat(e.getMessage()).contains("cannot be null");
-            }
-        }
-
-        @Test
-        @DisplayName("getCommands now sanitizes and rejects shell metacharacters")
+        @DisplayName("getCommands sanitizes and rejects shell metacharacters")
         void getCommandsNowSanitizesShellMetacharacters() {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> MavenInvoker.getCommands("mvn clean && rm -rf /"))

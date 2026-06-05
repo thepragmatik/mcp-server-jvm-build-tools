@@ -44,6 +44,10 @@ execute_build_command(buildToolName="maven", buildToolHome="/opt/maven",
 ```
 execute_build_command(projectDir="/path/to/project", command="build")
 ```
+User:   "Build all my projects"
+LLM:    list_build_tools()
+        → maven: clean, compile, test, ...
+           gradle: clean, build, test, ...
 
 **Any project (auto-detect):**
 ```
