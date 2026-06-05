@@ -311,6 +311,10 @@ Look up the version of a specific dependency used in your project.
 check_dependency_version(projectDir="/home/dev/my-app", dependency="com.google.guava:guava")
 → com.google.guava:guava:33.3.1-jre (compile scope)
 ```
+User:   "Build all my projects"
+LLM:    list_build_tools()
+        → maven: clean, compile, test, ...
+           gradle: clean, build, test, ...
 
 ## Quick Start
 
