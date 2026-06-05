@@ -96,6 +96,13 @@ public class DependencyService {
 
         StabilityFilter filter = parseStabilityFilter(stabilityFilter);
 
+        if (groupId == null || groupId.isBlank()) {
+            return errorResponse("groupId is required");
+        }
+        if (artifactId == null || artifactId.isBlank()) {
+            return errorResponse("artifactId is required");
+        }
+
         try {
             String groupPath = groupId.replace('.', '/');
             String metadataUrl = String.format("%s/%s/%s/maven-metadata.xml",

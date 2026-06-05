@@ -2,7 +2,7 @@
 """MCP stdio compliance test — newline-delimited JSON transport (SDK 0.8.0)."""
 import subprocess, json, os
 
-JAR = os.path.expanduser("~/hermes-working/mcp-server-jvm-build-tools-enhancement/repo/target/mcp-server-jvm-build-tools.jar")
+JAR = os.path.expanduser("/workspace/repo/target/mcp-server-jvm-build-tools.jar")
 
 proc = subprocess.Popen(
     ["java", "-jar", JAR],

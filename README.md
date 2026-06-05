@@ -300,18 +300,20 @@ Auto-detect which build tool a project uses by scanning for build files in the p
 **Detection order:** Checks for `pom.xml` first (Maven), then `build.gradle`/`build.gradle.kts` (Gradle), then `build.sbt` (SBT).
 
 ### `check_dependency_version`
-Look up the version of a specific dependency used in your project.
+Look up the latest version of a Maven Central dependency.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `projectDir` | string | Yes | Path to the project directory. |
-| `dependency` | string | Yes | Dependency coordinates. Maven: `groupId:artifactId` (e.g., `com.google.guava:guava`). Gradle: group:name notation. |
-| `buildToolName` | string | No | `"maven"`, `"gradle"`, or `"sbt"`. Omit to auto-detect from project files. |
+| `groupId` | string | Yes | Maven group ID (e.g., `com.google.guava`) |
+| `artifactId` | string | Yes | Maven artifact ID (e.g., `guava`) |
+| `currentVersion` | string | No | Current version to compare against |
+| `stabilityFilter` | string | No | `ALL`, `STABLE_ONLY` (default), or `PREFER_STABLE` |
+| `projectDir` | string | No | Project directory for build-tool context |
 
 **Example:**
 ```
-check_dependency_version(projectDir="/home/dev/my-app", dependency="com.google.guava:guava")
-→ com.google.guava:guava:33.3.1-jre (compile scope)
+check_dependency_version(groupId="com.google.guava", artifactId="guava")
+→ {"groupId":"com.google.guava","artifactId":"guava","latestVersion":"33.4.0","stability":"STABLE"}
 ```
 User:   "Build all my projects"
 LLM:    list_build_tools()
