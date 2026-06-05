@@ -359,7 +359,14 @@ class DependencyServiceTest {
         }
 
         @Test
-        @DisplayName("unknown filter defaults to RELEASE (Maven's stable release)")
+        @DisplayName("parses 'SNAPSHOT' preference")
+        void parsesSnapshotFilter() {
+            assertThat(DependencyService.parseVersionPreference("SNAPSHOT"))
+                    .isEqualTo(DependencyService.VersionPreference.SNAPSHOT);
+        }
+
+        @Test
+        @DisplayName("unknown filter defaults to RELEASE")
         void unknownFilterDefaultsToStableOnly() {
             assertThat(DependencyService.parseVersionPreference("BANANA"))
                     .isEqualTo(DependencyService.VersionPreference.RELEASE);

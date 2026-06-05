@@ -88,7 +88,7 @@ public class DependencyService {
                        description = "Current version to compare against. Omit to just get the latest version.")
             String currentVersion,
             @ToolParam(required = false,
-                       description = "Version preference: ALL, RELEASE (default), or LATEST")
+                       description = "Version preference: RELEASE (default), LATEST, SNAPSHOT, or ALL")
             String versionPreference,
             @ToolParam(required = false,
                        description = "Project directory path. When provided, auto-detects build tool and includes project context.")
@@ -219,6 +219,14 @@ public class DependencyService {
                     result.put("latestStable", stableVersions.get(stableVersions.size() - 1));
                 }
                 break;
+            case SNAPSHOT:
+                result.put("versionCount", allVersions.size());
+                result.put("totalVersions", totalVersions);
+                result.put("filteredVersions", allClassified);
+                if (!allVersions.isEmpty()) {
+                    result.put("latestVersion", allVersions.get(allVersions.size() - 1));
+                }
+                break;
             case ALL:
                 result.put("versionCount", allVersions.size());
                 result.put("totalVersions", totalVersions);
@@ -240,7 +248,7 @@ public class DependencyService {
         Object stableObj = result.get("latestStable");
 
         String compareTarget = null;
-        if (filter == VersionPreference.RELEASE || filter == VersionPreference.LATEST) {
+        if (filter == VersionPreference.RELEASE || filter == VersionPreference.LATEST || filter == VersionPreference.SNAPSHOT) {
             compareTarget = stableObj != null ? stableObj.toString() : null;
         }
         if (compareTarget == null) {
@@ -479,10 +487,12 @@ public class DependencyService {
     // ─── Supporting enums ───────────────────────────────────────────────
 
     public enum VersionPreference {
-        /** Stable releases only — matches Maven\'s &lt;release&gt; tag */
+        /** Stable releases only — no snapshots, no milestones/RCs */
         RELEASE,
-        /** Latest version including pre-releases — matches Maven\'s &lt;latest&gt; tag */
+        /** Latest release including milestones and RCs, excluding snapshots */
         LATEST,
+        /** Latest version including snapshots */
+        SNAPSHOT,
         /** Every published version */
         ALL
     }
