@@ -75,7 +75,7 @@ class DependencyServiceTest {
 
             Map<String, Object> result = service.parseMetadata(
                     "com.example", "test-lib", xml,
-                    DependencyService.StabilityFilter.STABLE_ONLY);
+                    DependencyService.VersionPreference.RELEASES_ONLY);
 
             assertThat(result.get("groupId")).isEqualTo("com.example");
             assertThat(result.get("artifactId")).isEqualTo("test-lib");
@@ -106,7 +106,7 @@ class DependencyServiceTest {
 
             Map<String, Object> result = service.parseMetadata(
                     "com.example", "no-release", xml,
-                    DependencyService.StabilityFilter.STABLE_ONLY);
+                    DependencyService.VersionPreference.RELEASES_ONLY);
 
             assertThat(result.get("latestVersion")).isEqualTo("1.0.0");
             assertThat(result.get("releaseVersion")).isNull();
@@ -136,7 +136,7 @@ class DependencyServiceTest {
 
             Map<String, Object> result = service.parseMetadata(
                     "com.example", "snap-lib", xml,
-                    DependencyService.StabilityFilter.ALL);
+                    DependencyService.VersionPreference.ALL);
 
             assertThat(result.get("versionCount")).isEqualTo(5);
             assertThat(result.get("totalVersions")).isEqualTo(5);
@@ -314,55 +314,55 @@ class DependencyServiceTest {
 
     @Nested
     @DisplayName("Stability filter parsing")
-    class StabilityFilterParsing {
+    class VersionPreferenceParsing {
 
         @Test
-        @DisplayName("null filter defaults to STABLE_ONLY")
+        @DisplayName("null filter defaults to RELEASES_ONLY")
         void nullFilterDefaultsToStableOnly() {
-            assertThat(DependencyService.parseStabilityFilter(null))
-                    .isEqualTo(DependencyService.StabilityFilter.STABLE_ONLY);
+            assertThat(DependencyService.parseVersionPreference(null))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
         }
 
         @Test
-        @DisplayName("empty filter defaults to STABLE_ONLY")
+        @DisplayName("empty filter defaults to RELEASES_ONLY")
         void emptyFilterDefaultsToStableOnly() {
-            assertThat(DependencyService.parseStabilityFilter(""))
-                    .isEqualTo(DependencyService.StabilityFilter.STABLE_ONLY);
+            assertThat(DependencyService.parseVersionPreference(""))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
         }
 
         @Test
-        @DisplayName("blank filter defaults to STABLE_ONLY")
+        @DisplayName("blank filter defaults to RELEASES_ONLY")
         void blankFilterDefaultsToStableOnly() {
-            assertThat(DependencyService.parseStabilityFilter("   "))
-                    .isEqualTo(DependencyService.StabilityFilter.STABLE_ONLY);
+            assertThat(DependencyService.parseVersionPreference("   "))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
         }
 
         @Test
         @DisplayName("parses 'ALL' filter")
         void parsesAllFilter() {
-            assertThat(DependencyService.parseStabilityFilter("ALL"))
-                    .isEqualTo(DependencyService.StabilityFilter.ALL);
+            assertThat(DependencyService.parseVersionPreference("ALL"))
+                    .isEqualTo(DependencyService.VersionPreference.ALL);
         }
 
         @Test
-        @DisplayName("parses 'STABLE_ONLY' filter")
+        @DisplayName("parses 'RELEASES_ONLY' filter")
         void parsesStableOnlyFilter() {
-            assertThat(DependencyService.parseStabilityFilter("STABLE_ONLY"))
-                    .isEqualTo(DependencyService.StabilityFilter.STABLE_ONLY);
+            assertThat(DependencyService.parseVersionPreference("RELEASES_ONLY"))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
         }
 
         @Test
-        @DisplayName("parses 'PREFER_STABLE' filter")
+        @DisplayName("parses 'INCLUDE_PRERELEASES' filter")
         void parsesPreferStableFilter() {
-            assertThat(DependencyService.parseStabilityFilter("PREFER_STABLE"))
-                    .isEqualTo(DependencyService.StabilityFilter.PREFER_STABLE);
+            assertThat(DependencyService.parseVersionPreference("INCLUDE_PRERELEASES"))
+                    .isEqualTo(DependencyService.VersionPreference.INCLUDE_PRERELEASES);
         }
 
         @Test
-        @DisplayName("unknown filter defaults to STABLE_ONLY")
+        @DisplayName("unknown filter defaults to RELEASES_ONLY")
         void unknownFilterDefaultsToStableOnly() {
-            assertThat(DependencyService.parseStabilityFilter("BANANA"))
-                    .isEqualTo(DependencyService.StabilityFilter.STABLE_ONLY);
+            assertThat(DependencyService.parseVersionPreference("BANANA"))
+                    .isEqualTo(DependencyService.VersionPreference.RELEASES_ONLY);
         }
     }
 
@@ -384,7 +384,7 @@ class DependencyServiceTest {
             result.put("latestStable", "2.5.0");
 
             service.enrichWithVersionComparison(result, "2.0.0",
-                    DependencyService.StabilityFilter.STABLE_ONLY);
+                    DependencyService.VersionPreference.RELEASES_ONLY);
 
             assertThat(result.get("currentVersion")).isEqualTo("2.0.0");
             assertThat(result.get("upgradeAvailable")).isEqualTo(true);
@@ -402,7 +402,7 @@ class DependencyServiceTest {
             result.put("latestStable", "2.5.0");
 
             service.enrichWithVersionComparison(result, "2.5.0",
-                    DependencyService.StabilityFilter.STABLE_ONLY);
+                    DependencyService.VersionPreference.RELEASES_ONLY);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }
@@ -415,7 +415,7 @@ class DependencyServiceTest {
             result.put("artifactId", "test-lib");
 
             service.enrichWithVersionComparison(result, "1.0.0",
-                    DependencyService.StabilityFilter.STABLE_ONLY);
+                    DependencyService.VersionPreference.RELEASES_ONLY);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }

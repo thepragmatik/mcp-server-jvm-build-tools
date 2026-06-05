@@ -33,7 +33,7 @@ import java.util.*;
  * Dependency intelligence service for Maven Central version lookups.
  * <p>
  * Queries the Maven Central REST API for {@code maven-metadata.xml} to
- * retrieve available versions of a dependency. Supports stability-aware
+ * retrieve available versions of a dependency. Supports 
  * version filtering and project-aware context when a project directory
  * is provided.
  * <p>
@@ -88,13 +88,13 @@ public class DependencyService {
                        description = "Current version to compare against. Omit to just get the latest version.")
             String currentVersion,
             @ToolParam(required = false,
-                       description = "Version stability filter: ALL, STABLE_ONLY (default), or PREFER_STABLE")
-            String stabilityFilter,
+                       description = "Version preference: ALL, RELEASES_ONLY (default), or INCLUDE_PRERELEASES")
+            String versionPreference,
             @ToolParam(required = false,
                        description = "Project directory path. When provided, auto-detects build tool and includes project context.")
             String projectDir) {
 
-        StabilityFilter filter = parseStabilityFilter(stabilityFilter);
+        VersionPreference filter = parseVersionPreference(versionPreference);
 
         if (groupId == null || groupId.isBlank()) {
             return errorResponse("groupId is required");
@@ -155,7 +155,7 @@ public class DependencyService {
      * Parse the maven-metadata.xml response and extract version information.
      */
     Map<String, Object> parseMetadata(String groupId, String artifactId,
-                                       String xmlBody, StabilityFilter filter) {
+                                       String xmlBody, VersionPreference filter) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("groupId", groupId);
         result.put("artifactId", artifactId);
@@ -198,7 +198,7 @@ public class DependencyService {
         int totalVersions = allVersions.size();
 
         switch (filter) {
-            case STABLE_ONLY:
+            case RELEASES_ONLY:
                 result.put("versionCount", stableVersions.size());
                 result.put("totalVersions", totalVersions);
                 result.put("filteredVersions", stableVersions);
@@ -206,7 +206,7 @@ public class DependencyService {
                     result.put("latestStable", stableVersions.get(stableVersions.size() - 1));
                 }
                 break;
-            case PREFER_STABLE:
+            case INCLUDE_PRERELEASES:
                 result.put("versionCount", allVersions.size());
                 result.put("totalVersions", totalVersions);
                 result.put("stableVersions", stableVersions);
@@ -233,14 +233,14 @@ public class DependencyService {
      * Enrich the result with version comparison data.
      */
     void enrichWithVersionComparison(Map<String, Object> result,
-                                      String currentVersion, StabilityFilter filter) {
+                                      String currentVersion, VersionPreference filter) {
         result.put("currentVersion", currentVersion);
 
         Object latestObj = result.get("latestVersion");
         Object stableObj = result.get("latestStable");
 
         String compareTarget = null;
-        if (filter == StabilityFilter.STABLE_ONLY || filter == StabilityFilter.PREFER_STABLE) {
+        if (filter == VersionPreference.RELEASES_ONLY || filter == VersionPreference.INCLUDE_PRERELEASES) {
             compareTarget = stableObj != null ? stableObj.toString() : null;
         }
         if (compareTarget == null) {
@@ -339,12 +339,12 @@ public class DependencyService {
         return values;
     }
 
-    static StabilityFilter parseStabilityFilter(String filter) {
-        if (filter == null || filter.isBlank()) return StabilityFilter.STABLE_ONLY;
+    static VersionPreference parseVersionPreference(String filter) {
+        if (filter == null || filter.isBlank()) return VersionPreference.RELEASES_ONLY;
         try {
-            return StabilityFilter.valueOf(filter.toUpperCase().trim());
+            return VersionPreference.valueOf(filter.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
-            return StabilityFilter.STABLE_ONLY;
+            return VersionPreference.RELEASES_ONLY;
         }
     }
 
@@ -478,8 +478,8 @@ public class DependencyService {
 
     // ─── Supporting enums ───────────────────────────────────────────────
 
-    public enum StabilityFilter {
-        ALL, STABLE_ONLY, PREFER_STABLE
+    public enum VersionPreference {
+        RELEASES_ONLY, INCLUDE_PRERELEASES, ALL
     }
 
     public enum Stability {
