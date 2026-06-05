@@ -460,7 +460,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-202 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, and `SbtServiceTest.java` for the full adversarial test suite.
+202 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, and `SbtBuildToolTest.java` for the full adversarial test suite.
 
 ## Comparison: Honest Take on Competitors
 
