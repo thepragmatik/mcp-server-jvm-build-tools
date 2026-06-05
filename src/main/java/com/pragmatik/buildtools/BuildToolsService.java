@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,8 @@ import java.util.stream.Collectors;
  *   <li>{@code execute_build_command} — execute a build command with auto-detection</li>
  *   <li>{@code list_build_tools} — list all registered tools and their commands</li>
  *   <li>{@code detect_build_tool} — detect which build tool(s) a project uses</li>
+ *   <li>{@code analyze_build_output} — execute a build and return structured JSON output</li>
+ *   <li>{@code validate_build_configuration} — validate build files before execution</li>
  * </ul>
  * The legacy {@code get_maven_version} and {@code execute_maven_command} tools
  * have been consolidated into the generic equivalents (specify {@code "maven"}
@@ -53,9 +56,13 @@ public class BuildToolsService {
             Pattern.compile("^(gradle\\w*\\s+)?[a-zA-Z0-9\\s._=/:@;\\-]+$");
 
     private final BuildToolProvider provider;
+    private final Map<String, BuildOutputParser> outputParsers;
 
     public BuildToolsService(BuildToolProvider provider) {
         this.provider = provider;
+        this.outputParsers = new LinkedHashMap<>();
+        this.outputParsers.put("maven", new MavenOutputParser());
+        this.outputParsers.put("gradle", new GradleOutputParser());
     }
 
     /**
@@ -267,6 +274,376 @@ public class BuildToolsService {
         return jsonEncode(result);
     }
 
+    /**
+     * Analyze the raw output of a build command and return structured JSON results.
+     * <p>
+     * Instead of returning raw text, this tool parses the build output (Maven or
+     * Gradle) into a structured JSON object with success status, test summaries,
+     * compile errors, warnings, and duration. This is far more usable for LLMs
+     * than raw shell output.
+     * <p>
+     * The build is actually executed — this is not a dry-run. The tool runs the
+     * same command as {@link #executeBuildCommand(String, String, String, String)}
+     * and then parses the output.
+     */
+    @Tool(name = "analyze_build_output",
+          description = "Execute a build command and return structured JSON output with parsed test " +
+                        "results, compile errors, and warnings instead of raw text. Supports Maven and Gradle. " +
+                        "Returns: {success, tool, command, duration, testSummary: {total, passed, failed, " +
+                        "errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, " +
+                        "warningCount}. Much easier for agents to process than raw build output.")
+    public String analyzeBuildOutput(
+            @ToolParam(required = false,
+                       description = "Name of the build tool ('maven' or 'gradle'). Omit to auto-detect from project directory.")
+            String buildToolName,
+            @ToolParam(required = false,
+                       description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
+            String buildToolHome,
+            @ToolParam(required = true,
+                       description = "Path to the project directory containing build files")
+            String projectDir,
+            @ToolParam(required = true,
+                       description = "Build command to execute (e.g., 'clean test' for Maven, 'test' for Gradle)")
+            String command) {
+
+        // Canonicalize paths
+        String validatedHome = null;
+        if (buildToolHome != null && !buildToolHome.isBlank()) {
+            try {
+                validatedHome = Path.of(buildToolHome).toRealPath().toString();
+            } catch (IOException e) {
+                return buildErrorResponse("Cannot resolve build tool home: " + buildToolHome);
+            }
+        }
+        Path validatedProject;
+        try {
+            validatedProject = Path.of(projectDir).toRealPath();
+        } catch (IOException e) {
+            return buildErrorResponse("Cannot resolve project directory: " + e.getMessage());
+        }
+        if (!Files.isDirectory(validatedProject)) {
+            return buildErrorResponse("Project directory is not valid: " + projectDir);
+        }
+
+        // Resolve the build tool
+        BuildTool tool;
+        try {
+            tool = provider.resolve(buildToolName, validatedProject);
+        } catch (IllegalArgumentException e) {
+            return buildErrorResponse(e.getMessage());
+        }
+
+        // Execute the build and capture output
+        String rawOutput;
+        int exitCode;
+        try {
+            rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
+            exitCode = 0;
+        } catch (RuntimeException e) {
+            rawOutput = e.getMessage();
+            exitCode = 1;
+        }
+
+        // Parse output using the appropriate parser
+        BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
+        Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
+
+        return jsonEncode(result);
+    }
+
+    /**
+     * Validate a project's build configuration files for correctness.
+     * <p>
+     * Checks pom.xml, build.gradle, and build.gradle.kts for syntax errors,
+     * required elements, and consistency issues. Returns a structured validation
+     * report that LLMs can use to diagnose and fix build problems.
+     * <p>
+     * This is a static analysis tool — it does NOT execute the build, so it is
+     * fast and safe. Use before {@link #executeBuildCommand} to catch issues early.
+     */
+    @Tool(name = "validate_build_configuration",
+          description = "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) " +
+                        "for correctness. Checks XML well-formedness, required elements, plugin version " +
+                        "consistency for Maven, and basic syntax for Gradle. Returns structured JSON with " +
+                        "{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}. " +
+                        "Use this before executing builds to catch configuration errors early.")
+    public String validateBuildConfiguration(
+            @ToolParam(required = true,
+                       description = "Path to the project directory containing build files")
+            String projectDir) {
+
+        Path dir;
+        try {
+            dir = Path.of(projectDir).toRealPath();
+        } catch (IOException e) {
+            return buildErrorResponse("Cannot resolve project directory: " + e.getMessage());
+        }
+        if (!Files.isDirectory(dir)) {
+            return buildErrorResponse("Project directory is not valid: " + projectDir);
+        }
+
+        List<Map<String, Object>> allIssues = new ArrayList<>();
+        String detectedTool = null;
+
+        // Validate pom.xml if present
+        Path pomXml = dir.resolve("pom.xml");
+        if (Files.exists(pomXml)) {
+            detectedTool = "maven";
+            List<Map<String, Object>> issues = validatePomXml(pomXml);
+            allIssues.addAll(issues);
+        }
+
+        // Validate build.gradle if present
+        Path buildGradle = dir.resolve("build.gradle");
+        if (Files.exists(buildGradle)) {
+            if (detectedTool == null) detectedTool = "gradle";
+            List<Map<String, Object>> issues = validateBuildGradle(buildGradle, false);
+            allIssues.addAll(issues);
+        }
+
+        // Validate build.gradle.kts if present
+        Path buildGradleKts = dir.resolve("build.gradle.kts");
+        if (Files.exists(buildGradleKts)) {
+            if (detectedTool == null) detectedTool = "gradle";
+            List<Map<String, Object>> issues = validateBuildGradle(buildGradleKts, true);
+            allIssues.addAll(issues);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", allIssues.stream().noneMatch(i -> "ERROR".equals(i.get("severity"))));
+        result.put("tool", detectedTool);
+        result.put("projectDir", dir.toString());
+
+        if (detectedTool != null) {
+            result.put("file", "maven".equals(detectedTool) ? "pom.xml" : "build.gradle");
+        }
+
+        result.put("issueCount", allIssues.size());
+        result.put("issues", allIssues);
+
+        return jsonEncode(result);
+    }
+
+    // ─── Build output analysis ──────────────────────────────────────────
+
+    /**
+     * Validate a pom.xml file for structural and content issues.
+     */
+    private List<Map<String, Object>> validatePomXml(Path pomXml) {
+        List<Map<String, Object>> issues = new ArrayList<>();
+
+        try {
+            String content = Files.readString(pomXml);
+
+            // Check XML well-formedness with basic heuristics
+            // Check for unmatched tags
+            if (!content.contains("<project") || !content.contains("</project>")) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", "pom.xml");
+                issue.put("message", "Missing <project> root element");
+                issue.put("suggestion", "Add <project> root element with correct namespace");
+                issues.add(issue);
+                return issues;
+            }
+
+            // Check required elements, accounting for parent POM inheritance
+            // Extract the parent block if present
+            String contentOutsideParent = content;
+            boolean hasParentBlock = content.contains("<parent>") && content.contains("</parent>");
+            if (hasParentBlock) {
+                int parentStart = content.indexOf("<parent>");
+                int parentEnd = content.indexOf("</parent>") + "</parent>".length();
+                contentOutsideParent = content.substring(0, parentStart) +
+                        content.substring(parentEnd);
+            }
+
+            String[] requiredElements = {"modelVersion", "groupId", "artifactId", "version"};
+            for (String element : requiredElements) {
+                boolean hasOpen = contentOutsideParent.contains("<" + element + ">");
+                boolean hasClose = contentOutsideParent.contains("</" + element + ">");
+
+                // groupId and version can be inherited from parent POM
+                boolean canBeInherited = element.equals("groupId") || element.equals("version");
+
+                if (!hasOpen && canBeInherited && hasParentBlock) {
+                    // Check if it's present in the parent block
+                    String parentBlock = content.substring(
+                            content.indexOf("<parent>"),
+                            content.indexOf("</parent>") + "</parent>".length());
+                    if (parentBlock.contains("<" + element + ">")) {
+                        // Inherited from parent — valid
+                        continue;
+                    }
+                }
+
+                if (!hasOpen) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "ERROR");
+                    issue.put("path", "pom.xml");
+                    issue.put("message", "Missing required element: <" + element + ">");
+                    issue.put("suggestion", "Add <" + element + "> element inside <project>");
+                    issues.add(issue);
+                } else if (!hasClose) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "ERROR");
+                    issue.put("path", "pom.xml");
+                    issue.put("message", "Unclosed element: <" + element + ">");
+                    issue.put("suggestion", "Add closing </" + element + "> tag");
+                    issues.add(issue);
+                }
+            }
+
+            // Check for duplicate dependency declarations
+            Map<String, Integer> depCounts = new LinkedHashMap<>();
+            Pattern depPattern = Pattern.compile("<artifactId>([^<]+)</artifactId>");
+            Matcher depMatcher = depPattern.matcher(content);
+            while (depMatcher.find()) {
+                String artifactId = depMatcher.group(1);
+                depCounts.merge(artifactId, 1, Integer::sum);
+            }
+            for (Map.Entry<String, Integer> entry : depCounts.entrySet()) {
+                if (entry.getValue() > 1) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "WARNING");
+                    issue.put("path", "pom.xml");
+                    issue.put("message", "Duplicate dependency declaration: " + entry.getKey() +
+                            " (declared " + entry.getValue() + " times)");
+                    issue.put("suggestion", "Remove duplicate <dependency> entry for " + entry.getKey());
+                    issues.add(issue);
+                }
+            }
+
+            // Check plugin version consistency (warn if multiple versions of same plugin)
+            Map<String, Set<String>> pluginVersions = new LinkedHashMap<>();
+            Pattern pluginPattern = Pattern.compile(
+                    "<plugin>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>\\s*(?:<version>([^<]+)</version>)?",
+                    Pattern.DOTALL);
+            Matcher pluginMatcher = pluginPattern.matcher(content);
+            while (pluginMatcher.find()) {
+                String groupId = pluginMatcher.group(1);
+                String artifactId = pluginMatcher.group(2);
+                String version = pluginMatcher.group(3) != null ? pluginMatcher.group(3) : "UNSPECIFIED";
+                String key = groupId + ":" + artifactId;
+                pluginVersions.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(version);
+            }
+            for (Map.Entry<String, Set<String>> entry : pluginVersions.entrySet()) {
+                if (entry.getValue().size() > 1) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "WARNING");
+                    issue.put("path", "pom.xml");
+                    issue.put("message", "Inconsistent plugin versions for " + entry.getKey() +
+                            ": " + String.join(", ", entry.getValue()));
+                    issue.put("suggestion", "Use <pluginManagement> to centralize plugin version for " +
+                            entry.getKey().split(":")[1]);
+                    issues.add(issue);
+                }
+            }
+
+        } catch (IOException e) {
+            Map<String, Object> issue = new LinkedHashMap<>();
+            issue.put("severity", "ERROR");
+            issue.put("path", "pom.xml");
+            issue.put("message", "Cannot read pom.xml: " + e.getMessage());
+            issues.add(issue);
+        }
+
+        return issues;
+    }
+
+    /**
+     * Validate a build.gradle or build.gradle.kts file for basic syntax.
+     */
+    private List<Map<String, Object>> validateBuildGradle(Path buildFile, boolean isKotlin) {
+        List<Map<String, Object>> issues = new ArrayList<>();
+        String filename = buildFile.getFileName().toString();
+
+        try {
+            String content = Files.readString(buildFile);
+
+            if (content.isBlank()) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", filename);
+                issue.put("message", "Build file is empty");
+                issue.put("suggestion", "Add at minimum a buildscript block or plugin declarations");
+                issues.add(issue);
+                return issues;
+            }
+
+            // Check brace balance
+            int braceDepth = 0;
+            int lineNum = 0;
+            for (String line : content.split("\\r?\\n")) {
+                lineNum++;
+                for (char c : line.toCharArray()) {
+                    if (c == '{') braceDepth++;
+                    if (c == '}') braceDepth--;
+                }
+            }
+            if (braceDepth != 0) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", filename);
+                issue.put("message", "Unbalanced braces: " + (braceDepth > 0 ? "missing " + braceDepth + " closing brace(s)" : "extra " + (-braceDepth) + " closing brace(s)"));
+                issue.put("suggestion", "Ensure all opening braces '{' have matching closing braces '}'");
+                issues.add(issue);
+            }
+
+            // Check for unclosed string literals
+            int quoteBalance = 0;
+            for (char c : content.toCharArray()) {
+                if (c == '\'' || c == '"') quoteBalance++;
+            }
+            if (quoteBalance % 2 != 0) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", filename);
+                issue.put("message", "Unclosed string literal detected");
+                issue.put("suggestion", "Ensure all string literals are properly closed with matching quotes");
+                issues.add(issue);
+            }
+
+            // In Groovy build.gradle, check for common issues
+            if (!isKotlin) {
+                // Check for missing 'apply plugin' or 'plugins' block
+                boolean hasPlugins = content.contains("apply plugin")
+                        || content.contains("plugins {")
+                        || content.contains("plugins{");
+                if (!hasPlugins && content.contains("dependencies")) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "WARNING");
+                    issue.put("path", filename);
+                    issue.put("message", "No plugin declarations found but dependencies are defined");
+                    issue.put("suggestion", "Add 'apply plugin: \"java\"' or 'plugins { id \"java\" }'");
+                    issues.add(issue);
+                }
+            }
+
+            if (isKotlin) {
+                // Check for common Kotlin DSL syntax issues
+                // e.g. using Groovy-style strings in Kotlin DSL
+                if (content.contains("'") && content.contains("implementation '")) {
+                    Map<String, Object> issue = new LinkedHashMap<>();
+                    issue.put("severity", "WARNING");
+                    issue.put("path", filename);
+                    issue.put("message", "Using Groovy-style single quotes in Kotlin DSL");
+                    issue.put("suggestion", "Use double quotes in Kotlin DSL: implementation(\"group:artifact:version\")");
+                    issues.add(issue);
+                }
+            }
+
+        } catch (IOException e) {
+            Map<String, Object> issue = new LinkedHashMap<>();
+            issue.put("severity", "ERROR");
+            issue.put("path", filename);
+            issue.put("message", "Cannot read build file: " + e.getMessage());
+            issues.add(issue);
+        }
+
+        return issues;
+    }
+
     // ─── Detection helpers ──────────────────────────────────────────────
 
     private void checkFile(Path dir, String filename, List<String> matched) {
@@ -283,6 +660,10 @@ public class BuildToolsService {
 
     private String buildDetectionError(String message) {
         return "{\"status\":\"error\",\"message\":\"" + escapeJson(message) + "\"}";
+    }
+
+    private String buildErrorResponse(String message) {
+        return "{\"error\":true,\"message\":\"" + escapeJson(message) + "\"}";
     }
 
     // ─── JSON helpers (inline to avoid adding dependencies) ─────────────
