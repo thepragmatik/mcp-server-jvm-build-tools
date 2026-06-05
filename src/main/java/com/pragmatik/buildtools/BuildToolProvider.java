@@ -38,7 +38,7 @@ public class BuildToolProvider {
         this.registry = new LinkedHashMap<>();
         register(new MavenBuildTool());
         register(new GradleBuildTool());
-        // Future: register(new SbtBuildTool());
+        register(new SbtBuildTool());
         // Future: register(new BazelBuildTool());
     }
 

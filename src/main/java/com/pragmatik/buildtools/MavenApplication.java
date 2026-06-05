@@ -30,7 +30,10 @@ public class MavenApplication {
     }
 
     @Bean
-    public ToolCallbackProvider buildTools(BuildToolsService service) {
-        return MethodToolCallbackProvider.builder().toolObjects(service).build();
+    public ToolCallbackProvider buildTools(BuildToolsService buildToolsService,
+                                           DependencyService dependencyService) {
+        return MethodToolCallbackProvider.builder()
+                .toolObjects(buildToolsService, dependencyService)
+                .build();
     }
 }
