@@ -35,104 +35,160 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 @DisplayName("Maven application integration tests")
 class MavenIntegrationTest {
 
-    private static final String MAVEN_HOME = TestUtils.resolveMavenHome();
-
     @Autowired
     private ToolCallbackProvider toolCallbackProvider;
 
     @Autowired
-    private MavenService mavenService;
+    private BuildToolsService buildToolsService;
 
     @Test
     @DisplayName("Spring context loads successfully")
     void contextLoads() {
         assertThat(toolCallbackProvider).isNotNull();
-        assertThat(mavenService).isNotNull();
+        assertThat(buildToolsService).isNotNull();
     }
 
-    @Test
-    @DisplayName("ToolCallbackProvider resolves get_build_tool_version tool")
-    void resolvesGetBuildToolVersionTool() {
-        FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-        assertThat(toolCallbacks).isNotNull();
-        assertThat(toolCallbacks).isNotEmpty();
-
-        boolean hasVersionTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "get_build_tool_version".equals(tc.getName()));
-        assertThat(hasVersionTool).isTrue();
-    }
-
-    @Test
-    @DisplayName("ToolCallbackProvider resolves execute_build_command tool")
-    void resolvesExecuteBuildCommandTool() {
-        FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-        boolean hasExecTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "execute_build_command".equals(tc.getName()));
-        assertThat(hasExecTool).isTrue();
-    }
-
-    @Test
-    @DisplayName("ToolCallbackProvider resolves list_build_tools tool")
-    void resolvesListBuildToolsTool() {
-        FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-        boolean hasListTool = Arrays.stream(toolCallbacks)
-                .anyMatch(tc -> "list_build_tools".equals(tc.getName()));
-        assertThat(hasListTool).isTrue();
-    }
-
-    @Test
-    @DisplayName("get_maven_version returns valid version string")
-    void getMavenVersionReturnsValidString() {
-        String version = mavenService.version();
-        assertThat(version)
-                .isNotNull()
-                .isNotEmpty()
-                .contains("Apache Maven");
-    }
+    // ──────────────────────────────────────────────
+    //  Tool registration verification
+    // ──────────────────────────────────────────────
 
     @Nested
-    @DisplayName("execute_maven_command integration")
-    class ExecuteMavenCommand {
+    @DisplayName("Tool registration")
+    class ToolRegistration {
+
+        @Test
+        @DisplayName("ToolCallbackProvider resolves get_build_tool_version tool")
+        void resolvesGetBuildToolVersionTool() {
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            assertThat(toolCallbacks).isNotNull();
+            assertThat(toolCallbacks).isNotEmpty();
+
+            boolean hasVersionTool = Arrays.stream(toolCallbacks)
+                    .anyMatch(tc -> "get_build_tool_version".equals(tc.getName()));
+            assertThat(hasVersionTool).isTrue();
+        }
+
+        @Test
+        @DisplayName("ToolCallbackProvider resolves execute_build_command tool")
+        void resolvesExecuteBuildCommandTool() {
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            boolean hasExecTool = Arrays.stream(toolCallbacks)
+                    .anyMatch(tc -> "execute_build_command".equals(tc.getName()));
+            assertThat(hasExecTool).isTrue();
+        }
+
+        @Test
+        @DisplayName("ToolCallbackProvider resolves list_build_tools tool")
+        void resolvesListBuildToolsTool() {
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            boolean hasListTool = Arrays.stream(toolCallbacks)
+                    .anyMatch(tc -> "list_build_tools".equals(tc.getName()));
+            assertThat(hasListTool).isTrue();
+        }
+
+        @Test
+        @DisplayName("ToolCallbackProvider resolves detect_build_tool tool (Phase 1)")
+        void resolvesDetectBuildToolTool() {
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            boolean hasDetectTool = Arrays.stream(toolCallbacks)
+                    .anyMatch(tc -> "detect_build_tool".equals(tc.getName()));
+            assertThat(hasDetectTool).isTrue();
+        }
+
+        @Test
+        @DisplayName("ToolCallbackProvider resolves check_dependency_version tool (Phase 1)")
+        void resolvesCheckDependencyVersionTool() {
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            boolean hasDepTool = Arrays.stream(toolCallbacks)
+                    .anyMatch(tc -> "check_dependency_version".equals(tc.getName()));
+            assertThat(hasDepTool).isTrue();
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  detect_build_tool integration
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("detect_build_tool integration")
+    class DetectBuildTool {
 
         @TempDir
         Path tempDir;
 
         @Test
-        @DisplayName("execute mvn --version with valid mavenHome and temp projectDir")
-        void executesVersionCommandWithValidInputs() throws Exception {
-            java.nio.file.Files.writeString(
-                    tempDir.resolve("pom.xml"),
-                    "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"\n" +
-                    "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n" +
-                    "  xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n" +
-                    "  <modelVersion>4.0.0</modelVersion>\n" +
-                    "  <groupId>test</groupId>\n" +
-                    "  <artifactId>test</artifactId>\n" +
-                    "  <version>1.0</version>\n" +
-                    "</project>"
-            );
+        @DisplayName("detects Maven project by pom.xml marker")
+        void detectsMavenProject() throws Exception {
+            java.nio.file.Files.createFile(tempDir.resolve("pom.xml"));
 
-            String result = mavenService.executeCommand(MAVEN_HOME, tempDir.toString(), "mvn --version");
-            assertThat(result).isNotNull();
-            assertThat(result).isNotEmpty();
+            String result = buildToolsService.detectBuildTool(tempDir.toString());
+            assertThat(result).contains("\"maven\"");
+            assertThat(result).contains("\"detected\":true");
+            assertThat(result).contains("\"pom.xml\"");
         }
 
         @Test
-        @DisplayName("execute with nonexistent projectDir throws")
-        void executeWithNonexistentProjectDirThrows() {
-            Path nonexistent = tempDir.resolve("nonexistent-project");
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> mavenService.executeCommand(
-                            MAVEN_HOME, nonexistent.toString(), "clean"))
-                    .withMessageContaining("Cannot resolve project directory");
+        @DisplayName("detects Gradle project by build.gradle marker")
+        void detectsGradleProject() throws Exception {
+            java.nio.file.Files.createFile(tempDir.resolve("build.gradle"));
+
+            String result = buildToolsService.detectBuildTool(tempDir.toString());
+            assertThat(result).contains("\"gradle\"");
+            assertThat(result).contains("\"detected\":true");
         }
 
         @Test
-        @DisplayName("execute with null projectDir throws")
-        void executeWithNullProjectDirThrows() {
+        @DisplayName("detects no build tool for empty directory")
+        void detectsNoBuildTool() {
+            String result = buildToolsService.detectBuildTool(tempDir.toString());
+            assertThat(result).contains("\"toolCount\":0");
+        }
+
+        @Test
+        @DisplayName("returns error for nonexistent project directory")
+        void returnsErrorForNonexistentDir() {
+            String result = buildToolsService.detectBuildTool(
+                    tempDir.resolve("nonexistent").toString());
+            assertThat(result).contains("\"error\"");
+        }
+
+        @Test
+        @DisplayName("detects hybrid project with multiple markers")
+        void detectsHybridProject() throws Exception {
+            java.nio.file.Files.createFile(tempDir.resolve("pom.xml"));
+            java.nio.file.Files.createFile(tempDir.resolve("build.gradle"));
+
+            String result = buildToolsService.detectBuildTool(tempDir.toString());
+            assertThat(result).contains("\"maven\"");
+            assertThat(result).contains("\"gradle\"");
+            assertThat(result).contains("\"toolCount\":2");
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  get_build_tool_version integration
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("get_build_tool_version integration")
+    class GetBuildToolVersion {
+
+        @Test
+        @DisplayName("get_maven_version returns valid version string")
+        void getMavenVersionReturnsValidString() {
+            String version = buildToolsService.getBuildToolVersion("maven");
+            assertThat(version)
+                    .isNotNull()
+                    .isNotEmpty()
+                    .contains("Apache Maven");
+        }
+
+        @Test
+        @DisplayName("throws for unknown build tool")
+        void throwsForUnknownBuildTool() {
             assertThatIllegalArgumentException()
-                    .isThrownBy(() -> mavenService.executeCommand(MAVEN_HOME, null, "clean"))
-                    .withMessageContaining("cannot be null");
+                    .isThrownBy(() -> buildToolsService.getBuildToolVersion("bazel"))
+                    .withMessageContaining("Unknown build tool");
         }
     }
 }
