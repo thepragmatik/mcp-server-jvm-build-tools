@@ -32,9 +32,10 @@ import java.util.regex.Pattern;
  * {@link GradleBuildTool}. SBT does not publish a stable embedder API
  * to Maven Central, so CLI invocation is the most portable approach.
  * <p>
- * <b>Security:</b> All SBT commands are validated against an allowlist of
- * safe tasks and a safe-argument pattern — mirroring the same security
- * model as {@link MavenInvoker} and {@link GradleBuildTool}.
+ * <b>Security:</b> Flags are validated against a safe-argument pattern
+ * for injection defense. Non-flag tokens (tasks) are trusted —
+ * the user or client calling this tool is responsible for deciding
+ * which tasks to execute.
  * <p>
  * <b>First-mover position:</b> No SBT MCP server exists on GitHub as of 2025.
  * This is the first MCP server to offer SBT build execution alongside
@@ -42,19 +43,7 @@ import java.util.regex.Pattern;
  */
 public class SbtBuildTool implements BuildTool {
 
-    private static final Set<String> ALLOWED_TASKS = Set.of(
-            "compile", "test", "run", "package", "clean", "assembly",
-            "publishLocal", "publish", "update", "doc", "console"
-    );
-
-    private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
-
     private static final String MARKER_FILE = "build.sbt";
-
-    private static final Set<String> BLOCKED_SBT_FLAGS = Set.of(
-            "-D", "-J", "-sbt-dir", "-sbt-boot", "-sbt-launch-dir",
-            "-ivy", "-maven-launcher"
-    );
 
     // Safe SBT flag pattern: --flag or -X (single letters for standard options)
     private static final Pattern SAFE_ARG_PATTERN =
@@ -65,8 +54,7 @@ public class SbtBuildTool implements BuildTool {
     private static final String EXECUTION_PROMPT = """
             You are an assistant for executing SBT build commands. Follow these rules:
 
-            1. Only execute SBT lifecycle tasks: compile, test, run, package, clean, assembly,
-               publishLocal, publish, update, doc, console.
+            1. Trust the user's judgment — execute any SBT task they request.
             2. Supported flags: --no-colors (always added for machine-readable output).
             3. Use semicolons to chain multiple tasks (e.g., "clean;compile;test").
             4. Do not execute arbitrary system commands or shell scripts.
@@ -171,7 +159,7 @@ public class SbtBuildTool implements BuildTool {
 
     @Override
     public List<String> getSupportedCommands() {
-        return SUPPORTED_COMMANDS;
+        return Collections.emptyList();
     }
 
     @Override
@@ -218,8 +206,8 @@ public class SbtBuildTool implements BuildTool {
      * Strips leading "sbt " prefix, then splits on whitespace or semicolons
      * (SBT's task-chaining delimiter).
      * <p>
-     * <b>Security:</b> Every token is validated against: (1) the ALLOWED_TASKS set,
-     * (2) the BLOCKED_SBT_FLAGS blocklist, and (3) the SAFE_ARG_PATTERN regex.
+     * <b>Security:</b> Every token is validated against the SAFE_ARG_PATTERN regex
+     * for injection defense. Non-flag tokens are trusted (user judgment).
      */
     static String[] parseCommandTokens(String command) {
         if (command == null || command.trim().isEmpty()) {
@@ -246,26 +234,13 @@ public class SbtBuildTool implements BuildTool {
         for (String token : tokens) {
             if (token.isEmpty()) continue;
 
-            // Non-flag tokens must be in allowed list
+            // Non-flag tokens: trust the user — no allowlist restriction
             if (!token.startsWith("-")) {
-                if (!ALLOWED_TASKS.contains(token)) {
-                    throw new IllegalArgumentException(
-                            "sbt task not allowed: " + token +
-                                    ". Allowed: " + ALLOWED_TASKS);
-                }
                 validated.add(token);
                 continue;
             }
 
-            // Block dangerous flags
-            for (String blocked : BLOCKED_SBT_FLAGS) {
-                if (token.startsWith(blocked)) {
-                    throw new IllegalArgumentException(
-                            "Blocked sbt flag: " + token);
-                }
-            }
-
-            // Validate safe flags against pattern
+            // Validate safe flags against pattern (injection defense)
             if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
                 throw new IllegalArgumentException(
                         "Invalid flag/argument: " + token);

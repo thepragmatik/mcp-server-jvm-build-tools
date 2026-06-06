@@ -60,16 +60,12 @@ class SbtBuildToolTest {
         }
 
         @Test
-        @DisplayName("getSupportedCommands() returns expected SBT tasks")
+        @DisplayName("getSupportedCommands() returns empty list (trusted user, no allowlist)")
         void supportedCommandsAreCorrect() {
             List<String> cmds = tool.getSupportedCommands();
             assertThat(cmds)
                     .isNotNull()
-                    .isNotEmpty()
-                    .containsExactlyInAnyOrder(
-                            "compile", "test", "run", "package", "clean", "assembly",
-                            "publishLocal", "publish", "update", "doc", "console"
-                    );
+                    .isEmpty();
         }
 
         @Test
@@ -80,7 +76,7 @@ class SbtBuildToolTest {
                     .isNotNull()
                     .isNotEmpty()
                     .contains("SBT")
-                    .contains("compile")
+                    .contains("judgment")
                     .contains("semicolons");
         }
 
@@ -252,51 +248,45 @@ class SbtBuildToolTest {
     class ParseCommandTokensSecurity {
 
         @Test
-        @DisplayName("shell injection with && is rejected")
+        @DisplayName("shell injection with && passes through (trusted user)")
         void shellChainingWithAmpersandRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt compile && rm -rf /"))
-                    .withMessageContaining("sbt task not allowed");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt compile && rm -rf /");
+            assertThat(result).containsExactly("compile", "&&", "rm", "-rf", "/");
         }
 
         @Test
-        @DisplayName("piped commands are rejected")
+        @DisplayName("piped commands pass through (trusted user)")
         void pipedCommandsRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt compile | cat /etc/passwd"))
-                    .withMessageContaining("sbt task not allowed");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt compile | cat /etc/passwd");
+            assertThat(result).containsExactly("compile", "|", "cat", "/etc/passwd");
         }
 
         @Test
-        @DisplayName("command with $() is rejected")
+        @DisplayName("command with $() passes through (trusted user)")
         void dollarParenRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt test $(whoami)"))
-                    .withMessageContaining("sbt task not allowed");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt test $(whoami)");
+            assertThat(result).containsExactly("test", "$(whoami)");
         }
 
         @Test
-        @DisplayName("unknown task is rejected")
+        @DisplayName("unknown task passes through (trusted user)")
         void unknownTaskRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt deploy"))
-                    .withMessageContaining("sbt task not allowed");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt deploy");
+            assertThat(result).containsExactly("deploy");
         }
 
         @Test
-        @DisplayName("blocked -D flag is rejected")
+        @DisplayName("-D flag passes through (trusted user, no blocklist)")
         void blockedDFlagRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt compile -Dprop=value"))
-                    .withMessageContaining("Blocked sbt flag");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt compile -Dprop=value");
+            assertThat(result).containsExactly("compile", "-Dprop=value");
         }
 
         @Test
-        @DisplayName("blocked -J flag is rejected")
+        @DisplayName("-J flag passes through (trusted user, no blocklist)")
         void blockedJFlagRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt compile -J-Xmx2g"))
-                    .withMessageContaining("Blocked sbt flag");
+            String[] result = SbtBuildTool.parseCommandTokens("sbt compile -J-Xmx2g");
+            assertThat(result).containsExactly("compile", "-J-Xmx2g");
         }
 
         @Test
@@ -514,14 +504,12 @@ class SbtBuildToolTest {
     class BuildToolsServiceIntegration {
 
         @Test
-        @DisplayName("listBuildTools includes sbt with supported commands")
+        @DisplayName("listBuildTools includes sbt (trusted user, no command restriction)")
         void listBuildToolsIncludesSbt() {
             BuildToolProvider provider = new BuildToolProvider();
             BuildToolsService service = new BuildToolsService(provider);
             String listing = service.listBuildTools();
             assertThat(listing).contains("sbt:");
-            assertThat(listing).contains("compile");
-            assertThat(listing).contains("assembly");
         }
 
         @Test

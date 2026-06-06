@@ -97,19 +97,6 @@ public class MavenInvoker {
         return finalResult;
     }
 
-    // Allowed Maven lifecycle phases and version flags
-    private static final Set<String> ALLOWED_COMMANDS = Set.of(
-            "clean", "compile", "test", "package", "install", "deploy", "validate",
-            "--version", "-v", "-version",
-            "dependency:tree"  // read-only analysis, commonly needed
-    );
-
-    // Dangerous plugin goals that can execute arbitrary code
-    private static final Set<String> BLOCKED_PLUGIN_PREFIXES = Set.of(
-            "exec:", "ant:", "antrun:", "sql:", "groovy:", "shell:", "help:",
-            "dependency:", "resources:", "plugin:", "archetype:", "release:"
-    );
-
     // Safe Maven flag pattern: -Dkey=value, -f file, -P profile, -q, -X, -T4, -B, -U, etc.
     // Also accepts --long-flags like --batch-mode, --non-recursive
     private static final Pattern SAFE_ARG_PATTERN =
@@ -132,31 +119,13 @@ public class MavenInvoker {
         List<String> validated = new ArrayList<>();
 
         for (String token : tokens) {
-            // Check allowed commands first (includes --version, -v, -version)
-            if (ALLOWED_COMMANDS.contains(token)) {
+            // Non-flag tokens: trust the user — no allowlist restriction
+            if (!token.startsWith("-")) {
                 validated.add(token);
                 continue;
             }
 
-            // Block dangerous plugin goals (contains ':' and is not a flag)
-            if (token.contains(":")) {
-                for (String prefix : BLOCKED_PLUGIN_PREFIXES) {
-                    if (token.toLowerCase().startsWith(prefix)) {
-                        throw new IllegalArgumentException(
-                                "Blocked plugin goal: " + token +
-                                        ". Allowed commands: " + ALLOWED_COMMANDS);
-                    }
-                }
-            }
-
-            // Non-flag tokens must be in the allowed list
-            if (!token.startsWith("-")) {
-                throw new IllegalArgumentException(
-                        "Command not allowed: " + token +
-                                ". Allowed: " + ALLOWED_COMMANDS);
-            }
-
-            // Validate flags against safe pattern
+            // Validate flags against safe pattern (injection defense)
             if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
                 throw new IllegalArgumentException(
                         "Invalid flag/argument: " + token);

@@ -33,9 +33,10 @@ import java.util.regex.Pattern;
  * Commands are executed with {@code --no-daemon --console=plain} for clean,
  * machine-readable output suitable for MCP server contexts.
  * <p>
- * <b>Security:</b> All Gradle commands are validated against an allowlist of
- * safe tasks, a blocklist of dangerous flags, and a safe-argument pattern —
- * mirroring the same security model as {@link MavenInvoker}.
+ * <b>Security:</b> Flags are validated against a safe-argument pattern
+ * for injection defense. Non-flag tokens (tasks) are trusted —
+ * the user or client calling this tool is responsible for deciding
+ * which tasks to execute.
  * <p>
  * <b>Upgrade path:</b> When the Gradle Tooling API becomes available as a dependency,
  * switch {@link #executeCommand} to use {@code GradleConnector.newConnector()}
@@ -44,25 +45,8 @@ import java.util.regex.Pattern;
  */
 public class GradleBuildTool implements BuildTool {
 
-    private static final Set<String> ALLOWED_TASKS = Set.of(
-            "clean", "build", "test", "compileJava", "compileTestJava",
-            "jar", "assemble", "check", "publishToMavenLocal",
-            "dependencies", "projects", "tasks"
-    );
-
-    private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
-
     private static final List<String> MARKER_FILES = List.of(
             "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"
-    );
-
-    // Dangerous Gradle flags that enable code execution or arbitrary file access
-    private static final Set<String> BLOCKED_GRADLE_FLAGS = Set.of(
-            "--init-script", "-I",
-            "--build-file", "-b",
-            "--project-dir", "-p",
-            "--include-build",
-            "--system-prop", "-D"
     );
 
     // Safe Gradle flag pattern: --flag or -X (single letters for standard options)
@@ -74,8 +58,7 @@ public class GradleBuildTool implements BuildTool {
     private static final String EXECUTION_PROMPT = """
             You are an assistant for executing Gradle build commands. Follow these rules:
 
-            1. Only execute Gradle lifecycle tasks: clean, build, test, compileJava, compileTestJava,
-               jar, assemble, check, publishToMavenLocal, dependencies, projects, tasks.
+            1. Trust the user's judgment — execute any Gradle task they request.
             2. Supported flags: --no-daemon (always added), --console=plain (always added),
                -x, --exclude-task, --parallel, --configure-on-demand, --build-cache.
             3. Do not execute arbitrary system commands or shell scripts.
@@ -173,7 +156,7 @@ public class GradleBuildTool implements BuildTool {
 
     @Override
     public List<String> getSupportedCommands() {
-        return SUPPORTED_COMMANDS;
+        return Collections.emptyList();
     }
 
     @Override
@@ -220,9 +203,8 @@ public class GradleBuildTool implements BuildTool {
      * Parses a command string into validated Gradle task tokens.
      * Strips leading "gradle " or "gradlew " prefix, then splits on whitespace.
      * <p>
-     * <b>Security:</b> Every token is validated against: (1) the ALLOWED_TASKS set,
-     * (2) the BLOCKED_GRADLE_FLAGS blocklist, and (3) the SAFE_ARG_PATTERN regex.
-     * This mirrors the same security model as {@link MavenInvoker#getCommands(String)}.
+     * <b>Security:</b> Every token is validated against the SAFE_ARG_PATTERN regex
+     * for injection defense. Non-flag tokens are trusted (user judgment).
      */
     static String[] parseCommandTokens(String command) {
         if (command == null || command.trim().isEmpty()) {
@@ -248,31 +230,15 @@ public class GradleBuildTool implements BuildTool {
         List<String> validated = new ArrayList<>();
 
         for (String token : tokens) {
-            // Non-flag tokens must be in allowed list.
-            // For colon-separated Gradle project paths (e.g., ":app:build"), extract
-            // the task name (last colon-separated segment) for validation.
+            // Non-flag tokens: trust the user — no allowlist restriction.
+            // For colon-separated Gradle project paths (e.g., ":app:build"), the
+            // task name is the last colon-separated segment.
             if (!token.startsWith("-")) {
-                String taskName = token.contains(":")
-                        ? token.substring(token.lastIndexOf(':') + 1)
-                        : token;
-                if (!ALLOWED_TASKS.contains(taskName)) {
-                    throw new IllegalArgumentException(
-                            "Gradle task not allowed: " + taskName +
-                                    ". Allowed: " + ALLOWED_TASKS);
-                }
                 validated.add(token);
                 continue;
             }
 
-            // Block dangerous flags
-            for (String blocked : BLOCKED_GRADLE_FLAGS) {
-                if (token.startsWith(blocked)) {
-                    throw new IllegalArgumentException(
-                            "Blocked Gradle flag: " + token);
-                }
-            }
-
-            // Validate safe flags against pattern
+            // Validate safe flags against pattern (injection defense)
             if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
                 throw new IllegalArgumentException(
                         "Invalid flag/argument: " + token);

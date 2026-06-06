@@ -66,17 +66,12 @@ class GradleServiceTest {
         }
 
         @Test
-        @DisplayName("getSupportedCommands() returns expected Gradle tasks")
+        @DisplayName("getSupportedCommands() returns empty list (trusted user, no allowlist)")
         void supportedCommandsAreCorrect() {
             List<String> cmds = tool.getSupportedCommands();
             assertThat(cmds)
                     .isNotNull()
-                    .isNotEmpty()
-                    .containsExactlyInAnyOrder(
-                            "clean", "build", "test", "compileJava", "compileTestJava",
-                            "jar", "assemble", "check", "publishToMavenLocal",
-                            "dependencies", "projects", "tasks"
-                    );
+                    .isEmpty();
         }
 
         @Test
@@ -293,19 +288,18 @@ class GradleServiceTest {
         }
 
         @Test
-        @DisplayName("unicode task names rejected if not in allowlist")
+        @DisplayName("unicode task names pass through (trusted user, no allowlist)")
         void handlesUnicodeTaskNames() {
-            // Unicode task names are not in ALLOWED_TASKS — rejected by validation
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle test\u00E9 \u6771\u4EAC"))
-                    .withMessageContaining("Gradle task not allowed");
+            // Unicode task names are no longer blocked — trusted user
+            String[] result = GradleBuildTool.parseCommandTokens("gradle test\u00E9 \u6771\u4EAC");
+            assertThat(result).containsExactly("test\u00E9", "\u6771\u4EAC");
         }
     }
 
     // ──────────────────────────────────────────────
     //  parseCommandTokens() — security and edge cases
-    //  NOTE: parseCommandTokens now has full security validation (allowlist + blocklist + safe pattern).
-    //        Shell metacharacters, unsafe flags, and unknown tasks are now rejected at parse time.
+    //  NOTE: parseCommandTokens now trusts the user — no allowlist or blocklist.
+    //        Only SAFE_ARG_PATTERN (injection defense) remains for flags.
     // ──────────────────────────────────────────────
 
     @Nested
@@ -313,35 +307,31 @@ class GradleServiceTest {
     class ParseCommandTokensSecurity {
 
         @Test
-        @DisplayName("shell injection with && is now rejected by allowlist")
+        @DisplayName("shell injection with && passes through (trusted user)")
         void shellChainingWithDoubleAmpersandRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle clean && rm -rf /"))
-                    .withMessageContaining("Gradle task not allowed");
+            String[] result = GradleBuildTool.parseCommandTokens("gradle clean && rm -rf /");
+            assertThat(result).containsExactly("clean", "&&", "rm", "-rf", "/");
         }
 
         @Test
-        @DisplayName("piped commands are now rejected")
+        @DisplayName("piped commands pass through (trusted user)")
         void pipedCommandsRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle build | cat /etc/passwd"))
-                    .withMessageContaining("Gradle task not allowed");
+            String[] result = GradleBuildTool.parseCommandTokens("gradle build | cat /etc/passwd");
+            assertThat(result).containsExactly("build", "|", "cat", "/etc/passwd");
         }
 
         @Test
-        @DisplayName("command with $() is now rejected")
+        @DisplayName("command with $() passes through (trusted user)")
         void dollarParenRejected() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle test $(whoami)"))
-                    .withMessageContaining("Gradle task not allowed");
+            String[] result = GradleBuildTool.parseCommandTokens("gradle test $(whoami)");
+            assertThat(result).containsExactly("test", "$(whoami)");
         }
 
         @Test
-        @DisplayName("null byte in input: now rejected as unsupported token")
+        @DisplayName("null byte in input: passed through (trusted user)")
         void nullByteInInput() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle clean\0evil"))
-                    .withMessageContaining("Gradle task not allowed");
+            String[] result = GradleBuildTool.parseCommandTokens("gradle clean\0evil");
+            assertThat(result).containsExactly("clean\0evil");
         }
 
         @Test
@@ -655,14 +645,12 @@ class GradleServiceTest {
         }
 
         @Test
-        @DisplayName("listBuildTools includes gradle with supported commands")
+        @DisplayName("listBuildTools includes gradle (trusted user, no command restriction)")
         void listBuildToolsIncludesGradle() {
             BuildToolProvider provider = new BuildToolProvider();
             BuildToolsService service = new BuildToolsService(provider);
             String listing = service.listBuildTools();
             assertThat(listing).contains("gradle:");
-            assertThat(listing).contains("clean");
-            assertThat(listing).contains("build");
         }
 
         @Test
@@ -746,16 +734,14 @@ class GradleServiceTest {
         }
 
         @Test
-        @DisplayName("GAP: parseCommandTokens validates against ALLOWED_TASKS")
+        @DisplayName("parseCommandTokens trusts user — no allowlist restriction")
         void gapNoAllowlistInParseCommandTokens() {
-            // GradleBuildTool.parseCommandTokens() now validates non-flag tokens
-            // against ALLOWED_TASKS — mirroring MavenInvoker's security model.
-            // Non-allowed tasks are rejected with IllegalArgumentException.
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> GradleBuildTool.parseCommandTokens("gradle exec:exec"))
-                    .withMessageContaining("Gradle task not allowed");
+            // GradleBuildTool.parseCommandTokens() now trusts the user.
+            // Previously blocked tasks like exec:exec pass through.
+            String[] tokens = GradleBuildTool.parseCommandTokens("gradle exec:exec");
+            assertThat(tokens).containsExactly("exec:exec");
             // Allowed tasks pass through normally
-            String[] tokens = GradleBuildTool.parseCommandTokens("gradle clean build");
+            tokens = GradleBuildTool.parseCommandTokens("gradle clean build");
             assertThat(tokens).containsExactly("clean", "build");
         }
     }

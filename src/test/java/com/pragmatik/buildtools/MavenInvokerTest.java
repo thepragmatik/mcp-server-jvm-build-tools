@@ -129,12 +129,11 @@ class MavenInvokerTest {
         }
 
         @Test
-        @DisplayName("rejects unallowlisted bare tokens after flag arguments")
-        void rejectsUnallowlistedTokensAfterFlags() {
-            // "hello" is not in ALLOWED_COMMANDS — security hardening rejects it
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean -Dcmd=echo hello"))
-                    .withMessageContaining("Command not allowed");
+        @DisplayName("passes through tokens after flag arguments (trusted user)")
+        void passesTokensAfterFlags() {
+            // "hello" is no longer blocked — trust the user's judgment
+            String[] result = MavenInvoker.getCommands("mvn clean -Dcmd=echo hello");
+            assertThat(result).containsExactly("clean", "-Dcmd=echo", "hello");
         }
     }
 
