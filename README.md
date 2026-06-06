@@ -7,12 +7,6 @@
 
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
-## Demo — The Server Analyzing Itself
-
-![Dogfooding demo](docs/demo.gif)
-
-*Above: the MCP server detecting its own build tool, linting its own pom.xml (finding a real duplicate dependency), checking Spring AI version, and returning structured build output — all from one unified API.*
-
 ## Table of Contents
 
 - [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions)
