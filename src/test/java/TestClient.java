@@ -104,12 +104,52 @@ public class TestClient {
     // ── Server startup ──────────────────────────────────────────────────
 
     private static void startServer() {
+        if (!serverJarFile.exists() || isJarStale()) {
+            System.out.println("JAR missing or stale — rebuilding...");
+            rebuildJar();
+        }
         var stdioParams = ServerParameters.builder("java")
                 .args("-jar", serverJarPath)
                 .build();
         var stdioTransport = new StdioClientTransport(stdioParams);
         mcpClient = McpClient.sync(stdioTransport).build();
         mcpClient.initialize();
+    }
+
+    /** Returns true if any source file under src/main is newer than the JAR. */
+    private static boolean isJarStale() {
+        long jarTime = serverJarFile.lastModified();
+        File srcDir = new File("src/main");
+        return youngestFile(srcDir) > jarTime;
+    }
+
+    private static long youngestFile(File dir) {
+        long youngest = 0;
+        File[] files = dir.listFiles();
+        if (files == null) return 0;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                youngest = Math.max(youngest, youngestFile(f));
+            } else if (f.lastModified() > youngest) {
+                youngest = f.lastModified();
+            }
+        }
+        return youngest;
+    }
+
+    private static void rebuildJar() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("mvn", "package", "-DskipTests", "-q");
+            pb.inheritIO();
+            int exit = pb.start().waitFor();
+            if (exit != 0) {
+                System.err.println("WARNING: mvn package exited with code " + exit
+                        + " — using existing JAR if available");
+            }
+        } catch (Exception e) {
+            System.err.println("WARNING: Could not rebuild JAR: " + e.getMessage()
+                    + " — using existing JAR if available");
+        }
     }
 
     // ── Test methods ────────────────────────────────────────────────────
