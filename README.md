@@ -219,19 +219,14 @@ The agent detected the project type, ran the build, parsed the error, checked th
 
 ## Why This Server?
 
-|---|---|---|---|
-| **Multi build tool** | ✓ Maven + Gradle | ✗ Maven only | ✗ Gradle only |
-| **Auto-detection** | ✓ Detects pom.xml, build.gradle(.kts), settings.gradle(.kts) | N/A (single tool) | N/A (single tool) |
-| **Unified API** | ✓ Same `execute_build_command` for both | N/A | N/A |
-| **Dependency tools** | ✓ check_dependency_version | ✓ Extensive (10+ tools) | ✗ |
-| **Security hardening** | ✓ Allowlisting, shell injection blocking, path canonicalization | Partial | Partial |
-| **Gradle wrapper support** | ✓ Auto-detects and uses gradlew | ✗ (Maven only) | ✓ |
-| **SBT support** | ✓ SBT support | ✗ | ✗ |
-| **Project scaffolding** | Coming soon | ✗ | ✗ |
-| **Structured output** | ✓ analyze_build_output | ✗ | ✗ |
-
-> **💡 Honest Take**
->
+- **Multi build tool** — runs Maven, Gradle, and SBT builds through a single server and a single API
+- **Auto-detection** — scans for pom.xml, build.gradle(.kts), settings.gradle(.kts), and build.sbt with no manual config
+- **Unified API** — same `execute_build_command` call for every build tool, no context-switching
+- **Dependency tools** — `check_dependency_version` for fast Maven Central lookups
+- **Security hardening** — shell injection blocking, dangerous flag blocking, path canonicalization, input validation
+- **Gradle wrapper support** — auto-detects and uses gradlew; falls back to system Gradle
+- **SBT support** — `build.sbt` detection and standard SBT lifecycle commands
+- **Structured output** — `analyze_build_output` parses build results into structured data
 
 ## Supported Build Tools
 
@@ -452,14 +447,14 @@ The server enforces multiple layers of defense:
 
 | Layer | What It Protects Against |
 |---|---|
-| **Command allowlisting** | Only approved Maven lifecycle phases, Gradle tasks, and SBT commands are executable. Arbitrary plugin goals (e.g., `exec:exec`, `ant:ant`, `groovy:`) are blocked. |
+| **Trust-based execution** | No command allowlists — any Maven goal, Gradle task, or SBT command can be executed. The server trusts user judgment. |
 | **Shell metacharacter blocking** | Attempts at command chaining (`&&`, `||`, `;`), piping (`|`), command substitution (`$()`, backticks), and redirection (`>`, `<`) are rejected. |
 | **Dangerous flag blocking** | Gradle flags that enable arbitrary code execution (`--init-script`, `--build-file`, `--project-dir`, `-D`) are blocked. |
 | **Path canonicalization** | All paths are resolved via `toRealPath()` to prevent directory traversal (`../../etc/passwd`). |
 | **Input validation** | Commands are length-limited (500 chars). Non-existent paths are rejected before execution. |
 | **Process isolation** | Maven builds use `MavenInvoker` (out-of-process). Gradle builds use `ProcessBuilder` with `--no-daemon`. |
 
-**What the server does NOT restrict:** Within the allowed command set, you can run any lifecycle phase or task. The server trusts the LLM operator to know what they're doing — it protects against malicious input, not against intentional builds.
+**What the server does NOT restrict:** You can run any Maven goal, Gradle task, or SBT command. The server trusts the LLM operator to know what they're doing — it protects against malicious input, not against intentional builds.
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
