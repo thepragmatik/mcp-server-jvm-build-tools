@@ -7,14 +7,14 @@
 ## Table of Contents
 
 - [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions)
-- [Why This Server?](#why-this-server)
+- [Why Use This Server](#why-use-this-server)
 - [Supported Build Tools](#supported-build-tools)
 - [All Available Tools](#all-available-tools)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Examples](#examples)
 - [Security](#security)
-- [Comparison: Honest Take on Competitors](#comparison-honest-take-on-competitors)
+- [Project Philosophy](#project-philosophy)
 - [CI/CD](#cicd)
 - [Contributing](#contributing)
 - [License](#license)
@@ -218,23 +218,14 @@ Agent:  "Compilation fixed! The PaymentService.java file was missing an import
 
 The agent detected the project type, ran the build, parsed the error, checked the dependency version to confirm the class should exist, fixed the source file, and rebuilt — all without you touching a terminal.
 
-## Why This Server?
+## Why Use This Server
 
-| | This Server | arvindand/maven-tools | rnett/gradle-mcp |
-|---|---|---|---|
-| **Multi build tool** | ✓ Maven + Gradle | ✗ Maven only | ✗ Gradle only |
-| **Auto-detection** | ✓ Detects pom.xml, build.gradle(.kts), settings.gradle(.kts) | N/A (single tool) | N/A (single tool) |
-| **Unified API** | ✓ Same `execute_build_command` for both | N/A | N/A |
-| **Dependency tools** | ✓ check_dependency_version | ✓ Extensive (10+ tools) | ✗ |
-| **Security hardening** | ✓ Allowlisting, shell injection blocking, path canonicalization | Partial | Partial |
-| **Gradle wrapper support** | ✓ Auto-detects and uses gradlew | ✗ (Maven only) | ✓ |
-| **SBT support** | ✓ SBT support | ✗ | ✗ |
-| **Project scaffolding** | Coming soon | ✗ | ✗ |
-| **Structured output** | ✓ analyze_build_output | ✗ | ✗ |
-
-> **💡 Honest Take**
->
-> If you work exclusively with Maven and need deep dependency inspection (tree traversal, version resolution, transitive analysis), `arvindand/maven-tools` is excellent — it has specialized tools we don't yet match. If you work exclusively with Gradle, `rnett/gradle-mcp` is a fine single-tool server. **Choose this server when you want one MCP server that handles multiple build tools, auto-detects your projects, and gives you a unified interface across Maven, Gradle, and SBT.**
+- **One server for Maven, Gradle, and SBT builds** — no switching between servers, no separate configs. A single MCP server covers your entire JVM project portfolio.
+- **Auto-detection** — drop the server into any project directory and it detects `pom.xml`, `build.gradle(.kts)`, or `build.sbt` automatically. No manual tool selection per project.
+- **Structured build output** — parse errors, test counts, and warnings into structured data that AI agents can act on directly, not raw terminal dumps.
+- **Build validation** — catch issues before executing. Commands are validated against allowed sets, paths are canonicalized, and shell injection attempts are blocked before they reach the build tool.
+- **Dependency version lookups via Maven Central** — check latest versions and stability of any published artifact without leaving the conversation.
+- **Security hardening** — layered defense: command allowlisting, shell metacharacter blocking, path canonicalization, input validation, and process isolation.
 
 ## Supported Build Tools
 
@@ -468,20 +459,12 @@ The server enforces multiple layers of defense:
 
 239 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `BuildOutputParserTest.java`, and `BuildConfigurationValidationTest.java`.
 
-## Comparison: Honest Take on Competitors
+## Project Philosophy
 
-### arvindand/maven-tools
-**Strengths:** The gold standard for Maven dependency analysis. Offers 10+ specialized tools for dependency tree traversal, version resolution, transitive dependency inspection, and POM manipulation. If dependency management is your primary use case with Maven, this is the tool to beat.
-
-**Our territory:** We offer multi-tool execution (Maven + Gradle + SBT), auto-detection, and a unified API. Our `check_dependency_version` tool provides fast dependency lookups, with more analysis tools on the roadmap.
-
-### rnett/gradle-mcp
-**Strengths:** Deep Gradle integration with Gradle Tooling API for rich build introspection.
-
-**Our territory:** We support Maven, Gradle, and SBT in one server, with auto-detection so you never have to specify which tool to use. We focus on unified execution across the entire JVM ecosystem, not just one build system.
-
-### Our Unique Position
-We are the **only MCP server that gives you one interface for all JVM build tools**. No context-switching between servers. No manual configuration per project. One server, auto-detection, unified API — Maven, Gradle, and SBT under one roof.
+- **Multi-tool by design, not an afterthought** — Maven, Gradle, and SBT support are built into the server's core architecture through a `BuildTool` SPI. Each tool is a first-class implementation, not a bolt-on.
+- **Security-first** — layered validation before any command executes. Allowlisting, shell injection blocking, and path canonicalization aren't optional features; they're the foundation every command passes through.
+- **Extensible** — new build tools integrate via the `BuildTool` service-provider interface. Adding support for a new build system means implementing one interface, not rearchitecting the server.
+- **Pragmatic** — Maven-native terminology, familiar lifecycle concepts, and build-tool-idiomatic commands. The server meets you where you already are, using the vocabulary you already know.
 
 ## CI/CD
 
