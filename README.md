@@ -245,7 +245,7 @@ The agent detected the project type, ran the build, parsed the error, checked th
 |---|---|---|---|
 | Execute builds | ✓ 7 lifecycle phases | ✓ 11 tasks | ✓ |
 | Version query | ✓ (embedder, no external process) | ✓ (CLI) | ✓ (CLI) |
-| Command allowlisting | ✓ | ✓ | ✓ |
+| Trust-based execution | ✓ | ✓ | ✓ |
 | Shell injection protection | ✓ | ✓ | ✓ |
 | Path canonicalization | ✓ | ✓ | ✓ |
 | Multi-module projects | ✓ | ✓ (`:subproject:task`) | ✓ |
