@@ -27,16 +27,30 @@ import java.util.Map;
 
 public class TestClient {
 
+    /** Resolve a test project directory, trying classpath first, then filesystem. */
+    private static String resolveTestProjectDir(String name) {
+        // Try classpath — works regardless of CWD
+        var url = TestClient.class.getClassLoader().getResource(name + "/pom.xml");
+        if (url == null) {
+            url = TestClient.class.getClassLoader().getResource(name + "/build.gradle");
+        }
+        if (url == null) {
+            url = TestClient.class.getClassLoader().getResource(name + "/build.sbt");
+        }
+        if (url != null && "file".equals(url.getProtocol())) {
+            return new File(url.getPath()).getParent();
+        }
+        // Fallback: resolve relative to project root (CWD)
+        return new File("src/test/resources/" + name).getAbsolutePath();
+    }
+
     private static final String currentProjectDir = new File(".").getAbsolutePath();
 
-    private static final String mavenTestProjectDir =
-            new File("src/test/resources/test-maven-project").getAbsolutePath();
+    private static final String mavenTestProjectDir = resolveTestProjectDir("test-maven-project");
 
-    private static final String gradleTestProjectDir =
-            new File("src/test/resources/test-gradle-project").getAbsolutePath();
+    private static final String gradleTestProjectDir = resolveTestProjectDir("test-gradle-project");
 
-    private static final String sbtTestProjectDir =
-            new File("src/test/resources/test-sbt-project").getAbsolutePath();
+    private static final String sbtTestProjectDir = resolveTestProjectDir("test-sbt-project");
 
     private static final String mavenHome = resolveMavenHome();
 
@@ -189,7 +203,7 @@ public class TestClient {
         if (output.contains("Unknown build tool")) {
             pass("Server reported unknown tool");
         } else {
-            System.err.println("FAIL: Expected 'Unknown build tool' but got: " + output);
+            System.err.println("FAIL: Server reported unknown tool — expected 'Unknown build tool' but got: " + output);
             failed++;
         }
 
@@ -203,7 +217,7 @@ public class TestClient {
                 || output.contains("not a directory")) {
             pass("Server reported invalid project dir");
         } else {
-            System.err.println("FAIL: Expected error for bad project dir but got: " + output);
+            System.err.println("FAIL: Server reported invalid project dir — expected path error but got: " + output);
             failed++;
         }
     }
@@ -221,8 +235,9 @@ public class TestClient {
             System.err.println("FAIL: Server executed injected command: " + output);
             failed++;
         } else {
-            System.err.println("INFO: Unexpected response for injection test: " + output);
-            passed++; // still blocking in some form
+            // Unexpected response — regressions deserve investigation, not a free pass
+            System.err.println("FAIL: Unexpected response to injection test: " + output);
+            failed++;
         }
     }
 
