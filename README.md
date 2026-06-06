@@ -13,6 +13,12 @@
 
 *Above: the MCP server detecting its own build tool, linting its own pom.xml (finding a real duplicate dependency), checking Spring AI version, and returning structured build output — all from one unified API.*
 
+## Demo — Real MCP Client
+
+![MCP client demo](docs/mcp-inspector.gif)
+
+*Above: a Python MCP client connecting over stdio, listing all 7 tools, detecting the Maven project, validating its pom.xml, and querying Maven Central — no AI involved, just the MCP protocol.*
+
 ## Table of Contents
 
 - [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions)
