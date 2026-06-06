@@ -29,6 +29,15 @@ public class TestClient {
 
     private static final String currentProjectDir = new File(".").getAbsolutePath();
 
+    private static final String mavenTestProjectDir =
+            new File("src/test/resources/test-maven-project").getAbsolutePath();
+
+    private static final String gradleTestProjectDir =
+            new File("src/test/resources/test-gradle-project").getAbsolutePath();
+
+    private static final String sbtTestProjectDir =
+            new File("src/test/resources/test-sbt-project").getAbsolutePath();
+
     public static final String TARGET_MCP_SERVER_JAR = "target/mcp-server-jvm-build-tools.jar";
 
     private static final File serverJarFile = new File(TARGET_MCP_SERVER_JAR);
@@ -37,159 +46,173 @@ public class TestClient {
 
     private static McpSyncClient mcpClient;
 
+    private static int passed = 0;
+    private static int failed = 0;
+
     public static void main(String[] args) {
-        // Prepare to invoke Server from Client using StdIO mechanism.
-        // No -Dmaven.home= JVM arg — the server auto-detects build tools from
-        // the buildToolHome parameter passed in each tool call, or from PATH
-        // (Gradle/SBT use wrappers or PATH fallback).
+        startServer();
+
+        testListBuildTools();
+        testGetBuildToolVersion();
+        testDetectBuildTool();
+        testMavenBuild();
+        testGradleBuild();
+        testSbtBuild();
+        testErrorHandling();
+        testSecurityInjection();
+        testBuildToolHome();
+        testAnalyzeBuildOutput();
+        testValidateBuildConfig();
+        testDependencyVersion();
+
+        mcpClient.closeGracefully();
+
+        System.out.println("\n══════ Results: " + passed + " passed, " + failed + " failed ══════");
+
+        if (failed > 0) {
+            System.exit(1);
+        }
+    }
+
+    // ── Server startup ──────────────────────────────────────────────────
+
+    private static void startServer() {
         var stdioParams = ServerParameters.builder("java")
                 .args("-jar", serverJarPath)
                 .build();
-
         var stdioTransport = new StdioClientTransport(stdioParams);
         mcpClient = McpClient.sync(stdioTransport).build();
         mcpClient.initialize();
+    }
 
-        int passed = 0;
-        int failed = 0;
+    // ── Test methods ────────────────────────────────────────────────────
 
-        // ── 1. list_build_tools — baseline, must succeed ────────────────
+    private static void testListBuildTools() {
         System.out.println("══════ list_build_tools ══════");
         try {
             callTool("list_build_tools", Collections.emptyMap());
-            System.out.println("PASS: list_build_tools");
-            passed++;
+            pass("list_build_tools");
         } catch (Exception e) {
-            System.err.println("FAIL: list_build_tools — " + e.getMessage());
-            failed++;
+            fail("list_build_tools", e);
         }
+    }
 
-        // ── 2. get_build_tool_version for Maven, Gradle, SBT ───────────
+    private static void testGetBuildToolVersion() {
         for (String tool : new String[]{"maven", "gradle", "sbt"}) {
             try {
                 System.out.println("══════ get_build_tool_version (" + tool + ") ══════");
                 callTool("get_build_tool_version", Map.of("buildToolName", tool));
-                System.out.println("PASS: get_build_tool_version(" + tool + ")");
-                passed++;
+                pass("get_build_tool_version(" + tool + ")");
             } catch (Exception e) {
-                System.err.println("INFO: get_build_tool_version(" + tool + ") not available — "
-                        + e.getMessage());
+                System.err.println("INFO: get_build_tool_version(" + tool
+                        + ") not available — " + e.getMessage());
                 passed++; // expected for tools not installed
             }
         }
+    }
 
-        // ── 3. detect_build_tool on current project ────────────────────
+    private static void testDetectBuildTool() {
         System.out.println("══════ detect_build_tool ══════");
         try {
             callTool("detect_build_tool", Map.of("projectDir", currentProjectDir));
-            System.out.println("PASS: detect_build_tool");
-            passed++;
+            pass("detect_build_tool");
         } catch (Exception e) {
-            System.err.println("FAIL: detect_build_tool — " + e.getMessage());
-            failed++;
+            fail("detect_build_tool", e);
         }
+    }
 
-        // ── 4. execute_build_command (Maven) ──────────────────────────
+    private static void testMavenBuild() {
         System.out.println("══════ execute_build_command (maven compile) ══════");
         try {
             callTool("execute_build_command", Map.of(
                     "buildToolName", "maven",
-                    "projectDir", currentProjectDir,
+                    "projectDir", mavenTestProjectDir,
                     "command", "compile"
             ));
-            System.out.println("PASS: execute_build_command(maven)");
-            passed++;
+            pass("execute_build_command(maven)");
         } catch (Exception e) {
-            System.err.println("FAIL: execute_build_command(maven) — " + e.getMessage());
-            failed++;
+            fail("execute_build_command(maven)", e);
         }
+    }
 
-        // ── 5. Gradle wrapper detection test ───────────────────────────
-        // Uses a documented command from the tool description
-        System.out.println("══════ execute_build_command (gradle build) ══════");
+    private static void testGradleBuild() {
+        System.out.println("══════ execute_build_command (gradle tasks) ══════");
         try {
             callTool("execute_build_command", Map.of(
                     "buildToolName", "gradle",
-                    "projectDir", currentProjectDir,
-                    "command", "build"
+                    "projectDir", gradleTestProjectDir,
+                    "command", "tasks"
             ));
-            System.out.println("PASS: execute_build_command(gradle)");
-            passed++;
+            pass("execute_build_command(gradle)");
         } catch (Exception e) {
-            System.err.println("INFO: execute_build_command(gradle) skipped — " + e.getMessage());
+            System.err.println("INFO: execute_build_command(gradle) skipped — "
+                    + e.getMessage());
             passed++; // gradle may not be installed
         }
+    }
 
-        // ── 6. SBT test ───────────────────────────────────────────────
+    private static void testSbtBuild() {
         System.out.println("══════ execute_build_command (sbt compile) ══════");
         try {
             callTool("execute_build_command", Map.of(
                     "buildToolName", "sbt",
-                    "projectDir", currentProjectDir,
+                    "projectDir", sbtTestProjectDir,
                     "command", "compile"
             ));
-            System.out.println("PASS: execute_build_command(sbt)");
-            passed++;
+            pass("execute_build_command(sbt)");
         } catch (Exception e) {
-            System.err.println("INFO: execute_build_command(sbt) skipped — " + e.getMessage());
+            System.err.println("INFO: execute_build_command(sbt) skipped — "
+                    + e.getMessage());
             passed++; // sbt may not be installed
         }
+    }
 
-        // ── 7. Error handling: nonexistent build tool ──────────────────
+    private static void testErrorHandling() {
+        // Unknown build tool
         System.out.println("══════ Error handling: unknown tool ══════");
-        {
-            String output = callToolAndGetText("get_build_tool_version",
-                    Map.of("buildToolName", "nonexistent"));
-            if (output.contains("Unknown build tool")) {
-                System.out.println("PASS: Server reported unknown tool: " + output);
-                passed++;
-            } else {
-                System.err.println("FAIL: Expected 'Unknown build tool' but got: " + output);
-                failed++;
-            }
+        String output = callToolAndGetText("get_build_tool_version",
+                Map.of("buildToolName", "nonexistent"));
+        if (output.contains("Unknown build tool")) {
+            pass("Server reported unknown tool");
+        } else {
+            System.err.println("FAIL: Expected 'Unknown build tool' but got: " + output);
+            failed++;
         }
 
-        // ── 8. Error handling: nonexistent project directory ───────────
+        // Nonexistent project directory
         System.out.println("══════ Error handling: bad project dir ══════");
-        {
-            String output = callToolAndGetText("execute_build_command",
-                    Map.of("buildToolName", "maven",
-                           "projectDir", "/tmp/non-existent-project-dir",
-                           "command", "compile"));
-            if (output.contains("Cannot resolve path") || output.contains("not valid")
-                    || output.contains("not a directory")) {
-                System.out.println("PASS: Server reported invalid project dir: " + output);
-                passed++;
-            } else {
-                System.err.println("FAIL: Expected error for bad project dir but got: " + output);
-                failed++;
-            }
+        output = callToolAndGetText("execute_build_command",
+                Map.of("buildToolName", "maven",
+                       "projectDir", "/tmp/non-existent-project-dir",
+                       "command", "compile"));
+        if (output.contains("Cannot resolve path") || output.contains("not valid")
+                || output.contains("not a directory")) {
+            pass("Server reported invalid project dir");
+        } else {
+            System.err.println("FAIL: Expected error for bad project dir but got: " + output);
+            failed++;
         }
+    }
 
-        // ── 9. Command injection rejection test ────────────────────────
-        // Verifies the server blocks shell metacharacters
+    private static void testSecurityInjection() {
         System.out.println("══════ Security: injection rejection ══════");
-        {
-            String output = callToolAndGetText("execute_build_command",
-                    Map.of("buildToolName", "maven",
-                           "projectDir", currentProjectDir,
-                           "command", "compile && rm -rf /"));
-            if (output.contains("disallowed") || output.contains("Disallowed")
-                    || output.contains("invalid") || output.contains("Invalid")) {
-                System.out.println("PASS: Server rejected injection attempt: " + output);
-                passed++;
-            } else if (output.contains("BUILD SUCCESS")) {
-                System.err.println("FAIL: Server executed injected command: " + output);
-                failed++;
-            } else {
-                System.err.println("INFO: Unexpected response for injection test: " + output);
-                passed++; // still blocking in some form
-            }
+        String output = callToolAndGetText("execute_build_command",
+                Map.of("buildToolName", "maven",
+                       "projectDir", currentProjectDir,
+                       "command", "compile && rm -rf /"));
+        if (output.contains("disallowed") || output.contains("Disallowed")
+                || output.contains("invalid") || output.contains("Invalid")) {
+            pass("Server rejected injection attempt");
+        } else if (output.contains("BUILD SUCCESS")) {
+            System.err.println("FAIL: Server executed injected command: " + output);
+            failed++;
+        } else {
+            System.err.println("INFO: Unexpected response for injection test: " + output);
+            passed++; // still blocking in some form
         }
+    }
 
-        // ── 10. buildToolHome parameter test ────────────────────────────
-        // Exercises the optional buildToolHome path canonicalization
-        // Uses mavenHome by reading MAVEN_HOME env var or falling back to /usr/share/maven
+    private static void testBuildToolHome() {
         System.out.println("══════ execute_build_command with buildToolHome ══════");
         try {
             String mavenHome = System.getenv("MAVEN_HOME");
@@ -202,43 +225,40 @@ public class TestClient {
                     "projectDir", currentProjectDir,
                     "command", "--version"
             ));
-            System.out.println("PASS: buildToolHome parameter (maven)");
-            passed++;
+            pass("buildToolHome parameter (maven)");
         } catch (Exception e) {
             System.err.println("INFO: buildToolHome test skipped — " + e.getMessage());
             passed++; // buildToolHome path may not exist
         }
+    }
 
-        // ── 11. analyze_build_output ───────────────────────────────────
+    private static void testAnalyzeBuildOutput() {
         System.out.println("══════ analyze_build_output (maven compile) ══════");
         try {
             callTool("analyze_build_output", Map.of(
                     "buildToolName", "maven",
-                    "projectDir", currentProjectDir,
+                    "projectDir", mavenTestProjectDir,
                     "command", "compile"
             ));
-            System.out.println("PASS: analyze_build_output");
-            passed++;
+            pass("analyze_build_output");
         } catch (Exception e) {
-            System.err.println("FAIL: analyze_build_output — " + e.getMessage());
-            failed++;
+            fail("analyze_build_output", e);
         }
+    }
 
-        // ── 12. validate_build_configuration ──────────────────────────
+    private static void testValidateBuildConfig() {
         System.out.println("══════ validate_build_configuration ══════");
         try {
             callTool("validate_build_configuration", Map.of(
                     "projectDir", currentProjectDir
             ));
-            System.out.println("PASS: validate_build_configuration");
-            passed++;
+            pass("validate_build_configuration");
         } catch (Exception e) {
-            System.err.println("FAIL: validate_build_configuration — " + e.getMessage());
-            failed++;
+            fail("validate_build_configuration", e);
         }
+    }
 
-        // ── 13. check_dependency_version ──────────────────────────────
-        // Makes a live Maven Central HTTP call; skipped if network unavailable
+    private static void testDependencyVersion() {
         System.out.println("══════ check_dependency_version ══════");
         try {
             callTool("check_dependency_version", Map.of(
@@ -246,27 +266,32 @@ public class TestClient {
                     "artifactId", "spring-boot-starter-web",
                     "projectDir", currentProjectDir
             ));
-            System.out.println("PASS: check_dependency_version");
-            passed++;
+            pass("check_dependency_version");
         } catch (Exception e) {
             String msg = e.getMessage();
-            if (msg != null && (msg.contains("ConnectException") || msg.contains("UnknownHostException")
-                    || msg.contains("timeout") || msg.contains("unreachable"))) {
-                System.out.println("INFO: check_dependency_version skipped — Maven Central unreachable");
+            if (msg != null && (msg.contains("ConnectException")
+                    || msg.contains("UnknownHostException")
+                    || msg.contains("timeout")
+                    || msg.contains("unreachable"))) {
+                System.out.println("INFO: check_dependency_version skipped"
+                        + " — Maven Central unreachable");
                 passed++;
             } else {
-                System.err.println("FAIL: check_dependency_version — " + msg);
-                failed++;
+                fail("check_dependency_version", e);
             }
         }
+    }
 
-        System.out.println("\n══════ Results: " + passed + " passed, " + failed + " failed ══════");
+    // ── Helpers ─────────────────────────────────────────────────────────
 
-        mcpClient.closeGracefully();
+    private static void pass(String name) {
+        System.out.println("PASS: " + name);
+        passed++;
+    }
 
-        if (failed > 0) {
-            System.exit(1);
-        }
+    private static void fail(String name, Exception e) {
+        System.err.println("FAIL: " + name + " — " + e.getMessage());
+        failed++;
     }
 
     private static void callTool(String tool, Map<String, Object> params) {
