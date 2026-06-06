@@ -38,6 +38,19 @@ public class TestClient {
     private static final String sbtTestProjectDir =
             new File("src/test/resources/test-sbt-project").getAbsolutePath();
 
+    private static final String mavenHome = resolveMavenHome();
+
+    private static String resolveMavenHome() {
+        String home = System.getenv("MAVEN_HOME");
+        if (home != null && !home.isBlank()) return home;
+        // Common installation paths
+        for (String candidate : new String[]{"/opt/apache-maven-3.9.9", "/usr/share/maven",
+                "/usr/local/maven", "/opt/homebrew/opt/maven/libexec"}) {
+            if (new File(candidate, "bin/mvn").exists()) return candidate;
+        }
+        return null;
+    }
+
     public static final String TARGET_MCP_SERVER_JAR = "target/mcp-server-jvm-build-tools.jar";
 
     private static final File serverJarFile = new File(TARGET_MCP_SERVER_JAR);
@@ -124,11 +137,12 @@ public class TestClient {
     private static void testMavenBuild() {
         System.out.println("══════ execute_build_command (maven compile) ══════");
         try {
-            callTool("execute_build_command", Map.of(
-                    "buildToolName", "maven",
-                    "projectDir", mavenTestProjectDir,
-                    "command", "compile"
-            ));
+            Map<String, Object> params = new java.util.HashMap<>();
+            params.put("buildToolName", "maven");
+            params.put("projectDir", mavenTestProjectDir);
+            params.put("command", "compile");
+            if (mavenHome != null) params.put("buildToolHome", mavenHome);
+            callTool("execute_build_command", params);
             pass("execute_build_command(maven)");
         } catch (Exception e) {
             fail("execute_build_command(maven)", e);
@@ -215,13 +229,10 @@ public class TestClient {
     private static void testBuildToolHome() {
         System.out.println("══════ execute_build_command with buildToolHome ══════");
         try {
-            String mavenHome = System.getenv("MAVEN_HOME");
-            if (mavenHome == null || mavenHome.isBlank()) {
-                mavenHome = "/usr/share/maven";
-            }
+            String home = mavenHome != null ? mavenHome : "/usr/share/maven";
             callTool("execute_build_command", Map.of(
                     "buildToolName", "maven",
-                    "buildToolHome", mavenHome,
+                    "buildToolHome", home,
                     "projectDir", currentProjectDir,
                     "command", "--version"
             ));
@@ -235,11 +246,12 @@ public class TestClient {
     private static void testAnalyzeBuildOutput() {
         System.out.println("══════ analyze_build_output (maven compile) ══════");
         try {
-            callTool("analyze_build_output", Map.of(
-                    "buildToolName", "maven",
-                    "projectDir", mavenTestProjectDir,
-                    "command", "compile"
-            ));
+            Map<String, Object> params = new java.util.HashMap<>();
+            params.put("buildToolName", "maven");
+            params.put("projectDir", mavenTestProjectDir);
+            params.put("command", "compile");
+            if (mavenHome != null) params.put("buildToolHome", mavenHome);
+            callTool("analyze_build_output", params);
             pass("analyze_build_output");
         } catch (Exception e) {
             fail("analyze_build_output", e);
