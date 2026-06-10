@@ -1,0 +1,40 @@
+name: Maven Release Package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-test-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # ── Phase 1: Verify tests pass before cutting a release ──
+      - name: Run tests
+        run: mvn -B verify --file pom.xml --no-transfer-progress
+
+      # ── Phase 2: Package (skip tests — already ran) ──
+      - name: Package artifact
+        run: mvn -B package -DskipTests --file pom.xml
+
+      # ── Phase 3: Create GitHub Release ──
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            target/*.jar
+          fail_on_unmatched_files: true
