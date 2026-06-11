@@ -87,7 +87,7 @@ New build tools (Bazel, Ant, etc.) can be added by implementing this interface.
 - Detects projects via `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts`
 - Supported commands: `clean`, `build`, `test`, `compileJava`, `compileTestJava`, `jar`, `assemble`, `check`, `publishToMavenLocal`, `dependencies`, `projects`, `tasks`
 - Safe flags: `-x`, `--exclude-task`, `--parallel`, `--configure-on-demand`, `--build-cache`
-- Blocked flags: `--init-script`, `--build-file`, `--project-dir`, `--include-build`, `--system-prop`, `-D`
+- Blocked flags: `--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`, `-D`
 
 #### `SbtBuildTool`
 - CLI invocation via `ProcessBuilder` with `--no-colors`
