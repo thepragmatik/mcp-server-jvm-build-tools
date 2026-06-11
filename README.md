@@ -7,12 +7,6 @@
 
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
-## Demo — The Server Analyzing Itself
-
-![Dogfooding demo](docs/demo.gif)
-
-*Above: the MCP server detecting its own build tool, linting its own pom.xml (finding a real duplicate dependency), checking Spring AI version, and returning structured build output — all from one unified API.*
-
 ## Table of Contents
 
 - [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions)
@@ -496,4 +490,4 @@ Apache License 2.0. See [LICENSE](LICENSE).
 ---
 
 **Repository:** [github.com/thepragmatik/mcp-server-jvm-build-tools](https://github.com/thepragmatik/mcp-server-jvm-build-tools)
-**Built with:** Spring Boot 3.4.4, Spring AI 1.0.0-M6, MCP SDK 0.8.0, Maven Embedder 3.9.9
+**Built with:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.9
