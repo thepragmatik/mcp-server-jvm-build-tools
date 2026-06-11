@@ -16,9 +16,6 @@
  */
 
 import io.modelcontextprotocol.client.McpClient;
-import io.modelcontextprotocol.json.McpJsonMapper;
-import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
-import tools.jackson.databind.json.JsonMapper;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.ServerParameters;
 import io.modelcontextprotocol.client.transport.StdioClientTransport;
@@ -114,7 +111,7 @@ public class TestClient {
         var stdioParams = ServerParameters.builder("java")
                 .args("-jar", serverJarPath)
                 .build();
-        var stdioTransport = new StdioClientTransport(stdioParams, new JacksonMcpJsonMapper(new JsonMapper()));
+        var stdioTransport = new StdioClientTransport(stdioParams);
         mcpClient = McpClient.sync(stdioTransport).build();
         mcpClient.initialize();
     }

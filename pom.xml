@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
+
      Copyright 2025 Rahul Thakur
 
      Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +22,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>3.4.4</version>
         <relativePath />
     </parent>
 
@@ -39,10 +40,9 @@
     </scm>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <spring-ai.version>2.0.0-RC2</spring-ai.version>
+        <spring-ai.version>1.0.0-M6</spring-ai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <licenses>
@@ -55,12 +55,22 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-mcp</artifactId>
+            <artifactId>spring-ai-mcp-server-spring-boot-starter</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.modelcontextprotocol.sdk</groupId>
+                    <artifactId>mcp</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Override MCP SDK to fix Claude Desktop compatibility:
+             SDK < 0.8.0 rejects unknown fields in ClientCapabilities (e.g. "extensions"
+             sent by Claude's 2025-11-25 protocol). 0.8.0+ has @JsonIgnoreProperties. -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>0.8.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

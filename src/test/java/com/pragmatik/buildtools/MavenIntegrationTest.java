@@ -20,7 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.model.function.FunctionCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,48 +59,48 @@ class MavenIntegrationTest {
         @Test
         @DisplayName("ToolCallbackProvider resolves get_build_tool_version tool")
         void resolvesGetBuildToolVersionTool() {
-            ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
             assertThat(toolCallbacks).isNotNull();
             assertThat(toolCallbacks).isNotEmpty();
 
             boolean hasVersionTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "get_build_tool_version".equals(tc.getToolDefinition().name()));
+                    .anyMatch(tc -> "get_build_tool_version".equals(tc.getName()));
             assertThat(hasVersionTool).isTrue();
         }
 
         @Test
         @DisplayName("ToolCallbackProvider resolves execute_build_command tool")
         void resolvesExecuteBuildCommandTool() {
-            ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
             boolean hasExecTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "execute_build_command".equals(tc.getToolDefinition().name()));
+                    .anyMatch(tc -> "execute_build_command".equals(tc.getName()));
             assertThat(hasExecTool).isTrue();
         }
 
         @Test
         @DisplayName("ToolCallbackProvider resolves list_build_tools tool")
         void resolvesListBuildToolsTool() {
-            ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
             boolean hasListTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "list_build_tools".equals(tc.getToolDefinition().name()));
+                    .anyMatch(tc -> "list_build_tools".equals(tc.getName()));
             assertThat(hasListTool).isTrue();
         }
 
         @Test
         @DisplayName("ToolCallbackProvider resolves detect_build_tool tool (Phase 1)")
         void resolvesDetectBuildToolTool() {
-            ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
             boolean hasDetectTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "detect_build_tool".equals(tc.getToolDefinition().name()));
+                    .anyMatch(tc -> "detect_build_tool".equals(tc.getName()));
             assertThat(hasDetectTool).isTrue();
         }
 
         @Test
         @DisplayName("ToolCallbackProvider resolves check_dependency_version tool (Phase 1)")
         void resolvesCheckDependencyVersionTool() {
-            ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
+            FunctionCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
             boolean hasDepTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "check_dependency_version".equals(tc.getToolDefinition().name()));
+                    .anyMatch(tc -> "check_dependency_version".equals(tc.getName()));
             assertThat(hasDepTool).isTrue();
         }
     }
