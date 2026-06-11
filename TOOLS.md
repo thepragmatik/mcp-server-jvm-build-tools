@@ -285,7 +285,7 @@ Response: {...,"detectedBuildTool":"gradle","dependencySyntax":{"gradle":"implem
 
 ## analyze_build_output
 
-Execute a build and return structured JSON with parsed test results, errors, and warnings.
+Execute a build and return structured JSON with parsed test results, errors, and warnings. Supports Maven and Gradle only (SBT output parsing not yet implemented).
 
 **Parameters:**
 
@@ -329,6 +329,8 @@ Execute a build and return structured JSON with parsed test results, errors, and
 ```
 
 **Parsers:**
+> **Note:** SBT output parsing is not yet supported. SBT builds can still be executed via `execute_build_command`, but the output will be raw text rather than structured JSON.
+
 - **MavenOutputParser**: Extracts BUILD SUCCESS/FAILURE, test counts (Tests run/Failures/Errors/Skipped), compile errors with file:line, warnings
 - **GradleOutputParser**: Extracts BUILD SUCCESSFUL/FAILED, test summaries, error references, warnings
 
@@ -352,7 +354,7 @@ Response: {"success":false,"tool":"gradle","command":"build",
 
 ## validate_build_configuration
 
-Validate build configuration files for correctness without executing the build.
+Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for correctness without executing the build. SBT build.sbt validation not yet supported.
 
 **Parameters:**
 
@@ -398,6 +400,8 @@ Validate build configuration files for correctness without executing the build.
 | Plugin version consistency | Cross-version checks planned | N/A |
 | Kotlin DSL structure | N/A | Basic structure checks |
 | Buildscript/plugins | N/A | Plugin presence check |
+| SBT (build.sbt) | Not validated | Not validated |
+
 
 **Examples:**
 ```
