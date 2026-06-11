@@ -65,7 +65,7 @@ All changes must go through Pull Requests. Branch protection enforces:
 ### Quality Gates
 
 Every PR must pass:
-1. **JUnit tests** — 240 tests, 0 failures required
+1. **JUnit tests** — 238 tests, 0 failures required
 2. **JaCoCo coverage** — reports generated (thresholds pending)
 3. **License headers** — mvn license:format runs (non-blocking)
 4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
@@ -107,7 +107,7 @@ Reviews are posted to GitHub for a permanent audit trail.
 | Staging branch     | All 5 features integrated, CI green                       |
 | Active PR          | #6 (staging → main) — pending review                      |
 | Coverage           | 48% instruction / 33% branch / 46% line                   |
-| Tests              | 240 |
+| Tests              | 238 |
 
 ### Recovery
 

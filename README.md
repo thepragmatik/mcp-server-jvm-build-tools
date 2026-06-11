@@ -461,19 +461,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-239 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `BuildOutputParserTest.java`, and `BuildConfigurationValidationTest.java`.
-
-
-**Strengths:** The gold standard for Maven dependency analysis. Offers 10+ specialized tools for dependency tree traversal, version resolution, transitive dependency inspection, and POM manipulation. If dependency management is your primary use case with Maven, this is the tool to beat.
-
-**Our territory:** We offer multi-tool execution (Maven + Gradle + SBT), auto-detection, and a unified API. Our `check_dependency_version` tool provides fast dependency lookups, with more analysis tools on the roadmap.
-
-**Strengths:** Deep Gradle integration with Gradle Tooling API for rich build introspection.
-
-**Our territory:** We support Maven, Gradle, and SBT in one server, with auto-detection so you never have to specify which tool to use. We focus on unified execution across the entire JVM ecosystem, not just one build system.
-
-### Our Unique Position
-We are the **only MCP server that gives you one interface for all JVM build tools**. No context-switching between servers. No manual configuration per project. One server, auto-detection, unified API — Maven, Gradle, and SBT under one roof.
+238 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `BuildOutputParserTest.java`, and `BuildConfigurationValidationTest.java`.
 
 ## CI/CD
 
@@ -481,7 +469,7 @@ Every PR runs on 3 JDK versions (21, 23, 25) with test coverage reporting (48% i
 
 ## Contributing
 
-Use GitHub Issues. See `WORKFLOW.md` for branch strategy (`feat/*`, `fix/*` → staging → main), commit conventions, quality gates, and cross-review protocol.
+Use GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, [WORKFLOW.md](WORKFLOW.md) for the development workflow and branch strategy (`feat/*`, `fix/*` → staging → main), and [ARCHITECTURE.md](ARCHITECTURE.md) for the internal architecture and extension guide.
 
 ## License
 
