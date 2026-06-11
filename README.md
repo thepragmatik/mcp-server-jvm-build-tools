@@ -53,7 +53,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (8 tools) | ✅ PASS |
+| `tools/list` discovery (7 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -241,7 +241,7 @@ The agent detected the project type, ran the build, parsed the error, checked th
 
 | Feature | Maven | Gradle | SBT |
 |---|---|---|---|
-| Execute builds | ✓ 7 lifecycle phases | ✓ 11 tasks | ✓ |
+| Execute builds | ✓ 7 lifecycle phases | ✓ 12 tasks | ✓ |
 | Version query | ✓ (embedder, no external process) | ✓ (CLI) | ✓ (CLI) |
 | Trust-based execution | ✓ | ✓ | ✓ |
 | Shell injection protection | ✓ | ✓ | ✓ |
@@ -278,7 +278,7 @@ Execute a build command with automatic tool detection.
 ### `list_build_tools`
 List all registered build tools and their supported commands. Returns formatted string like:
 ```
-maven: clean, compile, test, package, install, deploy, validate, dependency:tree
+maven: clean, compile, test, package, install, deploy, validate
 gradle: clean, build, test, compileJava, compileTestJava, jar, assemble, check, publishToMavenLocal, dependencies, projects, tasks
 sbt: compile, test, run, package, clean, assembly, publishLocal, publish, update, doc, console
 ```
@@ -290,7 +290,7 @@ Auto-detect which build tool a project uses by scanning for build files in the p
 |---|---|---|---|
 | `projectDir` | string | Yes | Path to the project directory to scan for build files. |
 
-**Returns:** JSON object with detected tools, matched marker files, wrapper availability, and project structure hints. Example: `{"status":"success","projectDir":"/path/to/project","detections":[{"tool":"maven","matchedFiles":["pom.xml"],"wrapperFiles":[],"hints":["POM-based project"]}]}`
+**Returns:** JSON object with detected tools, matched marker files, wrapper availability, and project structure hints. Example: `{"status":"success","projectDir":"/path/to/project","detections":[{"tool":"maven","matchedFiles":["pom.xml"],"wrappers":[],"hints":["POM-based project"]}]}`
 
 **Detection order:** Checks for `pom.xml` first (Maven), then `build.gradle`/`build.gradle.kts` (Gradle), then `build.sbt` (SBT).
 
@@ -470,7 +470,7 @@ The server enforces multiple layers of defense:
 |---|---|
 | **Trust-based execution** | No command allowlists. Any Maven goal, Gradle task, or SBT command can be executed. |
 | **Shell metacharacter blocking** | Attempts at command chaining (`&&`, `||`, `;`), piping (`|`), command substitution (`$()`, backticks), and redirection (`>`, `<`) are rejected. |
-| **Dangerous flag blocking** | Gradle flags that enable arbitrary code execution (`--init-script`, `--build-file`, `--project-dir`, `-D`) are blocked. |
+| **Dangerous flag blocking** | Gradle flags that enable arbitrary code execution (`--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`, `-D`) are blocked. |
 | **Path canonicalization** | All paths are resolved via `toRealPath()` to prevent directory traversal (`../../etc/passwd`). |
 | **Input validation** | Commands are length-limited (500 chars). Non-existent paths are rejected before execution. |
 | **Process isolation** | Maven builds use `MavenInvoker` (out-of-process). Gradle builds use `ProcessBuilder` with `--no-daemon`. |
@@ -479,7 +479,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-240 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
+262 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
 
 ## CI/CD
 

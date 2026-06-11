@@ -67,8 +67,8 @@ We follow conventional commits:
 ## Quality Gates
 
 Every PR must pass:
-- **240 tests** with 0 failures (JUnit 5)
-- **JaCoCo coverage** — reports generated (48% instruction / 33% branch / 46% line baseline)
+- **262 tests** with 0 failures (JUnit 5)
+- **JaCoCo coverage** — reports generated for information (48% instruction / 33% branch / 46% line baseline); enforcement thresholds are pending (not yet configured in POM)
 - **License headers** — `mvn license:format` must pass
 - **Compile warnings** — `mvn compile -Dmaven.compiler.showWarnings=true` must be clean
 
