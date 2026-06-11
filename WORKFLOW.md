@@ -40,7 +40,7 @@ All changes must go through Pull Requests. Branch protection enforces:
    gh pr create --base staging --head fix/my-fix
 
 4. CI runs automatically on staging:
-   - mvn verify (JUnit + JaCoCo coverage)
+   - mvn test (JUnit tests)
    - JDK 21, 23, 25 matrix
    - Quality checks (license headers + compile warnings)
 
@@ -66,7 +66,7 @@ All changes must go through Pull Requests. Branch protection enforces:
 
 Every PR must pass:
 1. **JUnit tests** — 240 tests, 0 failures required
-2. **JaCoCo coverage** — reports generated (thresholds pending)
+2. **Coverage** — JaCoCo thresholds pending (not yet configured in POM)
 3. **License headers** — mvn license:format runs (non-blocking)
 4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
 
@@ -105,9 +105,9 @@ Reviews are posted to GitHub for a permanent audit trail.
 |--------------------|-----------------------------------------------------------|
 | Main branch        | Production — must stay clean                              |
 | Staging branch     | All 5 features integrated, CI green                       |
-| Active PR          | #6 (staging → main) — pending review                      |
-| Coverage           | 48% instruction / 33% branch / 46% line                   |
-| Tests              | 240 |
+| Active PRs          | #34, #35 recently merged (staging → main) — up to date    |
+| Coverage            | JaCoCo not configured in POM — thresholds pending         |
+| Tests               | 240 (MavenInvoker: 17, MavenSecurity: 11, GradleService: 64, SbtBuildTool: 51, DependencyService: 47, Integration: 13, BuildToolProvider: 25, BuildOutputParser: 11, BuildConfig: 23, and more) |
 
 ### Recovery
 
