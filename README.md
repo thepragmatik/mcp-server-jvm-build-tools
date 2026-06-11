@@ -313,7 +313,7 @@ check_dependency_version(groupId="com.google.guava", artifactId="guava")
 
 
 ### `analyze_build_output`
-Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven and Gradle.
+Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven and Gradle (SBT output parsing not yet implemented).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -468,14 +468,14 @@ The server enforces multiple layers of defense:
 
 | Layer | What It Protects Against |
 |---|---|
-| **Trust-based execution** | No command allowlists. Any Maven goal, Gradle task, or SBT command can be executed. |
+| **Command allowlist** | Only predefined build tasks execute. Unknown commands rejected before process spawn (8 Maven phases/plugins, 12 Gradle tasks, 11 SBT tasks). |
 | **Shell metacharacter blocking** | Attempts at command chaining (`&&`, `||`, `;`), piping (`|`), command substitution (`$()`, backticks), and redirection (`>`, `<`) are rejected. |
 | **Dangerous flag blocking** | Gradle flags that enable arbitrary code execution (`--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`, `-D`) are blocked. |
 | **Path canonicalization** | All paths are resolved via `toRealPath()` to prevent directory traversal (`../../etc/passwd`). |
 | **Input validation** | Commands are length-limited (500 chars). Non-existent paths are rejected before execution. |
 | **Process isolation** | Maven builds use `MavenInvoker` (out-of-process). Gradle builds use `ProcessBuilder` with `--no-daemon`. |
 
-**What the server does NOT restrict:** You can run any Maven goal, Gradle task, or SBT command. The server trusts the LLM operator to know what they're doing — it protects against malicious input, not against intentional builds.
+**What the server does NOT restrict:** Shell injection attacks. The server trusts the LLM operator to use build tools appropriately (e.g., `mvn clean` is allowed). It defends against malicious input injection, not against intentional build operations.
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
