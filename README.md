@@ -21,7 +21,7 @@
 - [Contributing](#contributing)
 - [License](#license)
 
-Run Maven and Gradle builds through any MCP-compatible LLM client (Claude Desktop, Goose, Continue, etc.). One server, two build tools, auto-detection of your project type — no switching servers, no manual config per project.
+Run Maven, Gradle, and SBT builds through any MCP-compatible LLM client (Claude Desktop, Goose, Continue, etc.). One server, three build tools, auto-detection of your project type — no switching servers, no manual config per project.
 
 ```
 You:     "Build and test this project"
@@ -53,7 +53,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (7 tools) | ✅ PASS |
+| `tools/list` discovery (8 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -199,7 +199,7 @@ Agent:  execute_build_command(
 
 Agent:  check_dependency_version(
           projectDir="/home/dev/my-app",
-          dependency="com.example:payment-lib"
+          groupId="com.example", artifactId="payment-lib"
         )
         → com.example:payment-lib:2.1.0 (compile scope)
 
@@ -273,14 +273,14 @@ Execute a build command with automatic tool detection.
 
 **Supported Gradle commands:** `clean`, `build`, `test`, `compileJava`, `compileTestJava`, `jar`, `assemble`, `check`, `publishToMavenLocal`, `dependencies`, `projects`, `tasks` (+ safe flags: `-x`, `--exclude-task`, `--parallel`, `--configure-on-demand`, `--build-cache`)
 
-**Supported SBT commands:** `compile`, `test`, `package`, `clean`, `run`, `assembly`
+**Supported SBT commands:** `compile`, `test`, `run`, `package`, `clean`, `assembly`, `publishLocal`, `publish`, `update`, `doc`, `console`
 
 ### `list_build_tools`
 List all registered build tools and their supported commands. Returns formatted string like:
 ```
 maven: clean, compile, test, package, install, deploy, validate, dependency:tree
 gradle: clean, build, test, compileJava, compileTestJava, jar, assemble, check, publishToMavenLocal, dependencies, projects, tasks
-sbt: compile, test, package, clean, run, assembly
+sbt: compile, test, run, package, clean, assembly, publishLocal, publish, update, doc, console
 ```
 
 ### `detect_build_tool`
@@ -302,7 +302,7 @@ Look up the latest version of a Maven Central dependency.
 | `groupId` | string | Yes | Maven group ID (e.g., `com.google.guava`) |
 | `artifactId` | string | Yes | Maven artifact ID (e.g., `guava`) |
 | `currentVersion` | string | No | Current version to compare against |
-| `stabilityFilter` | string | No | `ALL`, `STABLE_ONLY` (default), or `PREFER_STABLE` |
+| `versionPreference` | string | No | `RELEASE` (default), `LATEST`, `SNAPSHOT`, or `ALL` |
 | `projectDir` | string | No | Project directory for build-tool context |
 
 **Example:**
@@ -310,10 +310,28 @@ Look up the latest version of a Maven Central dependency.
 check_dependency_version(groupId="com.google.guava", artifactId="guava")
 → {"groupId":"com.google.guava","artifactId":"guava","latestVersion":"33.4.0","stability":"STABLE"}
 ```
-User:   "Build all my projects"
-LLM:    list_build_tools()
-        → maven: clean, compile, test, ...
-           gradle: clean, build, test, ...
+
+
+### `analyze_build_output`
+Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven and Gradle.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `buildToolName` | string | No | `"maven"` or `"gradle"`. Omit to auto-detect from project directory. |
+| `buildToolHome` | string | No | Path to build tool installation. Optional for Gradle (uses wrapper or PATH). |
+| `projectDir` | string | Yes | Path to the project directory containing build files. |
+| `command` | string | Yes | Build command to execute (e.g., `"clean test"` for Maven, `"test"` for Gradle). |
+
+**Returns:** JSON with `{success, tool, command, duration, testSummary: {total, passed, failed, errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, warningCount}`.
+
+### `validate_build_configuration`
+Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for correctness without executing the build. Checks XML well-formedness, required elements, and plugin version consistency.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory containing build files. |
+
+**Returns:** JSON with `{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}`. Use before executing builds to catch configuration errors early.
 
 ## Quick Start
 
@@ -332,7 +350,7 @@ LLM:    list_build_tools()
    Compile my project → execute_build_command(projectDir="/path/to/project", command="clean compile")
    Build Gradle project → execute_build_command(projectDir="/path/to/gradle-project", command="build")
    Detect project type → detect_build_tool(projectDir="/path/to/project")
-   Check dependency      → check_dependency_version(projectDir="/path/to/project", dependency="com.example:lib")
+   Check dependency      → check_dependency_version(groupId="com.example", artifactId="lib")
    ```
 
 ## Installation
@@ -439,7 +457,7 @@ LLM:    detect_build_tool(projectDir="/home/me/my-app")
 
 LLM:    check_dependency_version(
           projectDir="/home/me/my-app",
-          dependency="com.google.guava:guava"
+          groupId="com.google.guava", artifactId="guava"
         )
         → com.google.guava:guava:33.3.1-jre
 ```
@@ -461,7 +479,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-238 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `BuildOutputParserTest.java`, and `BuildConfigurationValidationTest.java`.
+240 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
 
 ## CI/CD
 
