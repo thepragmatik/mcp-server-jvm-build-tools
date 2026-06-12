@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded dependency versions (Maven Embedder 3.9.9, Maven Shared Invoker 3.3.0)
 
 ### Added
+- **Async Build Execution (MCP Tasks)**: 4 new tools — `execute_build_async` (fire-and-forget builds with immediate task handle), `get_build_task` (poll for status, progress, and partial output), `cancel_build_task` (kill running build processes), `list_build_tasks` (list active and recent tasks). Uses virtual threads for concurrent builds. Supports Maven, Gradle, and SBT. Task lifecycle: queued → running → completed/failed/cancelled. Completed tasks retained for 1 hour.
+- **Tool Authorization & Audit**: 4 new tools — `check_tool_authorization` (pre-validate tool access against scope permissions), `list_available_scopes` (enumerate scopes with tool coverage), `audit_tool_access` (read OWASP MCP06 audit logs), `validate_access_token` (validate API keys configured via BUILDTOOLS_API_KEY_* env vars). Scope-based permission model with wildcard support and audit logging. Implements MCP Server Authorization specification.
 - **Build Performance Profiling**: profile_build tool with timing instrumentation, phase/task breakdown, test count extraction, build history persistence (.buildtools/history/), and trend detection (SLOWER/FASTER/STABLE). analyze_build_performance tool for read-only configuration analysis with optimization suggestions (parallel builds, caching, daemon, mvnd, Coursier, configuration cache).
 - **Dependency Conflict Detection**: detect_dependency_conflicts tool for Maven, Gradle, and SBT. Detects duplicate version declarations (WARNING) and direct-vs-dependencyManagement mismatches (ERROR). Resolves Maven property references. Generates structured resolution plans.
 - **MCP Server Card**: GET /.well-known/mcp-server endpoint for discoverability (capabilities, transports, features, security posture). GET /health endpoint for Streamable HTTP health checks.
@@ -39,14 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
 - 307 tests across security, functionality, integration, and MCP protocol compliance
-- 31 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, and resource template management
+- 39 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, resource template management, async build tasks, tool authorization, and security auditing
 
 ### Added
 - **SBOM Generation & Supply Chain Audit**: 3 new tools — `generate_sbom` (CycloneDX/SPDX SBOM generation for Maven/Gradle/SBT), `audit_supply_chain` (OSV.dev vulnerability cross-referencing with CVE severity and remediation), `check_license_compliance` (license classification: permissive/copyleft/restricted with risk assessment). Includes CycloneDX plugin detection, pre-existing SBOM discovery, dependency file parsing, and batch vulnerability lookups.
 - **Test Flakiness Detection & History**: 2 new tools — `detect_flaky_tests` (multi-run test execution with flakiness scoring: STABLE/FLAKY/VERY_FLAKY, Surefire XML report parsing, fix suggestions for timing/order-dependency/thread-safety issues) and `analyze_test_history` (historical pass/fail trend analysis from `profile_build` history, degrading test identification, quarantine candidate suggestions).
 - **Build Cache Health Analysis**: 2 new tools — `analyze_cache_health` (caching configuration audit with hit-rate scoring: GOOD/ADEQUATE/NEEDS_ATTENTION for Maven, Gradle, and SBT with execution log parsing) and `optimize_build_cache` (build-tool-specific optimization config snippets with exact file paths and estimated improvement percentages). Covers Maven mvnd/build-cache-extensions, Gradle config-cache/build-cache/parallel/daemon, and SBT Coursier/parallel-execution/incremental-compilation/turbo-mode.
 - **ROADMAP.md**: Research-driven enhancement plan covering MCP 2026-07-28 protocol migration (P0), async build tasks (P1), and completed SBOM/test-flakiness/cache-health features (P2-P4).
-- Total MCP tools: 31 (up from 24).
+- Total MCP tools: 39 (up from 31).
 
 ## [0.1.0] - 2025-05-23
 

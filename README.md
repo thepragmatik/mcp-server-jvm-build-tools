@@ -15,6 +15,8 @@
 
 ## What's New (June 2026)
 
+- **Async Build Execution (MCP Tasks)**: execute_build_async, get_build_task, cancel_build_task, list_build_tasks — fire-and-forget builds with task handles, progress polling, partial output streaming, cancellation support. Virtual threads for concurrency
+- **Tool Authorization & Audit**: check_tool_authorization, list_available_scopes, audit_tool_access, validate_access_token — scope-based MCP tool permissions (OWASP MCP06), API key management, audit logging
 - **SBOM Generation & Supply Chain Audit**: generate_sbom, audit_supply_chain, check_license_compliance tools — CycloneDX/SPDX SBOMs for Maven/Gradle/SBT, CVE cross-referencing via OSV.dev, license compliance
 - **Test Flakiness Detection & History**: detect_flaky_tests and analyze_test_history tools — multi-run flakiness scoring, Surefire XML parsing, trend analysis, quarantine candidates
 - **Build Cache Health Analysis**: analyze_cache_health and optimize_build_cache tools — caching audit for Maven/Gradle/SBT, hit-rate scoring, optimization snippets
@@ -79,7 +81,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (31 tools) | ✅ PASS |
+| `tools/list` discovery (39 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -645,6 +647,78 @@ Generate build-tool-specific cache optimization configuration snippets. Provides
 **Returns:** JSON with `{optimizations: [{area, priority, recommendation, configFile, config, estimatedImprovement}], currentConfig, estimatedTotalImprovement}`.
 
 **Covers:** Maven (mvnd, build cache extensions, parallel builds), Gradle (caching, parallel, daemon, configuration cache), SBT (Coursier, parallel execution, incremental compilation, turbo mode).
+
+
+### `execute_build_async`
+Start an asynchronous build and return a task handle immediately. The build runs in the background — poll with `get_build_task` for status, progress, and partial output. Supports Maven, Gradle, and SBT.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `buildToolName` | string | No | `"maven"`, `"gradle"`, or `"sbt"`. Omit to auto-detect from project files. |
+| `buildToolHome` | string | No | Path to build tool installation. Optional for Gradle/SBT (uses wrapper or PATH). |
+| `projectDir` | string | Yes | Path to the project directory. |
+| `command` | string | Yes | Build command to execute asynchronously (e.g., `"clean compile"`). |
+
+**Returns:** JSON with `{taskId, status: "queued", tool, command, projectDir}`. Use the `taskId` with `get_build_task` to poll for results.
+
+### `get_build_task`
+Poll an async build task for its current status, progress, and partial output.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `taskId` | string | Yes | Task ID returned by `execute_build_async`. |
+
+**Returns:** JSON with `{taskId, status, tool, command, elapsedSeconds, outputLines, output (last 200 lines), phaseProgress, result (when completed)}`. Status values: `queued`, `running`, `completed`, `failed`, `cancelled`.
+
+### `cancel_build_task`
+Cancel a running or queued async build task by killing the underlying process.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `taskId` | string | Yes | Task ID to cancel. |
+
+**Returns:** JSON with `{taskId, status, cancelled}`. Has no effect on already-completed tasks.
+
+### `list_build_tasks`
+List all async build tasks (active and recently completed).
+
+**Returns:** JSON with `{activeCount, completedCount, totalCount, tasks: [{taskId, status, tool, command, elapsedSeconds}]}`. Completed tasks are kept for 1 hour.
+
+### `check_tool_authorization`
+Check whether a specific MCP tool is authorized for a given set of permission scopes. Useful for pre-validation before calling tools.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `toolName` | string | Yes | The MCP tool name to check (e.g., `"execute_build_command"`). |
+| `grantedScopes` | string | Yes | Comma-separated granted scopes (e.g., `"build:read,build:execute"`). Use `"*"` for full access. |
+
+**Returns:** JSON with `{tool, authorized, scopesChecked, matchingScopes, requiredScopes, explanation}`.
+
+### `list_available_scopes`
+List all available permission scopes for tool authorization, each covering a category of tools.
+
+**Returns:** JSON with `{totalScopes, authEnabled, authMode, scopes: [{scope, toolCount, tools}], recommendations}`.
+
+**Scopes include:** `build:read` (detection/validation), `build:execute` (build commands), `dependency:read`, `prompt:*`, `resource:*`, `sbt:*`, `performance:*` etc.
+
+### `audit_tool_access`
+Read the most recent tool invocation audit log entries. Designed to satisfy OWASP MCP06 logging requirements.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `count` | integer | No | Number of recent entries (default: 20, max: 100). |
+| `filter` | string | No | `"all"` (default), `"authorized"`, or `"denied"`. |
+
+**Returns:** JSON with `{auditEnabled, auditLogPath, entryCount, entries: [{timestamp, tool, caller, authorized, duration}], summary}`.
+
+### `validate_access_token`
+Validate an MCP access token (API key) and return the granted permission scopes.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `token` | string | Yes | The access token to validate. Never exposed in responses. |
+
+**Returns:** JSON with `{valid, identity, scopes, scopeCount, hasWildcard, security: {hasDangerousScopes, recommendation}}`. Tokens are configured via `BUILDTOOLS_API_KEY_*` environment variables.
 
 ### Server Card Endpoint
 When running in Streamable HTTP mode, the server exposes discoverability endpoints:
