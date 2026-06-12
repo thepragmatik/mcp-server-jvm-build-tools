@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded dependency versions (Maven Embedder 3.9.9, Maven Shared Invoker 3.3.0)
 
 ### Added
+- **Build Performance Profiling**: profile_build tool with timing instrumentation, phase/task breakdown, test count extraction, build history persistence (.buildtools/history/), and trend detection (SLOWER/FASTER/STABLE). analyze_build_performance tool for read-only configuration analysis with optimization suggestions (parallel builds, caching, daemon, mvnd, Coursier, configuration cache).
 - **Dependency Conflict Detection**: detect_dependency_conflicts tool for Maven, Gradle, and SBT. Detects duplicate version declarations (WARNING) and direct-vs-dependencyManagement mismatches (ERROR). Resolves Maven property references. Generates structured resolution plans.
 - **MCP Server Card**: GET /.well-known/mcp-server endpoint for discoverability (capabilities, transports, features, security posture). GET /health endpoint for Streamable HTTP health checks.
 - **Credential Scanning**: check_credential_status tool — read-only scan of Maven settings.xml, Gradle properties, and environment variables with masked credential values.
@@ -25,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - detect_build_tool tool with structured JSON output and project structure hints
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
-- 262+ tests across security, functionality, and integration
-- 20 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, project analysis, resource exposure, and prompt templates
+- 270+ tests across security, functionality, and integration
+- 22 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, project analysis, resource exposure, and prompt templates
 
 ## [0.1.0] - 2025-05-23
 
