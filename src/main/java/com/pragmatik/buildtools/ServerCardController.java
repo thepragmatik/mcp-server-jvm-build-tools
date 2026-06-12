@@ -26,14 +26,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * MCP Server Card endpoint for discoverability.
+ * MCP Server Card endpoint for discoverability, plus health/readiness/liveness endpoints.
  * <p>
  * Implements the MCP .well-known pattern for server metadata discovery
  * without needing to connect via the MCP protocol. Exposed at
  * {@code GET /.well-known/mcp-server} when running in Streamable HTTP mode.
  * <p>
- * Compatible with MCP Server Card Working Group proposal and registry
- * discovery mechanisms.
+ * Also provides {@code /health}, {@code /health/ready}, and {@code /health/live}
+ * endpoints for container orchestration and monitoring.
  */
 @RestController
 public class ServerCardController {
@@ -60,15 +60,12 @@ public class ServerCardController {
         card.put("homepage", "https://github.com/thepragmatik/mcp-server-jvm-build-tools");
         card.put("license", "Apache-2.0");
 
-        // Supported transports
         List<String> transports = List.of("stdio", "streamable-http");
         card.put("transports", transports);
 
-        // MCP protocol versions
         List<String> protocolVersions = List.of("2024-11-05", "2025-03-26");
         card.put("mcpVersions", protocolVersions);
 
-        // Capabilities summary
         Map<String, Object> capabilities = new LinkedHashMap<>();
         capabilities.put("tools", true);
         capabilities.put("resources", true);
@@ -76,7 +73,6 @@ public class ServerCardController {
         capabilities.put("logging", false);
         card.put("capabilities", capabilities);
 
-        // Supported build tools
         List<Map<String, String>> buildTools = List.of(
                 Map.of("name", "maven", "minVersion", "3.6+", "detectionFile", "pom.xml"),
                 Map.of("name", "gradle", "minVersion", "7.0+", "detectionFile", "build.gradle(.kts)"),
@@ -84,7 +80,6 @@ public class ServerCardController {
         );
         card.put("supportedBuildTools", buildTools);
 
-        // Runtime requirements
         Map<String, Object> requirements = new LinkedHashMap<>();
         requirements.put("java", "21+");
         requirements.put("maven_home", "required for Maven builds (MAVEN_HOME env var)");
@@ -92,7 +87,6 @@ public class ServerCardController {
         requirements.put("sbt", "optional — uses PATH fallback");
         card.put("requirements", requirements);
 
-        // Key features
         List<String> features = List.of(
                 "Multi-build-tool execution (Maven, Gradle, SBT)",
                 "Automatic build tool detection from project markers",
@@ -108,7 +102,6 @@ public class ServerCardController {
         );
         card.put("features", features);
 
-        // Security posture
         Map<String, Object> security = new LinkedHashMap<>();
         security.put("transportSecurity", "stdio (local, no network surface); Streamable HTTP with Origin validation");
         security.put("inputValidation", "Shell injection blocking, dangerous flag blocking, path canonicalization");
@@ -116,7 +109,6 @@ public class ServerCardController {
         security.put("commandRestrictions", "Length limits (500 chars), character allowlists, rate limiting");
         card.put("security", security);
 
-        // Discovery / Registry
         Map<String, Object> registry = new LinkedHashMap<>();
         registry.put("namespace", "com.thepragmatik.mcp-server-jvm-build-tools");
         registry.put("smithery", "https://smithery.ai/server/mcp-server-jvm-build-tools");
@@ -133,5 +125,22 @@ public class ServerCardController {
         h.put("version", version);
         h.put("transport", "streamable-http");
         return h;
+    }
+
+    @GetMapping(value = "/health/ready", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> readiness() {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("status", "READY");
+        r.put("version", version);
+        r.put("availableBuildTools", List.of("maven", "gradle", "sbt"));
+        return r;
+    }
+
+    @GetMapping(value = "/health/live", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> liveness() {
+        Map<String, Object> l = new LinkedHashMap<>();
+        l.put("status", "ALIVE");
+        l.put("timestamp", System.currentTimeMillis());
+        return l;
     }
 }

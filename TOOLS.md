@@ -340,7 +340,7 @@ Execute a build and return structured JSON with parsed test results, errors, and
 ```
 
 **Parsers:**
-> **Note:** SBT output parsing is not yet supported. SBT builds can still be executed via `execute_build_command`, but the output will be raw text rather than structured JSON.
+> **Note:** SBT output parsing is supported via SbtOutputParser (integrated in BuildToolsService). SBT builds return structured JSON output similar to Maven and Gradle.
 
 - **MavenOutputParser**: Extracts BUILD SUCCESS/FAILURE, test counts (Tests run/Failures/Errors/Skipped), compile errors with file:line, warnings
 - **GradleOutputParser**: Extracts BUILD SUCCESSFUL/FAILED, test summaries, error references, warnings
@@ -487,9 +487,17 @@ Returns JSON with server metadata: name, version, description, vendor, capabilit
 
 Returns `{"status":"UP","version":"0.1.1-SNAPSHOT","transport":"streamable-http"}`.
 
+### GET /health/ready
+
+Readiness probe for container orchestration (Kubernetes, Docker). Returns `{"status":"READY","version":"0.1.1-SNAPSHOT","availableBuildTools":["maven","gradle","sbt"]}`.
+
+### GET /health/live
+
+Liveness probe for container orchestration. Returns `{"status":"ALIVE","timestamp":"..."}`.
+
 **Implementation:** `ServerCardController.java`
 
-**Use case:** Enables MCP client auto-discovery and MCP Registry integration without requiring a full MCP protocol connection.
+**Use case:** Enables MCP client auto-discovery and MCP Registry integration without requiring a full MCP protocol connection. Health/ready/liveness endpoints enable Kubernetes pod probes and Docker health checks.
 
 
 ## Error Handling

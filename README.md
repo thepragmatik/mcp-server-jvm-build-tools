@@ -25,6 +25,10 @@
 - **Dependency Intelligence**: Version checking, upgrade classification, build-tool-specific syntax
 - **Credential Scanning**: Read-only Maven/Gradle credential status checks (masked, safe)
 - **Tool Schema Enhancements**: Enum constraints, shared JSON utilities, improved error handling
+- **Container Probes**: /health/ready and /health/live endpoints for Kubernetes and Docker orchestration
+- **CLI Launcher**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT
+- **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability
+- **MCP Client Integration Guide**: `MCP_INTEGRATION.md` with configs for 9+ clients
 
 ## Table of Contents
 
@@ -72,7 +76,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (22 tools) | ✅ PASS |
+| `tools/list` discovery (24 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -579,7 +583,15 @@ Compatible with the MCP Server Card Working Group proposal and MCP Registry disc
 
 2. **Configure your MCP client** — see [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions) above for client-specific configuration examples, or [Installation](#installation) below.
 
-3. **Start building:**
+3. **Use the launcher script** (recommended):
+   ```bash
+   ./scripts/launcher.sh              # stdio mode (default)
+   ./scripts/launcher.sh --http       # Streamable HTTP mode
+   ./scripts/launcher.sh --help       # show options
+   ```
+   The launcher auto-discovers Java, Maven, Gradle, and SBT on your system.
+
+4. **Start building:**
    ```
    Get Maven version → get_build_tool_version("maven")
    Compile my project → execute_build_command(projectDir="/path/to/project", command="clean compile")
@@ -607,6 +619,8 @@ mvn clean package -DskipTests
 ```
 
 See [MCP Client Configuration](#mcp-client-configuration) above for Claude Desktop and other client-specific setup instructions.
+
+For a comprehensive integration guide covering all supported MCP clients with exact configuration snippets and troubleshooting, see [MCP_INTEGRATION.md](MCP_INTEGRATION.md). For MCP Registry discoverability, see [mcp-registry.json](mcp-registry.json).
 
 ### Option 2: Docker
 
@@ -714,7 +728,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-307 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
+307+ tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
 
 ## CI/CD
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Container Probes**: /health/ready (readiness) and /health/live (liveness) endpoints for Kubernetes and Docker orchestration
+- **CLI Launcher Script**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT installations. Supports `--http` flag for Streamable HTTP mode
+- **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability — tools, resources, prompts, transports, runtime requirements
+- **MCP Client Integration Guide**: `MCP_INTEGRATION.md` with configuration snippets for 9+ clients (Claude Desktop, Cursor, Cline, Windsurf, Goose, Continue, GitHub Copilot, LangChain, LlamaIndex)
+- **PR Conflict Resolution**: Synced `fix/pr-44-merge-conflict` branch with current staging (all 11 services registered)
+
+### Changed
+- Enhanced ServerCardController with /health/ready and /health/live endpoints alongside existing /health
+- Updated README, TOOLS.md, and docs/INDEX.md to reflect MCP-004 enhancements
+
+
 ### Changed
 - Upgraded Spring Boot from 3.4.x to 3.5.14
 - Upgraded Spring AI from 1.0.0-M6 to 2.0.0-RC2
