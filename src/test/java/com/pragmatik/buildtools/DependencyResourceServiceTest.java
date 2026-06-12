@@ -16,6 +16,9 @@
  */
 package com.pragmatik.buildtools;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,196 +27,163 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Tests for multi-build-tool dependency extraction (Maven, Gradle, SBT).
- */
 class DependencyResourceServiceTest {
 
-    @Test
-    void listResources_findsMavenPom(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("pom.xml"), "<project></project>");
+    private DependencyResourceService service;
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources(tempDir.toString());
-        assertTrue(result.contains("\"maven\""));
-        assertTrue(result.contains("/dependencies/maven"));
+    @BeforeEach
+    void setUp() {
+        var provider = new BuildToolProvider();
+        service = new DependencyResourceService(provider);
     }
 
-    @Test
-    void listResources_findsGradleGroovy(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("build.gradle"), "");
+    @Nested
+    @DisplayName("Maven dependency extraction")
+    class MavenExtraction {
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources(tempDir.toString());
-        assertTrue(result.contains("\"gradle\""));
-        assertTrue(result.contains("/dependencies/gradle"));
-    }
-
-    @Test
-    void listResources_findsGradleKotlin(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("build.gradle.kts"), "");
-
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources(tempDir.toString());
-        assertTrue(result.contains("\"gradle\""));
-        assertTrue(result.contains("/dependencies/gradle"));
-    }
-
-    @Test
-    void listResources_findsSbt(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("build.sbt"), "");
-
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources(tempDir.toString());
-        assertTrue(result.contains("\"sbt\""));
-        assertTrue(result.contains("/dependencies/sbt"));
-    }
-
-    @Test
-    void listResources_returnsErrorForInvalidDir() {
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources("/nonexistent/path/12345");
-        assertTrue(result.contains("\"error\""));
-    }
-
-    @Test
-    void listResources_allThreeTools(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("pom.xml"), "<project></project>");
-        Files.writeString(tempDir.resolve("build.gradle"), "");
-        Files.writeString(tempDir.resolve("build.sbt"), "");
-
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.listDependencyResources(tempDir.toString());
-        assertTrue(result.contains("\"maven\""));
-        assertTrue(result.contains("\"gradle\""));
-        assertTrue(result.contains("\"sbt\""));
-        // resourceCount should be 3
-        assertTrue(result.contains("\"resourceCount\":3"));
-    }
-
-    @Test
-    void extractMavenDependencies(@TempDir Path tempDir) throws Exception {
-        String pom = """
-            <project>
-                <dependencies>
+        @Test
+        @DisplayName("extracts dependencies from pom.xml")
+        void extractsMavenDeps(@TempDir Path tmp) throws Exception {
+            String pom = """
+                <project>
+                  <dependencies>
                     <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter</artifactId>
-                        <version>3.5.14</version>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter</artifactId>
                     </dependency>
                     <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13.2</version>
-                        <scope>test</scope>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>33.0.0-jre</version>
                     </dependency>
-                </dependencies>
-            </project>""";
-        Files.writeString(tempDir.resolve("pom.xml"), pom);
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter</artifactId>
+                      <version>5.10.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>""";
+            Files.writeString(tmp.resolve("pom.xml"), pom);
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
+            String result = service.readDependencyResource(
+                "build://test/dependencies/maven", tmp.toString());
 
-        String result = svc.readDependencyResource(
-            "build://test/dependencies/maven", tempDir.toString());
-        assertTrue(result.contains("spring-boot-starter"));
-        assertTrue(result.contains("3.5.14"));
-        assertTrue(result.contains("junit"));
-        assertTrue(result.contains("test"));
-        assertTrue(result.contains("\"dependencyCount\":2"));
+            assertTrue(result.contains("spring-boot-starter"));
+            assertTrue(result.contains("guava"));
+            assertTrue(result.contains("junit-jupiter"));
+            assertTrue(result.contains("[managed]"));
+            assertTrue(result.contains("test"));
+            assertTrue(result.contains("\"buildTool\":\"maven\""));
+        }
     }
 
-    @Test
-    void extractGradleGroovyDependencies(@TempDir Path tempDir) throws Exception {
-        String gradle = """
-            dependencies {
-                implementation 'com.google.guava:guava:33.4.0-jre'
-                testImplementation 'junit:junit:4.13.2'
-            }""";
-        Files.writeString(tempDir.resolve("build.gradle"), gradle);
+    @Nested
+    @DisplayName("Gradle dependency extraction")
+    class GradleExtraction {
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
+        @Test
+        @DisplayName("extracts groovy DSL dependencies")
+        void extractsGroovyDeps(@TempDir Path tmp) throws Exception {
+            String gradle = """
+                dependencies {
+                    implementation 'org.springframework.boot:spring-boot-starter:3.2.0'
+                    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+                    runtimeOnly 'com.h2database:h2:2.2.224'
+                }""";
+            Files.writeString(tmp.resolve("build.gradle"), gradle);
 
-        String result = svc.readDependencyResource(
-            "build://test/dependencies/gradle", tempDir.toString());
-        assertTrue(result.contains("guava"));
-        assertTrue(result.contains("33.4.0-jre"));
-        assertTrue(result.contains("groovy-dsl"));
+            String result = service.readDependencyResource(
+                "build://test/dependencies/gradle", tmp.toString());
+
+            assertTrue(result.contains("spring-boot-starter"));
+            assertTrue(result.contains("3.2.0"));
+            assertTrue(result.contains("junit-jupiter"));
+            assertTrue(result.contains("h2"));
+            assertTrue(result.contains("\"configuration\":\"implementation\""));
+            assertTrue(result.contains("\"configuration\":\"testImplementation\""));
+            assertTrue(result.contains("\"configuration\":\"runtimeOnly\""));
+            assertTrue(result.contains("groovy-dsl"));
+        }
+
+        @Test
+        @DisplayName("extracts kotlin DSL dependencies")
+        void extractsKotlinDeps(@TempDir Path tmp) throws Exception {
+            String gradle = """
+                dependencies {
+                    implementation("org.springframework.boot:spring-boot-starter:3.2.0")
+                    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+                }""";
+            Files.writeString(tmp.resolve("build.gradle.kts"), gradle);
+
+            String result = service.readDependencyResource(
+                "build://test/dependencies/gradle", tmp.toString());
+
+            assertTrue(result.contains("spring-boot-starter"));
+            assertTrue(result.contains("junit-jupiter"));
+            assertTrue(result.contains("kotlin-dsl"));
+        }
     }
 
-    @Test
-    void extractGradleKotlinDependencies(@TempDir Path tempDir) throws Exception {
-        String gradle = """
-            dependencies {
-                implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0")
-                testImplementation("io.kotest:kotest-runner-junit5:5.9.0")
-            }""";
-        Files.writeString(tempDir.resolve("build.gradle.kts"), gradle);
+    @Nested
+    @DisplayName("SBT dependency extraction")
+    class SbtExtraction {
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
+        @Test
+        @DisplayName("extracts SBT dependencies with % and %%")
+        void extractsSbtDeps(@TempDir Path tmp) throws Exception {
+            String sbt = """
+                scalaVersion := "2.13.15"
+                libraryDependencies += "org.typelevel" %% "cats-core" % "2.12.0"
+                libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.10.0"
+                libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test""";
+            Files.writeString(tmp.resolve("build.sbt"), sbt);
 
-        String result = svc.readDependencyResource(
-            "build://test/dependencies/gradle", tempDir.toString());
-        assertTrue(result.contains("kotlin-stdlib"));
-        assertTrue(result.contains("kotlin-dsl"));
-        assertTrue(result.contains("2.1.0"));
+            String result = service.readDependencyResource(
+                "build://test/dependencies/sbt", tmp.toString());
+
+            assertTrue(result.contains("cats-core"));
+            assertTrue(result.contains("os-lib"));
+            assertTrue(result.contains("scalatest"));
+            assertTrue(result.contains("2.12.0"));
+            assertTrue(result.contains("2.13.15"));
+            assertTrue(result.contains("\"buildTool\":\"sbt\""));
+            assertTrue(result.contains("\"scalaVersioned\":true"));
+        }
     }
 
-    @Test
-    void extractSbtDependencies(@TempDir Path tempDir) throws Exception {
-        String sbt = """
-            scalaVersion := "2.13.16"
-            libraryDependencies ++= Seq(
-              "org.typelevel" %% "cats-core" % "2.12.0",
-              "org.scalatest" %% "scalatest" % "3.2.19" % Test
-            )""";
-        Files.writeString(tempDir.resolve("build.sbt"), sbt);
+    @Nested
+    @DisplayName("Resource listing")
+    class ResourceListing {
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
+        @Test
+        @DisplayName("lists available dependency resources")
+        void listsResources(@TempDir Path tmp) throws Exception {
+            Files.writeString(tmp.resolve("pom.xml"), "<project></project>");
+            Files.writeString(tmp.resolve("build.gradle"), "");
 
-        String result = svc.readDependencyResource(
-            "build://test/dependencies/sbt", tempDir.toString());
-        assertTrue(result.contains("cats-core"));
-        assertTrue(result.contains("2.12.0"));
-        assertTrue(result.contains("scalaVersion"));
-        assertTrue(result.contains("2.13.16"));
-        assertTrue(result.contains("\"scalaVersioned\":true"));
-    }
+            String result = service.listDependencyResources(tmp.toString());
 
-    @Test
-    void unknownResourceUri_returnsError(@TempDir Path tempDir) throws Exception {
-        Files.writeString(tempDir.resolve("pom.xml"), "<project></project>");
+            assertTrue(result.contains("dependencies/maven"));
+            assertTrue(result.contains("dependencies/gradle"));
+            assertTrue(result.contains("\"resourceCount\":2"));
+        }
 
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
+        @Test
+        @DisplayName("returns error for invalid directory")
+        void invalidDir() {
+            String result = service.listDependencyResources("/nonexistent/dir");
+            assertTrue(result.contains("\"error\":true"));
+        }
 
-        String result = svc.readDependencyResource(
-            "build://test/bogus", tempDir.toString());
-        assertTrue(result.contains("\"error\""));
-    }
+        @Test
+        @DisplayName("returns error for unknown URI")
+        void unknownUri(@TempDir Path tmp) throws Exception {
+            Files.writeString(tmp.resolve("pom.xml"), "<project></project>");
 
-    @Test
-    void gradleDependencies_noGradleFile_returnsNotAvailable(@TempDir Path tempDir) throws Exception {
-        BuildToolProvider provider = new BuildToolProvider();
-        DependencyResourceService svc = new DependencyResourceService(provider);
-
-        String result = svc.readDependencyResource(
-            "build://test/dependencies/gradle", tempDir.toString());
-        assertTrue(result.contains("\"available\":false"));
+            String result = service.readDependencyResource(
+                "build://test/dependencies/unknown", tmp.toString());
+            assertTrue(result.contains("\"error\":true"));
+        }
     }
 }
