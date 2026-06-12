@@ -8,6 +8,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.14-brightgreen)](https://spring.io/projects/spring-boot)
 [![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.0--RC2-blue)](https://spring.io/projects/spring-ai)
 [![Transport](https://img.shields.io/badge/transport-stdio%20%7C%20HTTP-lightgrey)]()
+[![Smithery](https://smithery.ai/badge/mcp-server-jvm-build-tools)](https://smithery.ai/server/mcp-server-jvm-build-tools)
 
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
@@ -67,7 +68,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (7 tools) | ✅ PASS |
+| `tools/list` discovery (17 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -346,6 +347,97 @@ Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for
 | `projectDir` | string | Yes | Path to the project directory containing build files. |
 
 **Returns:** JSON with `{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}`. Use before executing builds to catch configuration errors early.
+
+
+### `prompt_build_and_test`
+Prompt template: guides the LLM through a structured build-and-test workflow with verification steps.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+### `prompt_dependency_audit`
+Prompt template: guides the LLM through auditing project dependencies for outdated versions, vulnerabilities, and upgrade paths.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+### `prompt_build_diagnosis`
+Prompt template: guides the LLM through diagnosing build failures by analyzing error output and suggesting fixes.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildOutput` | string | Yes | The raw build output/error log to diagnose. |
+| `buildToolName` | string | No | Build tool that produced the output. |
+
+### `list_build_resources`
+List available build resources (build configurations, output files, reports) in the project as MCP resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** JSON array of resource URIs with metadata (type, tool, path, lastModified).
+
+### `read_build_resource`
+Read the contents of a specific build resource identified by its URI.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Resource URI (e.g., `build://pom.xml`, `build://build.gradle`). |
+
+**Returns:** The resource content and metadata.
+
+### `list_dependency_resources`
+List available dependency resources (dependency trees, version reports, Maven Central metadata) as MCP resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+**Returns:** JSON array of dependency resource URIs with metadata.
+
+### `read_dependency_resource`
+Read the contents of a specific dependency resource identified by its URI.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Resource URI (e.g., `dependency://tree`). |
+
+**Returns:** The dependency resource content and metadata.
+
+### `detect_sbt_modules`
+Detect SBT sub-modules in a multi-module SBT project by parsing build.sbt.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+
+**Returns:** JSON with module names, paths, and inter-module dependencies.
+
+### `detect_sbt_test_frameworks`
+Detect which test frameworks are configured in an SBT project (ScalaTest, Specs2, MUnit, etc.).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+
+**Returns:** JSON with detected test frameworks, versions, and configuration details.
+
+### `analyze_sbt_build`
+Execute an SBT build command and return structured JSON output with parsed results, errors, and test summaries.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+| `command` | string | Yes | SBT command to execute (e.g., `compile`, `test`, `package`). |
+
+**Returns:** JSON with `{success, tool, command, duration, output, errors, warnings}`.
 
 ## Quick Start
 
