@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,8 @@ public class BuildToolsService {
     @Tool(name = "get_build_tool_version",
           description = "Get the installed version of a build tool. Supports maven, gradle, sbt, and other registered tools.")
     public String getBuildToolVersion(
-            @ToolParam(required = true, description = "Name of the build tool (e.g., 'maven', 'gradle', 'sbt')")
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
+            @ToolParam(required = true, description = "Name of the build tool ('maven', 'gradle', 'sbt')")
             String buildToolName) {
         BuildTool tool = provider.getTool(buildToolName)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -92,6 +94,7 @@ public class BuildToolsService {
                         "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. " +
                         "SBT supports: compile, test, run, package, clean, assembly.")
     public String executeBuildCommand(
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
             @ToolParam(required = false, description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
             String buildToolName,
             @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
@@ -294,8 +297,9 @@ public class BuildToolsService {
                         "errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, " +
                         "warningCount}. Much easier for agents to process than raw build output.")
     public String analyzeBuildOutput(
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
             @ToolParam(required = false,
-                       description = "Name of the build tool ('maven' or 'gradle'). Omit to auto-detect from project directory.")
+                       description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
             String buildToolName,
             @ToolParam(required = false,
                        description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")

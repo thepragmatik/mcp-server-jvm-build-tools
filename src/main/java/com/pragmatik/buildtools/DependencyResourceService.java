@@ -58,10 +58,10 @@ public class DependencyResourceService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return errorJson("Cannot resolve project directory: " + e.getMessage());
         }
         if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return errorJson("Project directory is not valid: " + projectDir);
         }
 
         String projectName = dir.getFileName().toString();
@@ -109,7 +109,7 @@ public class DependencyResourceService {
         result.put("resourceCount", resources.size());
         result.put("resources", resources);
 
-        return JsonUtils.toJson(result);
+        return toJson(result);
     }
 
     @Tool(name = "read_dependency_resource",
@@ -125,7 +125,7 @@ public class DependencyResourceService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return errorJson("Cannot resolve project directory: " + e.getMessage());
         }
 
         String projectName = dir.getFileName().toString();
@@ -133,20 +133,22 @@ public class DependencyResourceService {
         result.put("resourceUri", resourceUri);
         result.put("project", projectName);
 
-        if (resourceUri.contains("/dependencies/maven") && Files.exists(dir.resolve("pom.xml"))) {
+        if (resourceUri.endsWith("/dependencies/maven") && Files.exists(dir.resolve("pom.xml"))) {
             return extractMavenDependencies(dir, result);
-        } else if (resourceUri.contains("/dependencies/gradle")) {
+        } else if (resourceUri.endsWith("/dependencies/gradle")) {
             Path gf = findGradleFile(dir);
             if (gf != null) return extractGradleDependencies(gf, result);
             result.put("available", false);
             result.put("error", "No Gradle build file found");
-            return JsonUtils.toJson(result);
-        } else if (resourceUri.contains("/dependencies/sbt") && Files.exists(dir.resolve("build.sbt"))) {
+            return toJson(result);
+        } else if (resourceUri.endsWith("/dependencies/sbt") && Files.exists(dir.resolve("build.sbt"))) {
             return extractSbtDependencies(dir, result);
         } else {
-            return JsonUtils.errorJson("Unknown resource URI: " + resourceUri);
+            return errorJson("Unknown resource URI: " + resourceUri);
         }
     }
+
+    // ─── Maven ──────────────────────────────────────────────────────────
 
     private String extractMavenDependencies(Path dir, Map<String, Object> result) {
         try {
@@ -176,13 +178,15 @@ public class DependencyResourceService {
             result.put("dependencyCount", deps.size());
             result.put("dependencies", deps);
             result.put("available", !deps.isEmpty());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         } catch (IOException e) {
             result.put("available", false);
             result.put("error", "Failed to read pom.xml: " + e.getMessage());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         }
     }
+
+    // ─── Gradle ─────────────────────────────────────────────────────────
 
     private Path findGradleFile(Path dir) {
         for (String n : new String[]{"build.gradle.kts", "build.gradle"}) {
@@ -198,6 +202,8 @@ public class DependencyResourceService {
             List<Map<String, Object>> deps = new ArrayList<>();
             boolean kts = gf.getFileName().toString().endsWith(".kts");
 
+            // Kotlin DSL: implementation("group:artifact:version")
+            // Groovy DSL: implementation 'group:artifact:version'
             Pattern p;
             if (kts) {
                 p = Pattern.compile("(\\w+)\\s*\\(\\s*\"([^:\"]+):([^:\"]+):([^\"]+)\"\\s*\\)");
@@ -224,13 +230,15 @@ public class DependencyResourceService {
             result.put("dependencyCount", deps.size());
             result.put("dependencies", deps);
             result.put("available", !deps.isEmpty());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         } catch (IOException e) {
             result.put("available", false);
             result.put("error", "Failed to read " + gf.getFileName() + ": " + e.getMessage());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         }
     }
+
+    // ─── SBT ────────────────────────────────────────────────────────────
 
     private String extractSbtDependencies(Path dir, Map<String, Object> result) {
         try {
@@ -250,6 +258,7 @@ public class DependencyResourceService {
                 deps.add(d);
             }
 
+            // Extract scalaVersion
             Pattern sv = Pattern.compile("scalaVersion\\s*:=\\s*\"([^\"]+)\"");
             Matcher svm = sv.matcher(content);
             if (svm.find()) result.put("scalaVersion", svm.group(1).trim());
@@ -260,11 +269,69 @@ public class DependencyResourceService {
             result.put("dependencyCount", deps.size());
             result.put("dependencies", deps);
             result.put("available", !deps.isEmpty());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         } catch (IOException e) {
             result.put("available", false);
             result.put("error", "Failed to read build.sbt: " + e.getMessage());
-            return JsonUtils.toJson(result);
+            return toJson(result);
         }
+    }
+
+    // ─── JSON ───────────────────────────────────────────────────────────
+
+    private static String toJson(Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(esc(e.getKey())).append("\":");
+            appendVal(sb, e.getValue());
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void appendVal(StringBuilder sb, Object v) {
+        if (v == null) { sb.append("null"); }
+        else if (v instanceof String) { sb.append("\"").append(esc((String) v)).append("\""); }
+        else if (v instanceof Boolean || v instanceof Number) { sb.append(v); }
+        else if (v instanceof List) {
+            sb.append("[");
+            List<?> l = (List<?>) v;
+            for (int i = 0; i < l.size(); i++) { if (i > 0) sb.append(","); appendVal(sb, l.get(i)); }
+            sb.append("]");
+        } else if (v instanceof Map) {
+            sb.append("{");
+            Map<String, Object> m = (Map<String, Object>) v;
+            boolean f = true;
+            for (Map.Entry<String, Object> e : m.entrySet()) {
+                if (!f) sb.append(","); f = false;
+                sb.append("\"").append(esc(e.getKey())).append("\":");
+                appendVal(sb, e.getValue());
+            }
+            sb.append("}");
+        } else { sb.append("\"").append(esc(String.valueOf(v))).append("\""); }
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) {
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default: sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String errorJson(String msg) {
+        return "{\"error\":true,\"message\":\"" + esc(msg) + "\"}";
     }
 }

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <servers>
+    <server>
+      <id>central-repo</id>
+      <username>deploy-user</username>
+      <password>s3cret-password-abc</password>
+    </server>
+    <server>
+      <id>private-nexus</id>
+      <username>ci-bot</username>
+      <password>n3xus-t0k3n-xyz789</password>
+    </server>
+    <server>
+      <id>snapshots-repo</id>
+      <username>snapshot-deployer</username>
+      <password>snap-pass-123</password>
+    </server>
+  </servers>
+
+  <mirrors>
+    <mirror>
+      <id>corporate-mirror</id>
+      <name>Corporate Maven Mirror</name>
+      <url>https://maven.corp.example.com/repository/public</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+    <mirror>
+      <id>internal-mirror</id>
+      <url>https://nexus.internal.example.com/repository/maven-public</url>
+      <mirrorOf>*</mirrorOf>
+    </mirror>
+  </mirrors>
+
+  <proxies>
+    <proxy>
+      <id>corp-proxy</id>
+      <active>true</active>
+      <protocol>https</protocol>
+      <host>proxy.corp.example.com</host>
+      <port>8080</port>
+      <username>proxy-user</username>
+      <password>pr0xy-s3cret</password>
+      <nonProxyHosts>localhost|*.internal.example.com</nonProxyHosts>
+    </proxy>
+    <proxy>
+      <id>alt-proxy</id>
+      <active>false</active>
+      <protocol>http</protocol>
+      <host>alt-proxy.example.com</host>
+      <port>3128</port>
+    </proxy>
+  </proxies>
+</settings>

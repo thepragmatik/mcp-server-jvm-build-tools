@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -87,6 +88,7 @@ public class DependencyService {
             @ToolParam(required = false,
                        description = "Current version to compare against. Omit to just get the latest version.")
             String currentVersion,
+            @Schema(allowableValues = {"RELEASE", "LATEST", "SNAPSHOT", "ALL"})
             @ToolParam(required = false,
                        description = "Version preference: RELEASE (default), LATEST, SNAPSHOT, or ALL")
             String versionPreference,
