@@ -15,6 +15,7 @@
 
 ## What's New (June 2026)
 
+- **Build Performance Profiling**: profile_build and analyze_build_performance tools — timing instrumentation, trend analysis, optimization suggestions for 30-60% faster builds
 - **Dependency Conflict Detection**: Scan Maven/Gradle/SBT builds for version conflicts with severity classification and resolution plans
 - **MCP Server Card**: /.well-known/mcp-server endpoint for discoverability — metadata, capabilities, transports, security posture
 - **Streamable HTTP Transport**: Deploy as a web service with health checks alongside stdio
@@ -71,7 +72,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (20 tools) | ✅ PASS |
+| `tools/list` discovery (22 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -479,6 +480,45 @@ detect_dependency_conflicts(projectDir="/home/dev/my-app")
     ]
   }
 ```
+
+### `profile_build`
+Execute a build command with full timing instrumentation. Tracks wall-clock time vs tool-reported time, extracts phase/task breakdown, parses test counts, and persists build history for trend analysis.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `buildToolName` | string | No | `"maven"`, `"gradle"`, or `"sbt"`. Omit to auto-detect. |
+| `buildToolHome` | string | No | Path to build tool installation. |
+| `projectDir` | string | Yes | Path to the project directory. |
+| `command` | string | Yes | Build command to profile. |
+
+**Returns:** JSON with `{success, tool, command, durationSeconds, durationFormatted, phases: [{name, durationSeconds}], testSummary: {total, failed, errors, skipped}, comparison: {trend, recentAvgSeconds, buildsTracked}, suggestions}`.
+
+**History:** Build results persist to `.buildtools/history/` for trend analysis across sessions.
+
+**Example:**
+```
+profile_build(projectDir="/home/dev/my-app", command="clean test")
+→ {
+    "tool": "maven", "command": "clean test", "success": true,
+    "durationSeconds": 45.3, "durationFormatted": "45s",
+    "phases": [{"name":"maven-clean-plugin:clean","durationSeconds":0.5},...],
+    "testSummary": {"total":42,"failed":0,"errors":0,"skipped":0},
+    "comparison": {"trend":"FASTER","changePercent":-12.5,"buildsTracked":8},
+    "suggestions": ["Add -T4 flag to use 4 threads"]
+  }
+```
+
+### `analyze_build_performance`
+Analyze build performance from configuration and historical data without executing a build. Examines build files for missing optimization settings (parallel, caching, daemon) and provides actionable suggestions.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to analyze. Omit to auto-detect. |
+
+**Returns:** JSON with `{tool, projectDir, suggestions, suggestionCount, optimizationPotential: {level, estimatedImprovement}, totalTrackedBuilds}`.
+
+**Analyzes:** Maven fork mode and build cache plugins; Gradle parallel/caching/daemon/configuration-cache settings; SBT Coursier integration; historical build trends.
 
 ### Server Card Endpoint
 When running in Streamable HTTP mode, the server exposes discoverability endpoints:
