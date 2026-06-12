@@ -15,6 +15,9 @@
 
 ## What's New (June 2026)
 
+- **SBOM Generation & Supply Chain Audit**: generate_sbom, audit_supply_chain, check_license_compliance tools — CycloneDX/SPDX SBOMs for Maven/Gradle/SBT, CVE cross-referencing via OSV.dev, license compliance
+- **Test Flakiness Detection & History**: detect_flaky_tests and analyze_test_history tools — multi-run flakiness scoring, Surefire XML parsing, trend analysis, quarantine candidates
+- **Build Cache Health Analysis**: analyze_cache_health and optimize_build_cache tools — caching audit for Maven/Gradle/SBT, hit-rate scoring, optimization snippets
 - **Build Performance Profiling**: profile_build and analyze_build_performance tools — timing instrumentation, trend analysis, optimization suggestions for 30-60% faster builds
 - **Dependency Conflict Detection**: Scan Maven/Gradle/SBT builds for version conflicts with severity classification and resolution plans
 - **MCP Server Card**: /.well-known/mcp-server endpoint for discoverability — metadata, capabilities, transports, security posture
@@ -76,7 +79,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (24 tools) | ✅ PASS |
+| `tools/list` discovery (31 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -563,6 +566,85 @@ Analyze build performance from configuration and historical data without executi
 **Returns:** JSON with `{tool, projectDir, suggestions, suggestionCount, optimizationPotential: {level, estimatedImprovement}, totalTrackedBuilds}`.
 
 **Analyzes:** Maven fork mode and build cache plugins; Gradle parallel/caching/daemon/configuration-cache settings; SBT Coursier integration; historical build trends.
+
+
+### `generate_sbom`
+Generate a CycloneDX or SPDX Software Bill of Materials for a JVM project. Detects existing SBOM plugins and configuration, discovers pre-generated SBOM files, and provides instructions for manual plugin setup when needed.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `format` | string | No | SBOM format: `cyclonedx` (default) or `spdx`. |
+| `buildToolName` | string | No | Build tool. Omit to auto-detect. |
+
+**Returns:** JSON with `{success, format, sbom, dependencyCount, pluginDetected, instructions}`. When the SBOM plugin is not configured, returns plugin setup instructions for Maven, Gradle, or SBT.
+
+### `audit_supply_chain`
+Audit project dependencies for known vulnerabilities by cross-referencing against OSV.dev (Open Source Vulnerabilities database). Supports batch lookups for efficiency.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool. Omit to auto-detect. |
+
+**Returns:** JSON with `{totalDependencies, vulnerabilitiesFound, vulnerabilities: [{dependency, cveId, severity, fixedVersion, summary}], severityBreakdown, remediationRecommendations}`.
+
+### `check_license_compliance`
+Check dependency licenses for compliance with organizational policies. Classifies licenses into permissive, copyleft, restricted, and unknown categories.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool. Omit to auto-detect. |
+
+**Returns:** JSON with `{totalDependencies, licenseCounts: {permissive, copyleft, restricted, unknown}, dependencies: [{groupId, artifactId, version, license, category}], riskAssessment: {level, summary}}`.
+
+### `detect_flaky_tests`
+Run tests multiple times to detect non-deterministic failures. Parses Surefire XML reports to track pass/fail across iterations and computes flakiness scores per test method.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `iterations` | integer | No | Number of test runs (default: 5). |
+| `testFilter` | string | No | Optional test class/method filter (e.g., `"*ServiceTest"`). |
+| `buildToolName` | string | No | Build tool. Omit to auto-detect. |
+
+**Returns:** JSON with `{iterations, flakyTests: [{className, methodName, score, status, passRuns, failRuns, suggestion}], stableTests, summary: {total, flaky, veryFlaky, stable}}`.
+
+**Flakiness scores:** `0` = STABLE (passes every run), `> 0` = FLAKY (fails at least once), `> 0.5` = VERY FLAKY (fails most runs). Suggestions include timing fixes, order-dependency resolution, and thread-safety checks.
+
+### `analyze_test_history`
+Analyze historical test pass/fail trends from build history persisted by `profile_build`. Identifies degrading tests and suggests quarantine candidates.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** JSON with `{trends: [{className, methodName, totalRuns, passRate, trend, degradationRisk}], quarantineCandidates: [...], overallTestHealth: {total, stable, degrading}}`.
+
+### `analyze_cache_health`
+Audit build caching configuration and effectiveness across Maven, Gradle, and SBT. Checks cache-related settings in build files and properties, parses execution logs for cache hit/miss statistics, and scores the overall caching health.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to analyze. Omit to auto-detect. |
+
+**Returns:** JSON with `{tool, cacheScore, scoreLevel, findings: [{area, status, detail}], cacheHitRate, configurationGaps: [...], rawStats}`.
+
+**Score levels:** `GOOD` (>70%), `ADEQUATE` (>40%), `NEEDS_ATTENTION` (≤40%).
+
+### `optimize_build_cache`
+Generate build-tool-specific cache optimization configuration snippets. Provides exact file paths, content to add, and estimated improvement percentages.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool. Omit to auto-detect. |
+
+**Returns:** JSON with `{optimizations: [{area, priority, recommendation, configFile, config, estimatedImprovement}], currentConfig, estimatedTotalImprovement}`.
+
+**Covers:** Maven (mvnd, build cache extensions, parallel builds), Gradle (caching, parallel, daemon, configuration cache), SBT (Coursier, parallel execution, incremental compilation, turbo mode).
 
 ### Server Card Endpoint
 When running in Streamable HTTP mode, the server exposes discoverability endpoints:
