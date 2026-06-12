@@ -5,6 +5,7 @@ Complete reference for all 39 MCP tools exposed by the server. Each tool is an `
 ## Table of Contents
 
 - [analyze_build_output](#analyze_build_output)
+- [analyze_cache_health / optimize_build_cache](#analyze_cache_health)
 - [analyze_sbt_build](#analyze_sbt_build)
 - [analyze_test_history](#analyze_test_history)
 - [audit_supply_chain](#audit_supply_chain)
