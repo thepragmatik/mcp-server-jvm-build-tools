@@ -63,7 +63,8 @@ class AsyncBuildServiceTest {
     }
 
     @Test
-    void testExecuteBuildAsyncReturnsTaskHandle(@TempDir Path tempDir) throws IOException {
+    void testExecuteBuildAsyncReturnsTaskHandle(@TempDir Path tempDir,
+                                                 @TempDir Path mavenHome) throws IOException {
         // Create a basic Maven project so auto-detection works
         Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,7 +76,7 @@ class AsyncBuildServiceTest {
                 </project>
                 """);
 
-        String result = service.executeBuildAsync("maven", "/nonexistent/maven/home",
+        String result = service.executeBuildAsync("maven", mavenHome.toString(),
                 tempDir.toString(), "clean");
 
         assertNotNull(result);
@@ -111,7 +112,8 @@ class AsyncBuildServiceTest {
     }
 
     @Test
-    void testCancelBuildTaskNotRunning(@TempDir Path tempDir) throws IOException {
+    void testCancelBuildTaskNotRunning(@TempDir Path tempDir,
+                                        @TempDir Path mavenHome) throws IOException {
         // Create a task then manually set it to completed
         Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -123,7 +125,7 @@ class AsyncBuildServiceTest {
                 </project>
                 """);
 
-        String execResult = service.executeBuildAsync("maven", "/fake/home",
+        String execResult = service.executeBuildAsync("maven", mavenHome.toString(),
                 tempDir.toString(), "validate");
         assertTrue(execResult.contains("\"taskId\""));
 
@@ -132,7 +134,7 @@ class AsyncBuildServiceTest {
         assertNotNull(taskId);
 
         // Cancel should succeed since task hasn't started running yet
-        // (Maven home is invalid so it will fail, but status should still be cancelable)
+        // (Maven home has no mvn binary so execution will fail, but task is cancelable)
         String cancelResult = service.cancelBuildTask(taskId);
         assertNotNull(cancelResult);
     }
@@ -149,8 +151,10 @@ class AsyncBuildServiceTest {
                 </project>
                 """);
 
-        // Start a task
-        service.executeBuildAsync("maven", "/fake/home", tempDir.toString(), "validate");
+        // Start a task (maven home doesn't need to be valid for listing test)
+        Files.createDirectories(tempDir.resolve("maven-home"));
+        service.executeBuildAsync("maven", tempDir.resolve("maven-home").toString(),
+                tempDir.toString(), "validate");
 
         String result = service.listBuildTasks();
         assertNotNull(result);
