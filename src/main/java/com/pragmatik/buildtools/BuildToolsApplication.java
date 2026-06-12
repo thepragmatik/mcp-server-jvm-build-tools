@@ -42,7 +42,8 @@ public class BuildToolsApplication {
                                            BuildAuthService buildAuthService,
                                            DependencyConflictService dependencyConflictService,
                                            BuildPerformanceService buildPerformanceService,
-                                           JavaVersionService javaVersionService) {
+                                           JavaVersionService javaVersionService,
+                                           ToolAuthorizationService toolAuthorizationService) {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(buildToolsService, dependencyService, promptService,
                              buildResourceService, dependencyResourceService,
@@ -50,7 +51,8 @@ public class BuildToolsApplication {
                              buildAuthService,
                              dependencyConflictService,
                              buildPerformanceService,
-                             javaVersionService)
+                             javaVersionService,
+                             toolAuthorizationService)
                 .build();
     }
 }
