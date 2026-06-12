@@ -2,61 +2,1028 @@
   "$schema": "https://spec.modelcontextprotocol.io/schemas/registry-v1.json",
   "name": "mcp-server-jvm-build-tools",
   "version": "0.1.1-SNAPSHOT",
-  "description": "Unified MCP server for JVM build tools — Maven, Gradle, and SBT. Execute builds, detect project types, check dependency versions, analyze build output, validate configurations, scan credentials, detect dependency conflicts, profile build performance, and check Java version compatibility — all through a single MCP API.",
-  "vendor": { "name": "The Pragmatik", "url": "https://github.com/thepragmatik" },
+  "description": "Unified MCP server for JVM build tools \u2014 Maven, Gradle, and SBT. Execute builds, detect project types, check dependency versions, analyze build output, validate configurations, scan credentials, detect dependency conflicts, profile build performance, check Java version compatibility, authorize tool access, manage async builds, detect flaky tests, audit supply chains, and generate SBOMs \u2014 all through a single MCP API.",
+  "vendor": {
+    "name": "The Pragmatik",
+    "url": "https://github.com/thepragmatik"
+  },
   "homepage": "https://github.com/thepragmatik/mcp-server-jvm-build-tools",
   "license": "Apache-2.0",
-  "tags": ["maven","gradle","sbt","build-tools","java","jvm","devops","development"],
-  "capabilities": { "tools": true, "resources": true, "prompts": true, "logging": false, "streamableHttp": true, "stdio": true },
+  "tags": [
+    "maven",
+    "gradle",
+    "sbt",
+    "build-tools",
+    "java",
+    "jvm",
+    "devops",
+    "development",
+    "security",
+    "supply-chain"
+  ],
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": true,
+    "logging": false,
+    "streamableHttp": true,
+    "stdio": true
+  },
   "transports": [
-    { "type": "stdio", "description": "JSON-RPC via stdin/stdout. Compatible with Claude Desktop, Cursor, Cline, Goose, Continue, Windsurf." },
-    { "type": "streamable-http", "description": "HTTP with SSE, CORS, health endpoints. Enable via --spring.profiles.active=http.",
-      "endpoints": { "mcp": "/mcp/message", "serverCard": "/.well-known/mcp-server", "health": "/health", "readiness": "/health/ready", "liveness": "/health/live", "buildEvents": "/mcp/build-events/stream" }
+    {
+      "type": "stdio",
+      "description": "JSON-RPC via stdin/stdout. Compatible with Claude Desktop, Cursor, Cline, Goose, Continue, Windsurf."
+    },
+    {
+      "type": "streamable-http",
+      "description": "HTTP with SSE, CORS, health endpoints. Enable via --spring.profiles.active=http.",
+      "endpoints": {
+        "mcp": "/mcp/message",
+        "serverCard": "/.well-known/mcp-server",
+        "health": "/health",
+        "readiness": "/health/ready",
+        "liveness": "/health/live",
+        "buildEvents": "/mcp/build-events/stream"
+      }
     }
   ],
-  "mcpVersions": ["2024-11-05","2025-03-26"],
+  "mcpVersions": [
+    "2024-11-05",
+    "2025-03-26"
+  ],
   "tools": {
-    "total": 24,
+    "total": 39,
     "categories": {
-      "build_execution": ["get_build_tool_version","execute_build_command","list_build_tools","detect_build_tool"],
-      "output_analysis": ["analyze_build_output"],
-      "configuration_validation": ["validate_build_configuration"],
-      "dependency_management": ["check_dependency_version","detect_dependency_conflicts"],
-      "credential_scanning": ["check_credential_status"],
-      "performance_profiling": ["profile_build","analyze_build_performance"],
-      "java_compatibility": ["check_java_compatibility"],
-      "sbt_specific": ["detect_sbt_modules","detect_sbt_test_frameworks","analyze_sbt_build"],
-      "prompt_templates": ["prompt_build_and_test","prompt_dependency_audit","prompt_build_diagnosis"],
-      "mcp_resources": ["list_build_resources","read_build_resource","list_dependency_resources","read_dependency_resource","list_resource_templates","resolve_resource_template"]
-    }
+      "build_execution": [
+        "get_build_tool_version",
+        "execute_build_command",
+        "list_build_tools",
+        "detect_build_tool"
+      ],
+      "async_build": [
+        "execute_build_async",
+        "get_build_task",
+        "cancel_build_task",
+        "list_build_tasks"
+      ],
+      "output_analysis": [
+        "analyze_build_output"
+      ],
+      "configuration_validation": [
+        "validate_build_configuration"
+      ],
+      "dependency_management": [
+        "check_dependency_version",
+        "detect_dependency_conflicts"
+      ],
+      "credential_scanning": [
+        "check_credential_status"
+      ],
+      "performance_profiling": [
+        "profile_build",
+        "analyze_build_performance"
+      ],
+      "java_compatibility": [
+        "check_java_compatibility"
+      ],
+      "sbt_specific": [
+        "detect_sbt_modules",
+        "detect_sbt_test_frameworks",
+        "analyze_sbt_build"
+      ],
+      "tool_authorization": [
+        "check_tool_authorization",
+        "list_available_scopes",
+        "audit_tool_access",
+        "validate_access_token"
+      ],
+      "test_flakiness": [
+        "detect_flaky_tests",
+        "analyze_test_history"
+      ],
+      "build_cache": [
+        "analyze_cache_health",
+        "optimize_build_cache"
+      ],
+      "supply_chain": [
+        "generate_sbom",
+        "audit_supply_chain",
+        "check_license_compliance"
+      ],
+      "prompt_templates": [
+        "prompt_build_and_test",
+        "prompt_dependency_audit",
+        "prompt_build_diagnosis"
+      ],
+      "mcp_resources": [
+        "list_build_resources",
+        "read_build_resource",
+        "list_dependency_resources",
+        "read_dependency_resource",
+        "list_resource_templates",
+        "resolve_resource_template"
+      ]
+    },
+    "entries": [
+      {
+        "name": "get_build_tool_version",
+        "description": "Get the installed version of a build tool. Supports maven, gradle, sbt, and other registered tools.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool name (maven, gradle, sbt)",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            },
+            "buildToolHome": {
+              "type": "string",
+              "description": "Path to build tool installation"
+            }
+          },
+          "required": []
+        },
+        "category": "build_execution"
+      },
+      {
+        "name": "execute_build_command",
+        "description": "Execute a build command using Maven, Gradle, SBT, or any registered build tool. Auto-detects the build tool from project markers if no tool name is specified.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool name. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            },
+            "buildToolHome": {
+              "type": "string",
+              "description": "Path to build tool installation"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "command": {
+              "type": "string",
+              "description": "Build command to execute (e.g., 'clean compile')"
+            }
+          },
+          "required": [
+            "projectDir",
+            "command"
+          ]
+        },
+        "category": "build_execution"
+      },
+      {
+        "name": "list_build_tools",
+        "description": "List all registered build tools with their supported commands.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "build_execution"
+      },
+      {
+        "name": "detect_build_tool",
+        "description": "Detect which build tool a project uses by scanning for marker files (pom.xml, build.gradle, build.sbt, etc.).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "build_execution"
+      },
+      {
+        "name": "execute_build_async",
+        "description": "Start an async build and return a task handle immediately. Use this for long-running builds (30s+) instead of execute_build_command. Returns a task JSON with {taskId, status:'queued'}. Poll with get_build_task to track progress, stream output, and get results.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool name. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            },
+            "buildToolHome": {
+              "type": "string",
+              "description": "Path to build tool installation"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "command": {
+              "type": "string",
+              "description": "Build command to execute (e.g., 'clean compile')"
+            }
+          },
+          "required": [
+            "projectDir",
+            "command"
+          ]
+        },
+        "category": "async_build"
+      },
+      {
+        "name": "get_build_task",
+        "description": "Get the current status, progress, and partial output of an async build task. Returns JSON with {taskId, status, progress, output (partial), duration, phaseProgress, result (when completed)}.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "description": "Task ID returned by execute_build_async"
+            }
+          },
+          "required": [
+            "taskId"
+          ]
+        },
+        "category": "async_build"
+      },
+      {
+        "name": "cancel_build_task",
+        "description": "Cancel a running async build task. Kills the underlying build process and marks the task as cancelled. Has no effect on already-completed tasks.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "description": "Task ID to cancel"
+            }
+          },
+          "required": [
+            "taskId"
+          ]
+        },
+        "category": "async_build"
+      },
+      {
+        "name": "list_build_tasks",
+        "description": "List all async build tasks. Returns JSON with {activeCount, completedCount, tasks: [{taskId, status, tool, command, elapsed}]}.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "async_build"
+      },
+      {
+        "name": "analyze_build_output",
+        "description": "Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool name. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            },
+            "buildToolHome": {
+              "type": "string",
+              "description": "Path to build tool installation"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "command": {
+              "type": "string",
+              "description": "Build command to execute"
+            }
+          },
+          "required": [
+            "projectDir",
+            "command"
+          ]
+        },
+        "category": "output_analysis"
+      },
+      {
+        "name": "validate_build_configuration",
+        "description": "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for correctness. Checks XML well-formedness, required elements, plugin version consistency, and common misconfigurations.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "configuration_validation"
+      },
+      {
+        "name": "check_dependency_version",
+        "description": "Check if a newer version exists for a Maven Central dependency. Returns latest version, all versions, stability classification, and upgrade type (major/minor/patch).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string",
+              "description": "Maven groupId (e.g., 'com.google.guava')"
+            },
+            "artifactId": {
+              "type": "string",
+              "description": "Maven artifactId (e.g., 'guava')"
+            },
+            "currentVersion": {
+              "type": "string",
+              "description": "Current version to compare against"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory (optional, for build-tool-specific syntax)"
+            }
+          },
+          "required": [
+            "groupId",
+            "artifactId"
+          ]
+        },
+        "category": "dependency_management"
+      },
+      {
+        "name": "detect_dependency_conflicts",
+        "description": "Scan a JVM project for dependency version conflicts. Works with Maven (pom.xml), Gradle (build.gradle/.kts), and SBT (build.sbt).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "dependency_management"
+      },
+      {
+        "name": "check_credential_status",
+        "description": "Scan the project directory and system for configured Maven and Gradle credentials. Checks ~/.m2/settings.xml, environment variables, and embedded credentials in build files.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "credential_scanning"
+      },
+      {
+        "name": "profile_build",
+        "description": "Execute a build command with timing instrumentation. Returns detailed performance metrics including total duration, phase/task breakdown, and comparison against previous builds.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool name. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            },
+            "buildToolHome": {
+              "type": "string",
+              "description": "Path to build tool installation"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "command": {
+              "type": "string",
+              "description": "Build command to execute"
+            }
+          },
+          "required": [
+            "projectDir",
+            "command"
+          ]
+        },
+        "category": "performance_profiling"
+      },
+      {
+        "name": "analyze_build_performance",
+        "description": "Analyze build performance from historical data and configuration. Suggests optimizations like parallel builds, build caching, incremental compilation, and daemon usage. Read-only analysis.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "performance_profiling"
+      },
+      {
+        "name": "check_java_compatibility",
+        "description": "Check if a JVM project and its dependencies are compatible with a target Java version. Scans compiler settings and known framework minimum requirements.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "targetVersion": {
+              "type": "string",
+              "description": "Target Java version (e.g., '21', '25')"
+            }
+          },
+          "required": [
+            "projectDir",
+            "targetVersion"
+          ]
+        },
+        "category": "java_compatibility"
+      },
+      {
+        "name": "detect_sbt_modules",
+        "description": "Detect SBT modules/subprojects from build.sbt and project/ directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "sbt_specific"
+      },
+      {
+        "name": "detect_sbt_test_frameworks",
+        "description": "Detect SBT test frameworks configured in a project.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "sbt_specific"
+      },
+      {
+        "name": "analyze_sbt_build",
+        "description": "Analyze an SBT build definition for complexity, performance issues, and best practices.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "sbt_specific"
+      },
+      {
+        "name": "check_tool_authorization",
+        "description": "Check whether a specific MCP tool is authorized for a given set of permission scopes. Returns the authorization decision, matching scopes, and a human-readable explanation.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "toolName": {
+              "type": "string",
+              "description": "The MCP tool name to check (e.g., 'execute_build_command')."
+            },
+            "grantedScopes": {
+              "type": "string",
+              "description": "Comma-separated list of granted scopes. Use '*' for full access."
+            }
+          },
+          "required": [
+            "toolName",
+            "grantedScopes"
+          ]
+        },
+        "category": "tool_authorization"
+      },
+      {
+        "name": "list_available_scopes",
+        "description": "List all available permission scopes for tool authorization. Each scope covers a category of tools. Returns scope name, covered tool count, and specific tool names.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "tool_authorization"
+      },
+      {
+        "name": "audit_tool_access",
+        "description": "Read the most recent tool invocation audit log entries. Returns timestamp, tool name, caller identity, authorization status, and duration. Satisfies OWASP MCP06 logging requirements.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "description": "Number of most recent audit entries to return (default: 20, max: 100)."
+            },
+            "filter": {
+              "type": "string",
+              "description": "Filter by authorization status: 'all', 'authorized', or 'denied'.",
+              "enum": [
+                "all",
+                "authorized",
+                "denied"
+              ]
+            }
+          },
+          "required": []
+        },
+        "category": "tool_authorization"
+      },
+      {
+        "name": "validate_access_token",
+        "description": "Validate an MCP access token (API key) and return the granted permission scopes. Tokens are configured via BUILDTOOLS_API_KEY_* environment variables.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "The access token (API key) to validate. Never logged or stored."
+            }
+          },
+          "required": [
+            "token"
+          ]
+        },
+        "category": "tool_authorization"
+      },
+      {
+        "name": "detect_flaky_tests",
+        "description": "Detect flaky tests by running them multiple times. Tracks pass/fail per test method and computes a flakiness score. Flags: score=0 STABLE, >0 FLAKY, >0.5 VERY_FLAKY.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "iterations": {
+              "type": "integer",
+              "description": "Number of test iterations (default 5, max 20)"
+            },
+            "testFilter": {
+              "type": "string",
+              "description": "Test filter pattern (e.g., 'com.example.MyTest')"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "test_flakiness"
+      },
+      {
+        "name": "analyze_test_history",
+        "description": "Analyze historical test pass/fail trends from build history. Identifies degrading tests and suggests quarantine candidates.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "test_flakiness"
+      },
+      {
+        "name": "generate_sbom",
+        "description": "Generate a CycloneDX or SPDX Software Bill of Materials (SBOM) for a JVM project. Auto-detects build tool and uses the appropriate CycloneDX plugin. Formats: cyclonedx (default) or spdx.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "format": {
+              "type": "string",
+              "description": "SBOM format: 'cyclonedx' (default) or 'spdx'",
+              "enum": [
+                "cyclonedx",
+                "spdx"
+              ]
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "supply_chain"
+      },
+      {
+        "name": "audit_supply_chain",
+        "description": "Audit a project's dependencies for known vulnerabilities. Cross-references against OSV.dev and GitHub Advisory databases. Returns CVE details with severity, fix versions, and remediation steps.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "supply_chain"
+      },
+      {
+        "name": "check_license_compliance",
+        "description": "Check all project dependencies for license compliance. Classifies licenses as permissive, copyleft, restricted, or unknown. Flags GPL/AGPL dependencies that may impose copyleft obligations.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "supply_chain"
+      },
+      {
+        "name": "prompt_build_and_test",
+        "description": "Get a prompt template to help an LLM guide a user through building and testing a JVM project.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "prompt_templates"
+      },
+      {
+        "name": "prompt_dependency_audit",
+        "description": "Get a prompt template to help an LLM audit and upgrade project dependencies.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "prompt_templates"
+      },
+      {
+        "name": "prompt_build_diagnosis",
+        "description": "Get a prompt template to help an LLM diagnose and fix build failures.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "prompt_templates"
+      },
+      {
+        "name": "list_build_resources",
+        "description": "List all available build resources for a project directory. Returns resource URIs with descriptions and content types.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory path"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "read_build_resource",
+        "description": "Read the contents of a build resource by its URI. Use list_build_resources first to discover available resource URIs.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "resourceUri": {
+              "type": "string",
+              "description": "Resource URI (e.g., 'build://myproject/config')"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory path"
+            }
+          },
+          "required": [
+            "resourceUri",
+            "projectDir"
+          ]
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "list_dependency_resources",
+        "description": "List available dependency resources for a project directory. Returns resource URIs with dependency counts per build tool.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory path"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "read_dependency_resource",
+        "description": "Read extracted dependencies from a build file. Use list_dependency_resources first to discover available URIs.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "resourceUri": {
+              "type": "string",
+              "description": "Resource URI (e.g., 'build://myproject/dependencies/maven')"
+            },
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory path"
+            }
+          },
+          "required": [
+            "resourceUri",
+            "projectDir"
+          ]
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "list_resource_templates",
+        "description": "List all available MCP resource templates with their URI patterns and parameter descriptions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "resolve_resource_template",
+        "description": "Resolve a resource template URI by substituting parameter values. Returns the concrete resource URI and validates parameter constraints.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "templateName": {
+              "type": "string",
+              "description": "Template name from list_resource_templates"
+            },
+            "params": {
+              "type": "object",
+              "description": "Template parameter values as key-value pairs"
+            }
+          },
+          "required": [
+            "templateName",
+            "params"
+          ]
+        },
+        "category": "mcp_resources"
+      },
+      {
+        "name": "analyze_cache_health",
+        "description": "Audit build caching configuration and effectiveness across Maven, Gradle, and SBT. Scores overall caching health and identifies configuration gaps.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool to analyze. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "build_cache"
+      },
+      {
+        "name": "optimize_build_cache",
+        "description": "Generate build-tool-specific cache optimization configuration snippets with exact file paths and estimated improvement percentages.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Path to the project directory"
+            },
+            "buildToolName": {
+              "type": "string",
+              "description": "Build tool. Omit to auto-detect.",
+              "enum": [
+                "maven",
+                "gradle",
+                "sbt"
+              ]
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
+        },
+        "category": "build_cache"
+      }
+    ]
   },
   "resources": {
-    "uriSchemes": ["build://","dependency://","template://"],
-    "examples": ["build://pom.xml","build://build.gradle.kts","build://build.sbt","dependency://tree","dependency://version/com.google.guava/guava","template://build-config","template://dependency-report"]
+    "uriSchemes": [
+      "build://",
+      "dependency://",
+      "template://"
+    ],
+    "examples": [
+      "build://pom.xml",
+      "build://build.gradle.kts",
+      "build://build.sbt",
+      "dependency://tree",
+      "dependency://version/com.google.guava/guava",
+      "template://build-config",
+      "template://dependency-report"
+    ]
   },
   "prompts": [
-    { "name": "Build & Test Workflow", "tool": "prompt_build_and_test", "description": "Structured build-and-test workflow with verification" },
-    { "name": "Dependency Audit", "tool": "prompt_dependency_audit", "description": "Audit dependencies for outdated versions and upgrades" },
-    { "name": "Build Failure Diagnosis", "tool": "prompt_build_diagnosis", "description": "Diagnose build failures from error output" }
+    {
+      "name": "Build & Test Workflow",
+      "tool": "prompt_build_and_test",
+      "description": "Structured build-and-test workflow with verification"
+    },
+    {
+      "name": "Dependency Audit",
+      "tool": "prompt_dependency_audit",
+      "description": "Audit dependencies for outdated versions and upgrades"
+    },
+    {
+      "name": "Build Failure Diagnosis",
+      "tool": "prompt_build_diagnosis",
+      "description": "Diagnose build failures from error output"
+    }
   ],
   "runtime": {
     "java": "21+",
-    "requirements": { "maven_home": "required for Maven (MAVEN_HOME or buildToolHome)", "gradle": "optional — wrapper or PATH", "sbt": "optional — PATH fallback" },
+    "requirements": {
+      "maven_home": "required for Maven (MAVEN_HOME or buildToolHome)",
+      "gradle": "optional \u2014 wrapper or PATH",
+      "sbt": "optional \u2014 PATH fallback"
+    },
     "build_tools": [
-      { "name": "Maven", "detectionFile": "pom.xml", "minVersion": "3.6+", "homeRequired": true, "supportedCommands": ["clean","compile","test","package","install","deploy","validate","dependency:tree"] },
-      { "name": "Gradle", "detectionFiles": ["build.gradle","build.gradle.kts","settings.gradle","settings.gradle.kts"], "minVersion": "7.0+", "homeRequired": false, "supportedCommands": ["clean","build","test","compileJava","compileTestJava","jar","assemble","check","publishToMavenLocal","dependencies","projects","tasks"] },
-      { "name": "SBT", "detectionFile": "build.sbt", "minVersion": "1.0+", "homeRequired": false, "supportedCommands": ["compile","test","run","package","clean","assembly","publishLocal","publish","update","doc","console"] }
+      {
+        "name": "Maven",
+        "detectionFile": "pom.xml",
+        "minVersion": "3.6+",
+        "homeRequired": true,
+        "supportedCommands": [
+          "clean",
+          "compile",
+          "test",
+          "package",
+          "install",
+          "deploy",
+          "validate",
+          "dependency:tree"
+        ]
+      },
+      {
+        "name": "Gradle",
+        "detectionFiles": [
+          "build.gradle",
+          "build.gradle.kts",
+          "settings.gradle",
+          "settings.gradle.kts"
+        ],
+        "minVersion": "7.0+",
+        "homeRequired": false,
+        "supportedCommands": [
+          "clean",
+          "build",
+          "test",
+          "compileJava",
+          "compileTestJava",
+          "jar",
+          "assemble",
+          "check",
+          "publishToMavenLocal",
+          "dependencies",
+          "projects",
+          "tasks"
+        ]
+      },
+      {
+        "name": "SBT",
+        "detectionFile": "build.sbt",
+        "minVersion": "1.0+",
+        "homeRequired": false,
+        "supportedCommands": [
+          "compile",
+          "test",
+          "run",
+          "package",
+          "clean",
+          "assembly",
+          "publishLocal",
+          "publish",
+          "update",
+          "doc",
+          "console"
+        ]
+      }
     ]
   },
   "security": {
     "transportSecurity": "stdio (local); Streamable HTTP with CORS",
     "inputValidation": "Shell injection blocking, dangerous flag blocking, path canonicalization, length limits",
     "credentialHandling": "Read-only scanning with masked values",
-    "commandRestrictions": "Allowlisted commands per build tool"
+    "commandRestrictions": "Allowlisted commands per build tool",
+    "toolAuthorization": "Scope-based tool authorization via ToolAuthorizationService (check_tool_authorization, list_available_scopes, audit_tool_access, validate_access_token). API keys from BUILDTOOLS_API_KEY_* env vars. Addresses OWASP MCP07 (auth) and MCP06 (audit)."
   },
-  "registry": { "namespace": "com.thepragmatik.mcp-server-jvm-build-tools", "smithery": "https://smithery.ai/server/mcp-server-jvm-build-tools", "dockerImage": "thepragmatik/mcp-server-jvm-build-tools:latest", "github": "https://github.com/thepragmatik/mcp-server-jvm-build-tools" },
+  "registry": {
+    "namespace": "com.thepragmatik.mcp-server-jvm-build-tools",
+    "smithery": "https://smithery.ai/server/mcp-server-jvm-build-tools",
+    "dockerImage": "thepragmatik/mcp-server-jvm-build-tools:latest",
+    "github": "https://github.com/thepragmatik/mcp-server-jvm-build-tools"
+  },
   "installation": {
-    "jar": { "build": "git clone && mvn clean package -DskipTests", "artifact": "target/mcp-server-jvm-build-tools.jar", "launcher": "./scripts/launcher.sh" },
-    "docker": { "image": "thepragmatik/mcp-server-jvm-build-tools:latest", "run": "docker run -i --rm -v /path/to/projects:/projects -e MAVEN_HOME=/opt/maven thepragmatik/mcp-server-jvm-build-tools" }
+    "jar": {
+      "build": "git clone && mvn clean package -DskipTests",
+      "artifact": "target/mcp-server-jvm-build-tools.jar",
+      "launcher": "./scripts/launcher.sh"
+    },
+    "docker": {
+      "image": "thepragmatik/mcp-server-jvm-build-tools:latest",
+      "run": "docker run -i --rm -v /path/to/projects:/projects -e MAVEN_HOME=/opt/maven thepragmatik/mcp-server-jvm-build-tools"
+    }
   }
 }
