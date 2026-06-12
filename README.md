@@ -4,8 +4,31 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 [![AI](https://img.shields.io/badge/built_by-AI_%2B_human_review-8A2BE2)]()
+[![MCP](https://img.shields.io/badge/MCP-2024--11--05%2B-green)](https://spec.modelcontextprotocol.io)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.14-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.0--RC2-blue)](https://spring.io/projects/spring-ai)
+[![Transport](https://img.shields.io/badge/transport-stdio%20%7C%20HTTP-lightgrey)]()
+[![Smithery](https://smithery.ai/badge/mcp-server-jvm-build-tools)](https://smithery.ai/server/mcp-server-jvm-build-tools)
 
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
+
+
+## What's New (June 2026)
+
+- **Build Performance Profiling**: profile_build and analyze_build_performance tools — timing instrumentation, trend analysis, optimization suggestions for 30-60% faster builds
+- **Dependency Conflict Detection**: Scan Maven/Gradle/SBT builds for version conflicts with severity classification and resolution plans
+- **MCP Server Card**: /.well-known/mcp-server endpoint for discoverability — metadata, capabilities, transports, security posture
+- **Streamable HTTP Transport**: Deploy as a web service with health checks alongside stdio
+- **SBT Output Parser**: Full structured output parsing for Scala/SBT builds
+- **Prompt Templates**: Built-in templates for build and test, dependency audit, and failure diagnosis
+- **Resource Exposure**: Navigate build configs, dependencies, and outputs as MCP resources
+- **Dependency Intelligence**: Version checking, upgrade classification, build-tool-specific syntax
+- **Credential Scanning**: Read-only Maven/Gradle credential status checks (masked, safe)
+- **Tool Schema Enhancements**: Enum constraints, shared JSON utilities, improved error handling
+- **Container Probes**: /health/ready and /health/live endpoints for Kubernetes and Docker orchestration
+- **CLI Launcher**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT
+- **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability
+- **MCP Client Integration Guide**: `MCP_INTEGRATION.md` with configs for 9+ clients
 
 ## Table of Contents
 
@@ -53,7 +76,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (7 tools) | ✅ PASS |
+| `tools/list` discovery (24 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -313,7 +336,7 @@ check_dependency_version(groupId="com.google.guava", artifactId="guava")
 
 
 ### `analyze_build_output`
-Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven and Gradle.
+Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -333,6 +356,222 @@ Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for
 
 **Returns:** JSON with `{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}`. Use before executing builds to catch configuration errors early.
 
+
+### `prompt_build_and_test`
+Prompt template: guides the LLM through a structured build-and-test workflow with verification steps.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+### `prompt_dependency_audit`
+Prompt template: guides the LLM through auditing project dependencies for outdated versions, vulnerabilities, and upgrade paths.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+### `prompt_build_diagnosis`
+Prompt template: guides the LLM through diagnosing build failures by analyzing error output and suggesting fixes.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildOutput` | string | Yes | The raw build output/error log to diagnose. |
+| `buildToolName` | string | No | Build tool that produced the output. |
+
+### `list_build_resources`
+List available build resources (build configurations, output files, reports) in the project as MCP resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** JSON array of resource URIs with metadata (type, tool, path, lastModified).
+
+### `read_build_resource`
+Read the contents of a specific build resource identified by its URI.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Resource URI (e.g., `build://pom.xml`, `build://build.gradle`). |
+
+**Returns:** The resource content and metadata.
+
+### `list_dependency_resources`
+List available dependency resources (dependency trees, version reports, Maven Central metadata) as MCP resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to use. Omit to auto-detect. |
+
+**Returns:** JSON array of dependency resource URIs with metadata.
+
+### `read_dependency_resource`
+Read the contents of a specific dependency resource identified by its URI.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Resource URI (e.g., `dependency://tree`). |
+
+**Returns:** The dependency resource content and metadata.
+
+### `list_resource_templates`
+List available MCP resource templates that can be resolved for a project. Templates provide reusable patterns for accessing build configuration, dependency metadata, and project structure as structured resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** JSON array of template URIs with metadata (name, type, description, requiredParams).
+
+### `resolve_resource_template`
+Resolve a resource template into concrete MCP resources. Applies template parameters and returns the resolved resource content.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Template URI to resolve (e.g., `template://build-config`). |
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** The resolved resource content and metadata.
+
+### `detect_sbt_modules`
+Detect SBT sub-modules in a multi-module SBT project by parsing build.sbt.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+
+**Returns:** JSON with module names, paths, and inter-module dependencies.
+
+### `detect_sbt_test_frameworks`
+Detect which test frameworks are configured in an SBT project (ScalaTest, Specs2, MUnit, etc.).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+
+**Returns:** JSON with detected test frameworks, versions, and configuration details.
+
+### `analyze_sbt_build`
+Execute an SBT build command and return structured JSON output with parsed results, errors, and test summaries.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the SBT project directory. |
+| `command` | string | Yes | SBT command to execute (e.g., `compile`, `test`, `package`). |
+
+**Returns:** JSON with `{success, tool, command, duration, output, errors, warnings}`.
+
+### `check_java_compatibility`
+Check Java version compatibility of a project. Detects the current Java version from Maven (pom.xml), Gradle (build.gradle/build.gradle.kts), or SBT (build.sbt) configuration, and validates it against the minimum version requirements for common frameworks (Spring Boot, Hibernate, Micronaut, etc.). Catalogs breaking changes for major version upgrades (17→21→25).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `targetVersion` | string | No | Target Java version to check against. If omitted, checks against known framework minimums. |
+
+**Returns:** JSON with `{currentVersion, targetVersion, compatible, frameworkRequirements: [{framework, requiredVersion}], breakingChanges: [{from, to, impact, description}], upgradeSteps: [...]}`.
+
+**Example:**
+```
+check_java_compatibility(projectDir="/home/dev/my-app")
+→ {
+    "currentVersion": "17",
+    "compatible": false,
+    "frameworkRequirements": [{"framework":"Spring Boot 3.5","requiredVersion":"21"},...],
+    "breakingChanges": [...]
+  }
+```
+
+### `check_credential_status`
+Check build tool credential configuration status for Maven and Gradle. Scans ~/.m2/settings.xml, ~/.gradle/gradle.properties, and environment variables for configured credentials. All sensitive values are masked in the output.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | No | Project directory for build-tool-specific context. |
+| `scope` | string | No | `"maven"`, `"gradle"`, or `"all"` (default). Limits which credential sources to check. |
+
+**Returns:** JSON with `{status, summary: {totalServers, totalMirrors, totalProxies, credentialsFound}, maven: {servers, mirrors, proxies, activeProfiles}, gradle: {credentials, repositories}, environmentVariables: {found, count}, gaps: [...], recommendations: [...]}`. All passwords are masked (e.g., `"****xyz"`), never exposed in plaintext.
+
+### `detect_dependency_conflicts`
+Scan a JVM project for dependency version conflicts across Maven, Gradle, and SBT build files. Detects duplicate dependencies with different versions, conflicts between direct declarations and dependency management/BOM versions, and transitive override risks.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory containing build files. |
+| `scope` | string | No | Build tool scope: `"maven"`, `"gradle"`, `"sbt"`, or `"all"` (default). |
+
+**Returns:** JSON with `{project, filesAnalyzed, conflictCount, conflicts: [{groupId, artifactId, severity, versions: [{version, source, scope}], affectedBuildTool, suggestion}], summary: {errorCount, warningCount, message}, resolutionPlan: {action, steps}}`.
+
+**Severity levels:** `ERROR` for direct-vs-managed version mismatches (resolvable by removing version from direct declaration), `WARNING` for duplicate declarations with different versions.
+
+**Example:**
+```
+detect_dependency_conflicts(projectDir="/home/dev/my-app")
+→ {
+    "conflictCount": 2,
+    "conflicts": [
+      {"groupId":"com.google.guava","artifactId":"guava","severity":"WARNING",
+       "versions":[{"version":"31.0-jre","source":"dependency"},
+                   {"version":"33.0-jre","source":"dependency"}]},
+      {"groupId":"org.slf4j","artifactId":"slf4j-api","severity":"ERROR",
+       "versions":[{"version":"1.7.36","source":"dependency"},
+                   {"version":"2.0.9","source":"dependencyManagement"}]}
+    ]
+  }
+```
+
+### `profile_build`
+Execute a build command with full timing instrumentation. Tracks wall-clock time vs tool-reported time, extracts phase/task breakdown, parses test counts, and persists build history for trend analysis.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `buildToolName` | string | No | `"maven"`, `"gradle"`, or `"sbt"`. Omit to auto-detect. |
+| `buildToolHome` | string | No | Path to build tool installation. |
+| `projectDir` | string | Yes | Path to the project directory. |
+| `command` | string | Yes | Build command to profile. |
+
+**Returns:** JSON with `{success, tool, command, durationSeconds, durationFormatted, phases: [{name, durationSeconds}], testSummary: {total, failed, errors, skipped}, comparison: {trend, recentAvgSeconds, buildsTracked}, suggestions}`.
+
+**History:** Build results persist to `.buildtools/history/` for trend analysis across sessions.
+
+**Example:**
+```
+profile_build(projectDir="/home/dev/my-app", command="clean test")
+→ {
+    "tool": "maven", "command": "clean test", "success": true,
+    "durationSeconds": 45.3, "durationFormatted": "45s",
+    "phases": [{"name":"maven-clean-plugin:clean","durationSeconds":0.5},...],
+    "testSummary": {"total":42,"failed":0,"errors":0,"skipped":0},
+    "comparison": {"trend":"FASTER","changePercent":-12.5,"buildsTracked":8},
+    "suggestions": ["Add -T4 flag to use 4 threads"]
+  }
+```
+
+### `analyze_build_performance`
+Analyze build performance from configuration and historical data without executing a build. Examines build files for missing optimization settings (parallel, caching, daemon) and provides actionable suggestions.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | Build tool to analyze. Omit to auto-detect. |
+
+**Returns:** JSON with `{tool, projectDir, suggestions, suggestionCount, optimizationPotential: {level, estimatedImprovement}, totalTrackedBuilds}`.
+
+**Analyzes:** Maven fork mode and build cache plugins; Gradle parallel/caching/daemon/configuration-cache settings; SBT Coursier integration; historical build trends.
+
+### Server Card Endpoint
+When running in Streamable HTTP mode, the server exposes discoverability endpoints:
+
+- `GET /.well-known/mcp-server` — MCP server metadata (name, version, capabilities, transports, features, security posture, registry info)
+- `GET /health` — Health check (`{"status":"UP","version":"0.1.1-SNAPSHOT","transport":"streamable-http"}`)
+
+Compatible with the MCP Server Card Working Group proposal and MCP Registry discoverability mechanisms.
+
 ## Quick Start
 
 1. **Build the JAR:**
@@ -344,7 +583,15 @@ Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for
 
 2. **Configure your MCP client** — see [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions) above for client-specific configuration examples, or [Installation](#installation) below.
 
-3. **Start building:**
+3. **Use the launcher script** (recommended):
+   ```bash
+   ./scripts/launcher.sh              # stdio mode (default)
+   ./scripts/launcher.sh --http       # Streamable HTTP mode
+   ./scripts/launcher.sh --help       # show options
+   ```
+   The launcher auto-discovers Java, Maven, Gradle, and SBT on your system.
+
+4. **Start building:**
    ```
    Get Maven version → get_build_tool_version("maven")
    Compile my project → execute_build_command(projectDir="/path/to/project", command="clean compile")
@@ -372,6 +619,8 @@ mvn clean package -DskipTests
 ```
 
 See [MCP Client Configuration](#mcp-client-configuration) above for Claude Desktop and other client-specific setup instructions.
+
+For a comprehensive integration guide covering all supported MCP clients with exact configuration snippets and troubleshooting, see [MCP_INTEGRATION.md](MCP_INTEGRATION.md). For MCP Registry discoverability, see [mcp-registry.json](mcp-registry.json).
 
 ### Option 2: Docker
 
@@ -468,18 +717,18 @@ The server enforces multiple layers of defense:
 
 | Layer | What It Protects Against |
 |---|---|
-| **Trust-based execution** | No command allowlists. Any Maven goal, Gradle task, or SBT command can be executed. |
+| **Command allowlist** | Only predefined build tasks execute. Unknown commands rejected before process spawn (8 Maven phases/plugins, 12 Gradle tasks, 11 SBT tasks). |
 | **Shell metacharacter blocking** | Attempts at command chaining (`&&`, `||`, `;`), piping (`|`), command substitution (`$()`, backticks), and redirection (`>`, `<`) are rejected. |
 | **Dangerous flag blocking** | Gradle flags that enable arbitrary code execution (`--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`, `-D`) are blocked. |
 | **Path canonicalization** | All paths are resolved via `toRealPath()` to prevent directory traversal (`../../etc/passwd`). |
 | **Input validation** | Commands are length-limited (500 chars). Non-existent paths are rejected before execution. |
 | **Process isolation** | Maven builds use `MavenInvoker` (out-of-process). Gradle builds use `ProcessBuilder` with `--no-daemon`. |
 
-**What the server does NOT restrict:** You can run any Maven goal, Gradle task, or SBT command. The server trusts the LLM operator to know what they're doing — it protects against malicious input, not against intentional builds.
+**What the server does NOT restrict:** Shell injection attacks. The server trusts the LLM operator to use build tools appropriately (e.g., `mvn clean` is allowed). It defends against malicious input injection, not against intentional build operations.
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-262 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
+307+ tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
 
 ## CI/CD
 

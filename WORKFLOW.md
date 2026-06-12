@@ -65,7 +65,7 @@ All changes must go through Pull Requests. Branch protection enforces:
 ### Quality Gates
 
 Every PR must pass:
-1. **JUnit tests** — 262 tests, 0 failures required
+1. **JUnit tests** — 307 tests, 0 failures required
 2. **Coverage** — JaCoCo thresholds pending (not yet configured in POM)
 3. **License headers** — mvn license:format runs (non-blocking)
 4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
@@ -105,9 +105,9 @@ Reviews are posted to GitHub for a permanent audit trail.
 |--------------------|-----------------------------------------------------------|
 | Main branch        | Production — must stay clean                              |
 | Staging branch     | All 5 features integrated, CI green                       |
-| Active PRs          | #38 (staging → main docs update) — pending review               |
+| Current State       | All features integrated and merged to staging. Production integration PR target: main.               |
 | Coverage            | JaCoCo not configured in POM — thresholds pending         |
-| Tests               | 262 (MavenInvoker: 17, MavenSecurity: 11, GradleService: 64, SbtBuildTool: 51, DependencyService: 47, MavenIntegration: 13, BuildToolProvider: 25, BuildOutputParser: 11, BuildConfigValidator: 10, BuildConfigurationValidation: 13) |
+| Tests               | 307 (GradleServiceTest: 64, SbtBuildToolTest: 51, DependencyServiceTest: 47, BuildAuthServiceTest: 20, MavenInvokerTest: 15, BuildOutputParserTest: 14, MavenIntegrationTest: 13, BuildConfigurationValidationTest: 13, MavenSecurityTest: 11, BuildConfigValidatorTest: 10, ResourceTemplateServiceTest: 10, SbtProjectServiceTest: 8, DependencyConflictServiceTest: 7, DependencyResourceServiceTest: 7, BuildPerformanceServiceTest: 6, JavaVersionServiceTest: 6, TransportConfigTest: 5) |
 
 ### Recovery
 

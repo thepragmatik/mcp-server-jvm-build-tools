@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,7 @@ public class BuildToolsService {
         this.outputParsers = new LinkedHashMap<>();
         this.outputParsers.put("maven", new MavenOutputParser());
         this.outputParsers.put("gradle", new GradleOutputParser());
+        this.outputParsers.put("sbt", new SbtOutputParser());
     }
 
     /**
@@ -71,7 +73,8 @@ public class BuildToolsService {
     @Tool(name = "get_build_tool_version",
           description = "Get the installed version of a build tool. Supports maven, gradle, sbt, and other registered tools.")
     public String getBuildToolVersion(
-            @ToolParam(required = true, description = "Name of the build tool (e.g., 'maven', 'gradle', 'sbt')")
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
+            @ToolParam(required = true, description = "Name of the build tool ('maven', 'gradle', 'sbt')")
             String buildToolName) {
         BuildTool tool = provider.getTool(buildToolName)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -91,6 +94,7 @@ public class BuildToolsService {
                         "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. " +
                         "SBT supports: compile, test, run, package, clean, assembly.")
     public String executeBuildCommand(
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
             @ToolParam(required = false, description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
             String buildToolName,
             @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
@@ -175,10 +179,10 @@ public class BuildToolsService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return buildDetectionError("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
         }
         if (!Files.isDirectory(dir)) {
-            return buildDetectionError("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -271,7 +275,7 @@ public class BuildToolsService {
             result.put("warning", "Multiple build tools detected (hybrid project). Maven is prioritized for auto-detection when tool name is not specified.");
         }
 
-        return jsonEncode(result);
+        return JsonUtils.toJson(result);
     }
 
     /**
@@ -288,13 +292,14 @@ public class BuildToolsService {
      */
     @Tool(name = "analyze_build_output",
           description = "Execute a build command and return structured JSON output with parsed test " +
-                        "results, compile errors, and warnings instead of raw text. Supports Maven and Gradle. " +
+                        "results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT. " +
                         "Returns: {success, tool, command, duration, testSummary: {total, passed, failed, " +
                         "errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, " +
                         "warningCount}. Much easier for agents to process than raw build output.")
     public String analyzeBuildOutput(
+            @Schema(allowableValues = {"maven", "gradle", "sbt"})
             @ToolParam(required = false,
-                       description = "Name of the build tool ('maven' or 'gradle'). Omit to auto-detect from project directory.")
+                       description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
             String buildToolName,
             @ToolParam(required = false,
                        description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
@@ -312,17 +317,17 @@ public class BuildToolsService {
             try {
                 validatedHome = Path.of(buildToolHome).toRealPath().toString();
             } catch (IOException e) {
-                return buildErrorResponse("Cannot resolve build tool home: " + buildToolHome);
+                return JsonUtils.errorJson("Cannot resolve build tool home: " + buildToolHome);
             }
         }
         Path validatedProject;
         try {
             validatedProject = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return buildErrorResponse("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
         }
         if (!Files.isDirectory(validatedProject)) {
-            return buildErrorResponse("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
         }
 
         // Resolve the build tool
@@ -330,7 +335,7 @@ public class BuildToolsService {
         try {
             tool = provider.resolve(buildToolName, validatedProject);
         } catch (IllegalArgumentException e) {
-            return buildErrorResponse(e.getMessage());
+            return JsonUtils.errorJson(e.getMessage());
         }
 
         // Execute the build and capture output
@@ -348,7 +353,7 @@ public class BuildToolsService {
         BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
         Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
 
-        return jsonEncode(result);
+        return JsonUtils.toJson(result);
     }
 
     /**
@@ -376,10 +381,10 @@ public class BuildToolsService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return buildErrorResponse("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
         }
         if (!Files.isDirectory(dir)) {
-            return buildErrorResponse("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
         }
 
         List<Map<String, Object>> allIssues = new ArrayList<>();
@@ -421,10 +426,28 @@ public class BuildToolsService {
         result.put("issueCount", allIssues.size());
         result.put("issues", allIssues);
 
-        return jsonEncode(result);
+        return JsonUtils.toJson(result);
     }
 
     // ─── Build output analysis ──────────────────────────────────────────
+
+    /**
+     * Check if a file exists in the given directory and add it to the matched files list.
+     */
+    private void checkFile(Path dir, String filename, List<String> matchedFiles) {
+        if (Files.exists(dir.resolve(filename))) {
+            matchedFiles.add(filename);
+        }
+    }
+
+    /**
+     * Check if a build tool wrapper script exists in the given directory.
+     */
+    private void checkWrapper(Path dir, String wrapperName, List<String> wrapperFiles) {
+        if (Files.exists(dir.resolve(wrapperName))) {
+            wrapperFiles.add(wrapperName);
+        }
+    }
 
     /**
      * Validate a pom.xml file for structural and content issues.
@@ -642,96 +665,5 @@ public class BuildToolsService {
         }
 
         return issues;
-    }
-
-    // ─── Detection helpers ──────────────────────────────────────────────
-
-    private void checkFile(Path dir, String filename, List<String> matched) {
-        if (Files.exists(dir.resolve(filename))) {
-            matched.add(filename);
-        }
-    }
-
-    private void checkWrapper(Path dir, String wrapperName, List<String> wrappers) {
-        if (Files.isExecutable(dir.resolve(wrapperName))) {
-            wrappers.add(wrapperName + " wrapper available");
-        }
-    }
-
-    private String buildDetectionError(String message) {
-        return "{\"status\":\"error\",\"message\":\"" + escapeJson(message) + "\"}";
-    }
-
-    private String buildErrorResponse(String message) {
-        return "{\"error\":true,\"message\":\"" + escapeJson(message) + "\"}";
-    }
-
-    // ─── JSON helpers (inline to avoid adding dependencies) ─────────────
-
-    @SuppressWarnings("unchecked")
-    static String jsonEncode(Map<String, Object> map) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) sb.append(",");
-            first = false;
-            sb.append("\"");
-            sb.append(escapeJson(entry.getKey()));
-            sb.append("\":");
-            appendJsonValue(sb, entry.getValue());
-        }
-        sb.append("}");
-        return sb.toString();
-    }
-
-    static void appendJsonValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String) {
-            sb.append("\"").append(escapeJson((String) value)).append("\"");
-        } else if (value instanceof Boolean) {
-            sb.append(value);
-        } else if (value instanceof Number) {
-            sb.append(value);
-        } else if (value instanceof List) {
-            sb.append("[");
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) sb.append(",");
-                appendJsonValue(sb, list.get(i));
-            }
-            sb.append("]");
-        } else if (value instanceof Map) {
-            sb.append("{");
-            Map<String, Object> map = (Map<String, Object>) value;
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                if (!first) sb.append(",");
-                first = false;
-                sb.append("\"").append(escapeJson(entry.getKey())).append("\":");
-                appendJsonValue(sb, entry.getValue());
-            }
-            sb.append("}");
-        } else {
-            sb.append("\"").append(escapeJson(String.valueOf(value))).append("\"");
-        }
-    }
-
-    static String escapeJson(String s) {
-        if (s == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default: sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 }

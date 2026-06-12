@@ -1,0 +1,62 @@
+{
+  "$schema": "https://spec.modelcontextprotocol.io/schemas/registry-v1.json",
+  "name": "mcp-server-jvm-build-tools",
+  "version": "0.1.1-SNAPSHOT",
+  "description": "Unified MCP server for JVM build tools — Maven, Gradle, and SBT. Execute builds, detect project types, check dependency versions, analyze build output, validate configurations, scan credentials, detect dependency conflicts, profile build performance, and check Java version compatibility — all through a single MCP API.",
+  "vendor": { "name": "The Pragmatik", "url": "https://github.com/thepragmatik" },
+  "homepage": "https://github.com/thepragmatik/mcp-server-jvm-build-tools",
+  "license": "Apache-2.0",
+  "tags": ["maven","gradle","sbt","build-tools","java","jvm","devops","development"],
+  "capabilities": { "tools": true, "resources": true, "prompts": true, "logging": false, "streamableHttp": true, "stdio": true },
+  "transports": [
+    { "type": "stdio", "description": "JSON-RPC via stdin/stdout. Compatible with Claude Desktop, Cursor, Cline, Goose, Continue, Windsurf." },
+    { "type": "streamable-http", "description": "HTTP with SSE, CORS, health endpoints. Enable via --spring.profiles.active=http.",
+      "endpoints": { "mcp": "/mcp/message", "serverCard": "/.well-known/mcp-server", "health": "/health", "readiness": "/health/ready", "liveness": "/health/live", "buildEvents": "/mcp/build-events/stream" }
+    }
+  ],
+  "mcpVersions": ["2024-11-05","2025-03-26"],
+  "tools": {
+    "total": 24,
+    "categories": {
+      "build_execution": ["get_build_tool_version","execute_build_command","list_build_tools","detect_build_tool"],
+      "output_analysis": ["analyze_build_output"],
+      "configuration_validation": ["validate_build_configuration"],
+      "dependency_management": ["check_dependency_version","detect_dependency_conflicts"],
+      "credential_scanning": ["check_credential_status"],
+      "performance_profiling": ["profile_build","analyze_build_performance"],
+      "java_compatibility": ["check_java_compatibility"],
+      "sbt_specific": ["detect_sbt_modules","detect_sbt_test_frameworks","analyze_sbt_build"],
+      "prompt_templates": ["prompt_build_and_test","prompt_dependency_audit","prompt_build_diagnosis"],
+      "mcp_resources": ["list_build_resources","read_build_resource","list_dependency_resources","read_dependency_resource","list_resource_templates","resolve_resource_template"]
+    }
+  },
+  "resources": {
+    "uriSchemes": ["build://","dependency://","template://"],
+    "examples": ["build://pom.xml","build://build.gradle.kts","build://build.sbt","dependency://tree","dependency://version/com.google.guava/guava","template://build-config","template://dependency-report"]
+  },
+  "prompts": [
+    { "name": "Build & Test Workflow", "tool": "prompt_build_and_test", "description": "Structured build-and-test workflow with verification" },
+    { "name": "Dependency Audit", "tool": "prompt_dependency_audit", "description": "Audit dependencies for outdated versions and upgrades" },
+    { "name": "Build Failure Diagnosis", "tool": "prompt_build_diagnosis", "description": "Diagnose build failures from error output" }
+  ],
+  "runtime": {
+    "java": "21+",
+    "requirements": { "maven_home": "required for Maven (MAVEN_HOME or buildToolHome)", "gradle": "optional — wrapper or PATH", "sbt": "optional — PATH fallback" },
+    "build_tools": [
+      { "name": "Maven", "detectionFile": "pom.xml", "minVersion": "3.6+", "homeRequired": true, "supportedCommands": ["clean","compile","test","package","install","deploy","validate","dependency:tree"] },
+      { "name": "Gradle", "detectionFiles": ["build.gradle","build.gradle.kts","settings.gradle","settings.gradle.kts"], "minVersion": "7.0+", "homeRequired": false, "supportedCommands": ["clean","build","test","compileJava","compileTestJava","jar","assemble","check","publishToMavenLocal","dependencies","projects","tasks"] },
+      { "name": "SBT", "detectionFile": "build.sbt", "minVersion": "1.0+", "homeRequired": false, "supportedCommands": ["compile","test","run","package","clean","assembly","publishLocal","publish","update","doc","console"] }
+    ]
+  },
+  "security": {
+    "transportSecurity": "stdio (local); Streamable HTTP with CORS",
+    "inputValidation": "Shell injection blocking, dangerous flag blocking, path canonicalization, length limits",
+    "credentialHandling": "Read-only scanning with masked values",
+    "commandRestrictions": "Allowlisted commands per build tool"
+  },
+  "registry": { "namespace": "com.thepragmatik.mcp-server-jvm-build-tools", "smithery": "https://smithery.ai/server/mcp-server-jvm-build-tools", "dockerImage": "thepragmatik/mcp-server-jvm-build-tools:latest", "github": "https://github.com/thepragmatik/mcp-server-jvm-build-tools" },
+  "installation": {
+    "jar": { "build": "git clone && mvn clean package -DskipTests", "artifact": "target/mcp-server-jvm-build-tools.jar", "launcher": "./scripts/launcher.sh" },
+    "docker": { "image": "thepragmatik/mcp-server-jvm-build-tools:latest", "run": "docker run -i --rm -v /path/to/projects:/projects -e MAVEN_HOME=/opt/maven thepragmatik/mcp-server-jvm-build-tools" }
+  }
+}

@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -87,6 +88,7 @@ public class DependencyService {
             @ToolParam(required = false,
                        description = "Current version to compare against. Omit to just get the latest version.")
             String currentVersion,
+            @Schema(allowableValues = {"RELEASE", "LATEST", "SNAPSHOT", "ALL"})
             @ToolParam(required = false,
                        description = "Version preference: RELEASE (default), LATEST, SNAPSHOT, or ALL")
             String versionPreference,
@@ -97,10 +99,10 @@ public class DependencyService {
         VersionPreference filter = parseVersionPreference(versionPreference);
 
         if (groupId == null || groupId.isBlank()) {
-            return errorResponse("groupId is required");
+            return JsonUtils.errorJson("groupId is required");
         }
         if (artifactId == null || artifactId.isBlank()) {
-            return errorResponse("artifactId is required");
+            return JsonUtils.errorJson("artifactId is required");
         }
 
         try {
@@ -116,17 +118,17 @@ public class DependencyService {
                     HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 404) {
-                return errorResponse("Dependency not found on Maven Central: "
+                return JsonUtils.errorJson("Dependency not found on Maven Central: "
                         + groupId + ":" + artifactId);
             }
             if (response.statusCode() != 200) {
-                return errorResponse("Maven Central returned HTTP "
+                return JsonUtils.errorJson("Maven Central returned HTTP "
                         + response.statusCode() + " for " + groupId + ":" + artifactId);
             }
 
             String xmlBody = response.body();
             if (xmlBody == null || xmlBody.isBlank()) {
-                return errorResponse("No metadata found for " + groupId + ":" + artifactId);
+                return JsonUtils.errorJson("No metadata found for " + groupId + ":" + artifactId);
             }
 
             Map<String, Object> result = parseMetadata(groupId, artifactId, xmlBody, filter);
@@ -139,15 +141,15 @@ public class DependencyService {
                 enrichWithProjectContext(result, projectDir);
             }
 
-            return toJson(result);
+            return JsonUtils.toJson(result);
 
         } catch (IOException e) {
-            return errorResponse("Network error checking dependency version: " + e.getMessage());
+            return JsonUtils.errorJson("Network error checking dependency version: " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return errorResponse("Request interrupted checking dependency version");
+            return JsonUtils.errorJson("Request interrupted checking dependency version");
         } catch (Exception e) {
-            return errorResponse("Error checking dependency version: " + e.getMessage());
+            return JsonUtils.errorJson("Error checking dependency version: " + e.getMessage());
         }
     }
 
@@ -409,79 +411,6 @@ public class DependencyService {
         }
 
         return "PATCH";
-    }
-
-    // ─── JSON serialization ─────────────────────────────────────────────
-
-    static String toJson(Map<String, Object> map) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) sb.append(",");
-            first = false;
-            sb.append("\"");
-            sb.append(escapeJson(entry.getKey()));
-            sb.append("\":");
-            appendValue(sb, entry.getValue());
-        }
-        sb.append("}");
-        return sb.toString();
-    }
-
-    @SuppressWarnings("unchecked")
-    static void appendValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String) {
-            sb.append("\"").append(escapeJson((String) value)).append("\"");
-        } else if (value instanceof Boolean) {
-            sb.append(value);
-        } else if (value instanceof Number) {
-            sb.append(value);
-        } else if (value instanceof List) {
-            sb.append("[");
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) sb.append(",");
-                appendValue(sb, list.get(i));
-            }
-            sb.append("]");
-        } else if (value instanceof Map) {
-            sb.append("{");
-            Map<String, Object> map = (Map<String, Object>) value;
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                if (!first) sb.append(",");
-                first = false;
-                sb.append("\"").append(escapeJson(entry.getKey())).append("\":");
-                appendValue(sb, entry.getValue());
-            }
-            sb.append("}");
-        } else {
-            sb.append("\"").append(escapeJson(String.valueOf(value))).append("\"");
-        }
-    }
-
-    static String escapeJson(String s) {
-        if (s == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default: sb.append(c);
-            }
-        }
-        return sb.toString();
-    }
-
-    static String errorResponse(String message) {
-        return "{\"error\":true,\"message\":\"" + escapeJson(message) + "\"}";
     }
 
     // ─── Supporting enums ───────────────────────────────────────────────

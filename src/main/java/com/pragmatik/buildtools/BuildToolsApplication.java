@@ -33,9 +33,24 @@ public class BuildToolsApplication {
 
     @Bean
     public ToolCallbackProvider buildTools(BuildToolsService buildToolsService,
-                                           DependencyService dependencyService) {
+                                           DependencyService dependencyService,
+                                           PromptService promptService,
+                                           BuildResourceService buildResourceService,
+                                           DependencyResourceService dependencyResourceService,
+                                           ResourceTemplateService resourceTemplateService,
+                                           SbtProjectService sbtProjectService,
+                                           BuildAuthService buildAuthService,
+                                           DependencyConflictService dependencyConflictService,
+                                           BuildPerformanceService buildPerformanceService,
+                                           JavaVersionService javaVersionService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(buildToolsService, dependencyService)
+                .toolObjects(buildToolsService, dependencyService, promptService,
+                             buildResourceService, dependencyResourceService,
+                             resourceTemplateService, sbtProjectService,
+                             buildAuthService,
+                             dependencyConflictService,
+                             buildPerformanceService,
+                             javaVersionService)
                 .build();
     }
 }

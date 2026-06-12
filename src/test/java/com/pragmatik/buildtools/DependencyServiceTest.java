@@ -524,7 +524,7 @@ class DependencyServiceTest {
             map.put("count", 42);
             map.put("active", true);
 
-            String json = DependencyService.toJson(map);
+            String json = JsonUtils.toJson(map);
             assertThat(json).contains("\"name\":\"test\"");
             assertThat(json).contains("\"count\":42");
             assertThat(json).contains("\"active\":true");
@@ -539,7 +539,7 @@ class DependencyServiceTest {
             Map<String, Object> outer = new java.util.LinkedHashMap<>();
             outer.put("nested", inner);
 
-            String json = DependencyService.toJson(outer);
+            String json = JsonUtils.toJson(outer);
             assertThat(json).contains("\"nested\":{\"key\":\"value\"}");
         }
 
@@ -549,7 +549,7 @@ class DependencyServiceTest {
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("items", List.of("a", "b", "c"));
 
-            String json = DependencyService.toJson(map);
+            String json = JsonUtils.toJson(map);
             assertThat(json).contains("\"items\":[\"a\",\"b\",\"c\"]");
         }
 
@@ -559,7 +559,7 @@ class DependencyServiceTest {
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("message", "hello \"world\"\nnew line");
 
-            String json = DependencyService.toJson(map);
+            String json = JsonUtils.toJson(map);
             assertThat(json).contains("\\\"world\\\"");
             assertThat(json).contains("\\n");
         }
@@ -567,9 +567,9 @@ class DependencyServiceTest {
         @Test
         @DisplayName("error response is valid JSON")
         void errorResponseIsValidJson() {
-            String error = DependencyService.errorResponse("Something went wrong");
-            assertThat(error).contains("\"error\":true");
-            assertThat(error).contains("\"message\":\"Something went wrong\"");
+            String error = JsonUtils.errorJson("Something went wrong");
+            assertThat(error).contains("\"success\":false");
+            assertThat(error).contains("\"error\":\"Something went wrong\"");
             // Should be valid JSON (starts with { and ends with })
             assertThat(error).startsWith("{").endsWith("}");
         }
