@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ROADMAP.md**: Research-driven enhancement plan covering MCP 2026-07-28 protocol migration (P0), async build tasks (P1), and completed SBOM/test-flakiness/cache-health features (P2-P4).
 - Total MCP tools: 39 (up from 31).
 
+## [0.2.0] - 2026-06-12
+
 ## [0.1.0] - 2025-05-23
 
 ### Added

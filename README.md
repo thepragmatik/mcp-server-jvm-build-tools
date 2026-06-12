@@ -13,7 +13,7 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
-## What's New (June 2026)
+## What's New in v0.2.0 (June 2026)
 
 - **Async Build Execution (MCP Tasks)**: execute_build_async, get_build_task, cancel_build_task, list_build_tasks — fire-and-forget builds with task handles, progress polling, partial output streaming, cancellation support. Virtual threads for concurrency
 - **Tool Authorization & Audit**: check_tool_authorization, list_available_scopes, audit_tool_access, validate_access_token — scope-based MCP tool permissions (OWASP MCP06), API key management, audit logging
