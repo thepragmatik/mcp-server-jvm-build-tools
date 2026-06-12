@@ -151,7 +151,12 @@ public class ToolAuthorizationService {
                                      "(e.g., 'build:read,build:execute'). Use '*' for full access.")
             String grantedScopes) {
 
-        List<String> scopes = parseScopes(grantedScopes);
+        List<String> scopes;
+        if (grantedScopes == null || grantedScopes.isBlank()) {
+            scopes = List.of();
+        } else {
+            scopes = parseScopes(grantedScopes);
+        }
         boolean authorized = ToolPermission.isToolAuthorized(toolName, scopes);
 
         Map<String, Object> result = new LinkedHashMap<>();
