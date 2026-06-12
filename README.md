@@ -415,6 +415,25 @@ Read the contents of a specific dependency resource identified by its URI.
 
 **Returns:** The dependency resource content and metadata.
 
+### `list_resource_templates`
+List available MCP resource templates that can be resolved for a project. Templates provide reusable patterns for accessing build configuration, dependency metadata, and project structure as structured resources.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** JSON array of template URIs with metadata (name, type, description, requiredParams).
+
+### `resolve_resource_template`
+Resolve a resource template into concrete MCP resources. Applies template parameters and returns the resolved resource content.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `uri` | string | Yes | Template URI to resolve (e.g., `template://build-config`). |
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Returns:** The resolved resource content and metadata.
+
 ### `detect_sbt_modules`
 Detect SBT sub-modules in a multi-module SBT project by parsing build.sbt.
 
@@ -442,6 +461,27 @@ Execute an SBT build command and return structured JSON output with parsed resul
 | `command` | string | Yes | SBT command to execute (e.g., `compile`, `test`, `package`). |
 
 **Returns:** JSON with `{success, tool, command, duration, output, errors, warnings}`.
+
+### `check_java_compatibility`
+Check Java version compatibility of a project. Detects the current Java version from Maven (pom.xml), Gradle (build.gradle/build.gradle.kts), or SBT (build.sbt) configuration, and validates it against the minimum version requirements for common frameworks (Spring Boot, Hibernate, Micronaut, etc.). Catalogs breaking changes for major version upgrades (17→21→25).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `targetVersion` | string | No | Target Java version to check against. If omitted, checks against known framework minimums. |
+
+**Returns:** JSON with `{currentVersion, targetVersion, compatible, frameworkRequirements: [{framework, requiredVersion}], breakingChanges: [{from, to, impact, description}], upgradeSteps: [...]}`.
+
+**Example:**
+```
+check_java_compatibility(projectDir="/home/dev/my-app")
+→ {
+    "currentVersion": "17",
+    "compatible": false,
+    "frameworkRequirements": [{"framework":"Spring Boot 3.5","requiredVersion":"21"},...],
+    "breakingChanges": [...]
+  }
+```
 
 ### `check_credential_status`
 Check build tool credential configuration status for Maven and Gradle. Scans ~/.m2/settings.xml, ~/.gradle/gradle.properties, and environment variables for configured credentials. All sensitive values are masked in the output.
@@ -674,7 +714,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-262 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
+307 tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
 
 ## CI/CD
 

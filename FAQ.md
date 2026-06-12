@@ -35,7 +35,7 @@ Yes. The primary deployment model is a plain JAR: `java -jar mcp-server-jvm-buil
 
 ### Is this production-ready?
 
-The project is pre-1.0 (v0.1.x) but actively maintained with 262 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
+The project is pre-1.0 (v0.1.x) but actively maintained with 307 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
 
 ### What's the difference between this and arvindand/maven-tools-mcp?
 
@@ -92,7 +92,7 @@ The server is extensible via the `BuildTool` SPI. To add support for Bazel, Ant,
 | Returns | Raw text (stdout) | Structured JSON |
 | Parsed output | No | Yes — test counts, errors, warnings |
 | Use case | Quick builds, version checks | CI analysis, error parsing |
-| Build tools supported | Maven, Gradle, SBT | Maven, Gradle (SBT not yet) |
+| Build tools supported | Maven, Gradle, SBT | Maven, Gradle, SBT |
 
 Use `execute_build_command` for simple builds where you just need the output text. Use `analyze_build_output` when you need machine-readable results — especially useful for agents that need to parse test failures and compilation errors.
 
@@ -233,7 +233,7 @@ cd mcp-server-jvm-build-tools
 mvn verify
 ```
 
-262 tests across 11 test classes covering security, functionality, integration, and MCP protocol compliance. Tests do NOT require actual Maven/Gradle/SBT installations — the security and validation tests are unit tests.
+307 tests across 17 test classes covering security, functionality, integration, SBT project analysis, dependency conflict detection, build performance profiling, credential scanning, Java version compatibility, and MCP protocol compliance. Tests do NOT require actual Maven/Gradle/SBT installations — the security and validation tests are unit tests.
 
 ### What's the coverage?
 

@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - detect_build_tool tool with structured JSON output and project structure hints
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
-- 270+ tests across security, functionality, and integration
-- 22 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, project analysis, resource exposure, and prompt templates
+- 307 tests across security, functionality, integration, and MCP protocol compliance
+- 24 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, and resource template management
 
 ## [0.1.0] - 2025-05-23
 
