@@ -72,7 +72,11 @@ Test files: MavenSecurityTest.java, GradleServiceTest.java, SbtBuildToolTest.jav
 
 ## Transport Security
 
-Stdio-only. No network port, no HTTP endpoint, no TLS. Attack surface: MCP JSON-RPC messages, filesystem paths, spawned processes.
+The server supports two transport modes with different attack surfaces:
+
+- **stdio** — Default. No network port, no HTTP endpoint, no TLS. Attack surface: MCP JSON-RPC messages (stdin/stdout), filesystem paths, spawned processes.
+
+- **Streamable HTTP** — Enabled via `--http` flag. HTTP server on port 8081 (configurable) with SSE, CORS, health endpoints. Additional attack surface: network exposure, CORS misconfiguration, unauthenticated endpoints. Deploy behind a TLS-terminating reverse proxy for production HTTPS.
 
 ## Configuration Hardening
 

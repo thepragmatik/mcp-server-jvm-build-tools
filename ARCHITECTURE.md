@@ -18,12 +18,12 @@ This project is an MCP (Model Context Protocol) server that gives AI agents hand
 |  +------------------------------------------------------+  |
 |  |           BuildToolsApplication                       |  |
 |  |  @SpringBootApplication                              |  |
-|  |  @Bean -> ToolCallbackProvider(16 services)           |  |
-|  |    +-- toolObjects(/* 16 service beans */)            |  |
+|  |  @Bean -> ToolCallbackProvider(12 services)           |  |
+|  |    +-- toolObjects(/* 12 service beans */)            |  |
 |  +---------------------------+--------------------------+  |
 |                              |                              |
 |             +----------------v-----------------+            |
-|             |  16 Service Beans, 39 MCP Tools  |            |
+|             |  12 Service Beans, 28 MCP Tools  |            |
 |             |  Auto-discovered by               |            |
 |             |  MethodToolCallbackProvider       |            |
 |             +----------------+-----------------+            |
@@ -57,7 +57,7 @@ This project is an MCP (Model Context Protocol) server that gives AI agents hand
 ### 1. Application Entry Point - BuildToolsApplication
 
 - Spring Boot application with @SpringBootApplication
-- Registers 16 service beans as MCP tool callbacks via MethodToolCallbackProvider
+- Registers 12 service beans as MCP tool callbacks via MethodToolCallbackProvider
 - Blocks main thread after startup to keep the JVM alive for stdio MCP transport
 - Streamable HTTP mode launched via --spring.profiles.active=http which starts an embedded Tomcat on port 8080
 
@@ -108,7 +108,7 @@ New build tools (Bazel, Ant, etc.) can be added by implementing this interface.
 - resolve(name, projectDir) - explicit lookup or auto-detection by scanning markers
 - getAllTools() - read-only view for list_build_tools
 
-### 5. MCP Tool Services (16 services, 39 tools)
+### 5. MCP Tool Services (12 services, 28 tools)
 
 Services are auto-registered via MethodToolCallbackProvider in BuildToolsApplication.
 

@@ -12,14 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI Launcher Script**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT installations. Supports `--http` flag for Streamable HTTP mode
 - **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability — tools, resources, prompts, transports, runtime requirements
 - **MCP Client Integration Guide**: `MCP_INTEGRATION.md` with configuration snippets for 9+ clients (Claude Desktop, Cursor, Cline, Windsurf, Goose, Continue, GitHub Copilot, LangChain, LlamaIndex)
-- **PR Conflict Resolution**: Synced `fix/pr-44-merge-conflict` branch with current staging (all 16 services registered)
+- **PR Conflict Resolution**: Synced `fix/pr-44-merge-conflict` branch with current staging (all 12 services registered)
 
 ### Changed
 - Enhanced ServerCardController with /health/ready and /health/live endpoints alongside existing /health
 - Updated README, TOOLS.md, and docs/INDEX.md to reflect MCP-004 enhancements
-
-
-### Changed
 - Upgraded Spring Boot from 3.4.x to 3.5.14
 - Upgraded Spring AI from 1.0.0-M6 to 2.0.0-RC2
 - Upgraded Java baseline from 17 to 21
@@ -41,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
 - 375 tests across security, functionality, integration, and MCP protocol compliance
-- 39 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, resource template management, async build tasks, tool authorization, security auditing, build cache health analysis, SBOM generation, test flakiness detection
+- 28 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, resource template management, async build tasks, tool authorization, security auditing, build cache health analysis, SBOM generation, test flakiness detection
 
 ### Added
 - **SBOM Generation & Supply Chain Audit**: 3 new tools — `generate_sbom` (CycloneDX/SPDX SBOM generation for Maven/Gradle/SBT), `audit_supply_chain` (OSV.dev vulnerability cross-referencing with CVE severity and remediation), `check_license_compliance` (license classification: permissive/copyleft/restricted with risk assessment). Includes CycloneDX plugin detection, pre-existing SBOM discovery, dependency file parsing, and batch vulnerability lookups.

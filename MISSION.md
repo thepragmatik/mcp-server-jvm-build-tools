@@ -32,7 +32,7 @@ Comprehensive research documented in `mcp-ecosystem-research-june-2026.md`. Key 
 - **Repository**: github.com/thepragmatik/mcp-server-jvm-build-tools
 - **Stack**: Spring Boot 3.5.14, Spring AI 2.0.0-RC2, Java 21
 - **Architecture**: MCP stdio + Streamable HTTP server with BuildTool SPI, auto-detection, 3 build tool implementations (Maven, Gradle, SBT)
-- **Tool count**: 39 MCP tools across 16 service classes (+ 2 REST controllers, 5 utility/support components)
+- **Tool count**: 28 MCP tools across 12 service classes (+ 2 REST controllers, 5 utility/support components)
 - **Security**: 5-layer defense model (command allowlist, flag blocking, safe-argument pattern, input validation, process isolation)
 - **License**: Apache 2.0
 
@@ -103,7 +103,7 @@ Comprehensive research documented in `mcp-ecosystem-research-june-2026.md`. Key 
 
 ---
 
-## Final Tool Inventory (39 tools, 16 service classes)
+## Final Tool Inventory (28 tools, 12 service classes)
 
 | Service | Tools | Count |
 |---------|-------|-------|
@@ -150,15 +150,15 @@ Inter-branch conflicts resolved via feat/integrate-all-features (PR #48) which c
 
 | File | Purpose | Final State |
 |------|---------|-------------|
-| README.md | Project overview, quick start, client configs | 39 tools, all services documented, HTTP+stdio transport |
-| ARCHITECTURE.md | Internal architecture, class relationships | 16 services, 39 tools, full package structure, HTTP transport, updated diagram |
-| TOOLS.md | Complete reference for all 39 MCP tools | Full reference with schemas, examples, error handling |
+| README.md | Project overview, quick start, client configs | 28 tools, all services documented, HTTP+stdio transport |
+| ARCHITECTURE.md | Internal architecture, class relationships | 12 services, 28 tools, full package structure, HTTP transport, updated diagram |
+| TOOLS.md | Complete reference for all 28 MCP tools | Full reference with schemas, examples, error handling |
 | CONFIGURATION.md | Environment variables, JVM flags, Spring properties | HTTP transport profile, web server configuration |
 | SECURITY.md | Security model, vulnerability reporting | 5-layer model + HTTP transport attack surface |
 | CHANGELOG.md | Version history, changes | All PRs #42-50 documented |
-| FAQ.md | Frequently asked questions | HTTP, prompts, resources, credential tools, 39 tools noted |
+| FAQ.md | Frequently asked questions | HTTP, prompts, resources, credential tools, 28 tools noted |
 | TROUBLESHOOTING.md | Common problems and solutions | HTTP transport troubleshooting, current error patterns |
-| QUICKSTART.md | 5-minute setup guide | 39 tools referenced, HTTP transport option noted |
+| QUICKSTART.md | 5-minute setup guide | 28 tools referenced, HTTP transport option noted |
 | WORKFLOW.md | Development workflow, branch strategy | Current state updated, all merged PRs noted |
 
 ### Research & Mission Documentation
@@ -182,7 +182,7 @@ Full documentation audit performed against staging branch code. All inaccuracies
 | Transport (SECURITY/FAQ/CONFIG) | stdio-only | stdio + Streamable HTTP |
 | Package structure (ARCHITECTURE) | Missing 11 classes | Complete with all 31+ classes |
 | CHANGELOG | Initial release only | PRs #42-61 documented |
-| TOOLS.md | 7 tools | 39 tools |
+| TOOLS.md | 7 tools | 28 tools |
 
 ---
 
@@ -190,7 +190,7 @@ Full documentation audit performed against staging branch code. All inaccuracies
 
 1. **MCP ecosystem thoroughly researched**: Transport evolution, SDK landscape, build tool server trends, security patterns, governance, and active working groups -- all documented.
 
-2. **32 new MCP tools built across 14 new services**: Expanding the server from 7 to 39 tools. Services: PromptService (3), BuildResourceService (2), DependencyResourceService (2), ResourceTemplateService (2), SbtProjectService (3), BuildAuthService (1), DependencyConflictService (1).
+2. **32 new MCP tools built across 14 new services**: Expanding the server from 7 to 28 tools. Services: PromptService (3), BuildResourceService (2), DependencyResourceService (2), ResourceTemplateService (2), SbtProjectService (3), BuildAuthService (1), DependencyConflictService (1).
 
 3. **Streamable HTTP transport**: Dual-mode server supporting both stdio and HTTP with SSE, CORS, request logging, health endpoints (including K8s probes), and MCP server card discoverability.
 
@@ -200,7 +200,7 @@ Full documentation audit performed against staging branch code. All inaccuracies
 
 6. **Complete documentation suite**: 10 in-repo docs + 1 research doc + 1 mission doc + MCP registry manifest + integration guide + launcher script -- 15 artifacts total, all cross-referenced and consistent with staging code.
 
-7. **Production-ready**: 39 MCP tools, dual transport, 16 services, 375 tests, Apache 2.0 licensed.
+7. **Production-ready**: 28 MCP tools, dual transport, 12 services, 375 tests, Apache 2.0 licensed.
 
 ---
 
