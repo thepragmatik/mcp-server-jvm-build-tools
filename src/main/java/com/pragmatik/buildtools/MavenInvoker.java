@@ -20,6 +20,8 @@ import org.apache.maven.cli.MavenCli;
 import org.apache.maven.shared.invoker.*;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -169,5 +171,75 @@ public class MavenInvoker {
 
     static boolean invocationResultedInError(InvocationResult result) {
         return result.getExitCode() != 0;
+    }
+
+    /**
+     * A cancellable Maven execution that exposes the underlying {@link Process}
+     * so the async build service can destroy it on task cancellation.
+     */
+    public record MavenProcessExecution(Process process, Thread outputCollector,
+                                        StringBuilder output, StringBuilder errors) {}
+
+    /**
+     * Execute a Maven command using {@link ProcessBuilder} so the caller can
+     * capture the {@link Process} handle for cancellation.
+     * <p>
+     * Launches {@code mvn} (or {@code mvnw}) from the given Maven home directory
+     * with the validated command tokens. Collected stdout/stderr are available
+     * via the returned {@link MavenProcessExecution} record.
+     * <p>
+     * <b>Security:</b> Callers must validate commands via
+     * {@link #getCommands(String)} before passing them here.
+     *
+     * @param mavenHome  path to the Maven installation (containing bin/mvn or mvnw)
+     * @param commands   pre-validated command tokens
+     * @param projectDir the project directory to run in
+     * @return a handle to the running process and output collectors
+     * @throws IOException if the process cannot be started
+     */
+    static MavenProcessExecution executeWithProcessCapture(String mavenHome, String[] commands,
+                                                            String projectDir) throws IOException {
+        Path homePath = Path.of(mavenHome);
+        Path mvnw = homePath.resolve("mvnw");
+        Path mvnBin = homePath.resolve("bin/mvn");
+        String executable;
+        if (Files.isExecutable(mvnw)) {
+            executable = mvnw.toString();
+        } else if (Files.isExecutable(mvnBin)) {
+            executable = mvnBin.toString();
+        } else {
+            executable = "mvn";
+        }
+
+        List<String> cmdList = new ArrayList<>();
+        cmdList.add(executable);
+        cmdList.addAll(Arrays.asList(commands));
+
+        ProcessBuilder pb = new ProcessBuilder(cmdList);
+        pb.directory(new File(projectDir));
+        Process process = pb.start();
+
+        StringBuilder output = new StringBuilder();
+        StringBuilder errors = new StringBuilder();
+
+        Thread collector = new Thread(() -> {
+            try (BufferedReader outReader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
+                 BufferedReader errReader = new BufferedReader(
+                         new InputStreamReader(process.getErrorStream()))) {
+                String line;
+                while ((line = outReader.readLine()) != null) {
+                    output.append(line).append(System.lineSeparator());
+                }
+                while ((line = errReader.readLine()) != null) {
+                    errors.append(line).append(System.lineSeparator());
+                }
+            } catch (IOException ignored) {
+                // Process was likely destroyed
+            }
+        }, "maven-output-collector");
+        collector.start();
+
+        return new MavenProcessExecution(process, collector, output, errors);
     }
 }
