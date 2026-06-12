@@ -7,7 +7,7 @@
 
 ## Overview
 
-v0.2.0 is a major expansion of the MCP Server for JVM Build Tools. This release grows from 7 tools to 39 MCP tools across 16 services, adds SBT support alongside Maven and Gradle, introduces HTTP transport with SSE, delivers build performance profiling and dependency conflict detection, adds build cache health analysis, test flakiness detection, SBOM generation and supply chain auditing, tool authorization, and MCP tasks for async build execution, and upgrades the foundation to Spring Boot 3.5.14, Spring AI 2.0.0-RC2, and Java 21.
+v0.2.0 is a major expansion of the MCP Server for JVM Build Tools. This release grows from 7 tools to 28 MCP tools across 12 services, adds SBT support alongside Maven and Gradle, introduces HTTP transport with SSE, delivers build performance profiling and dependency conflict detection, adds build cache health analysis, test flakiness detection, SBOM generation and supply chain auditing, tool authorization, and MCP tasks for async build execution, and upgrades the foundation to Spring Boot 3.5.14, Spring AI 2.0.0-RC2, and Java 21.
 
 **43 commits** since v0.1.0. **375 tests** across **22 test classes**.
 

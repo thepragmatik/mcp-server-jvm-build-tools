@@ -21,7 +21,7 @@ Central documentation hub for the MCP server that gives AI agents hands-on acces
 | [mcp-registry.json](../mcp-registry.json) | MCP Registry manifest for ecosystem discoverability |
 | [scripts/launcher.sh](../scripts/launcher.sh) | CLI launcher with auto-discovery |
 
-## MCP Tools Overview (39 tools)
+## MCP Tools Overview (28 tools)
 
 ### Build Execution (4)
 - `get_build_tool_version` — version query for any registered build tool
