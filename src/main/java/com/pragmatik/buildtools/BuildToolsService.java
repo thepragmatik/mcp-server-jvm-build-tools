@@ -428,6 +428,24 @@ public class BuildToolsService {
     // ─── Build output analysis ──────────────────────────────────────────
 
     /**
+     * Check if a file exists in the given directory and add it to the matched files list.
+     */
+    private void checkFile(Path dir, String filename, List<String> matchedFiles) {
+        if (Files.exists(dir.resolve(filename))) {
+            matchedFiles.add(filename);
+        }
+    }
+
+    /**
+     * Check if a build tool wrapper script exists in the given directory.
+     */
+    private void checkWrapper(Path dir, String wrapperName, List<String> wrapperFiles) {
+        if (Files.exists(dir.resolve(wrapperName))) {
+            wrapperFiles.add(wrapperName);
+        }
+    }
+
+    /**
      * Validate a pom.xml file for structural and content issues.
      */
     private List<Map<String, Object>> validatePomXml(Path pomXml) {
