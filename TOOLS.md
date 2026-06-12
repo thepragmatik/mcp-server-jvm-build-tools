@@ -1,6 +1,6 @@
 # Tools Reference — mcp-server-jvm-build-tools
 
-Complete reference for all 20 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
+Complete reference for all 24 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
 
 ## Table of Contents
 
@@ -16,6 +16,9 @@ Complete reference for all 20 MCP tools exposed by the server. Each tool is an `
 - [detect_sbt_modules](#detect_sbt_modules)
 - [detect_sbt_test_frameworks](#detect_sbt_test_frameworks)
 - [analyze_sbt_build](#analyze_sbt_build)
+- [profile_build / analyze_build_performance](#profile_build)
+- [check_java_compatibility](#check_java_compatibility)
+- [list_resource_templates / resolve_resource_template](#list_resource_templates)
 - [prompt_build_and_test](#prompt_build_and_test)
 - [prompt_dependency_audit](#prompt_dependency_audit)
 - [prompt_build_diagnosis](#prompt_build_diagnosis)
@@ -296,7 +299,7 @@ Response: {...,"detectedBuildTool":"gradle","dependencySyntax":{"gradle":"implem
 
 ## analyze_build_output
 
-Execute a build and return structured JSON with parsed test results, errors, and warnings. Supports Maven and Gradle only (SBT output parsing not yet implemented).
+Execute a build and return structured JSON with parsed test results, errors, and warnings. Execute a build and return structured JSON with parsed test results, errors, and warnings.
 
 **Parameters:**
 
@@ -365,7 +368,7 @@ Response: {"success":false,"tool":"gradle","command":"build",
 
 ## validate_build_configuration
 
-Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for correctness without executing the build. SBT build.sbt validation not yet supported.
+Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for correctness without executing the build.
 
 **Parameters:**
 
@@ -474,6 +477,323 @@ Scan JVM project build files for dependency version conflicts.
 **Tests:** `DependencyConflictServiceTest.java` (7 test cases)
 
 ---
+
+## detect_sbt_modules
+
+Detect subprojects/modules in a multi-module SBT build. Parses `build.sbt` for `lazy val` or project definitions. Returns module names, base directories, aggregated status, and aggregated module list.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Project directory path containing `build.sbt` |
+
+**Returns:** JSON object with module detection results.
+
+**JSON Schema:**
+```json
+{
+  "project": "myproject",
+  "projectDir": "/path/to/project",
+  "buildFile": "build.sbt",
+  "multiModule": true,
+  "moduleCount": 3,
+  "modules": [
+    {"name": "core", "baseDirectory": "core", "existsOnDisk": true},
+    {"name": "web", "baseDirectory": "web", "existsOnDisk": true},
+    {"name": "api", "baseDirectory": "api", "existsOnDisk": true}
+  ],
+  "hasRootProject": true,
+  "aggregatedModules": ["core", "web", "api"]
+}
+```
+
+**Detection:** Matches `lazy val moduleName = project.in(file("path"))` and `lazy val moduleName = project` patterns. Also checks project/*.scala for additional Build.scala-style definitions.
+
+**Implementation:** `SbtProjectService.java`
+
+---
+
+## detect_sbt_test_frameworks
+
+Detect which test frameworks are configured in an SBT build. Parses `libraryDependencies` in `build.sbt` for known test frameworks (ScalaTest, specs2, MUnit, uTest, ScalaCheck, JUnit, Weaver). Returns detected frameworks with version information.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Project directory path containing `build.sbt` |
+
+**Returns:** JSON object with detected frameworks and version information.
+
+**JSON Schema:**
+```json
+{
+  "project": "myproject",
+  "buildFile": "build.sbt",
+  "testFrameworks": [
+    {"groupId": "org.scalatest", "artifactId": "scalatest_2.13", "version": "3.2.19", "framework": "scalatest", "scope": "Test"}
+  ],
+  "frameworkCount": 1,
+  "hasExplicitTestConfig": true
+}
+```
+
+**Settings detection:** Also detects testFrameworks, testOptions, Test / fork, and Test / parallelExecution configuration.
+
+**Implementation:** `SbtProjectService.java`
+
+---
+
+## analyze_sbt_build
+
+Analyze an SBT build.sbt for plugins, Scala version, resolvers, and other structural information. Useful for understanding project configuration without executing SBT. Read-only analysis.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Project directory path containing `build.sbt` |
+
+**Returns:** JSON object with structural build information.
+
+**JSON Schema:**
+```json
+{
+  "project": "myproject",
+  "buildFile": "build.sbt",
+  "scalaVersion": "2.13.15",
+  "sbtVersion": "1.10.7",
+  "organization": "com.example",
+  "name": "myproject",
+  "detectedPlugins": [
+    {"plugin": "sbt-assembly"},
+    {"plugin": "sbt-scalafmt"}
+  ],
+  "customResolvers": ["confluent @ https://packages.confluent.io/maven/"],
+  "scalacOptions": ["-Xlint", "-deprecation", "-feature"],
+  "crossScalaVersions": ["2.13.15", "3.6.2"]
+}
+```
+
+**What gets extracted:** Scala version, SBT version from project/build.properties, organization/name, plugins (sbt-assembly, sbt-native-packager, sbt-docker, sbt-release, sbt-scalafmt, sbt-scoverage, sbt-buildinfo, sbt-git, sbt-header, sbt-ci-release), custom resolvers, scalacOptions, crossScalaVersions, test settings.
+
+**Implementation:** `SbtProjectService.java`
+
+---
+
+## profile_build / analyze_build_performance
+
+### profile_build
+
+Execute a build command with timing instrumentation. Returns detailed performance metrics including total duration, phase/task breakdown (for Maven), and comparison against previous builds. Use to identify slow build phases and track build performance over time.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `buildToolName` | string | No | One of `"maven"`, `"gradle"`, `"sbt"`. Omit to auto-detect. |
+| `buildToolHome` | string | No | Path to build tool installation. |
+| `projectDir` | string | Yes | Path to the project directory. |
+| `command` | string | Yes | Build command to profile. |
+
+**Returns:** JSON object with timing metrics, phases, trend comparison, and optimization suggestions.
+
+**JSON Schema:**
+```json
+{
+  "tool": "maven",
+  "command": "clean test",
+  "success": true,
+  "durationSeconds": 12.345,
+  "durationFormatted": "12.3s",
+  "phaseCount": 8,
+  "phases": [
+    {"plugin": "maven-clean-plugin", "goal": "clean", "durationSeconds": 0.5, "estimated": true}
+  ],
+  "testSummary": {"total": 42, "failed": 0, "errors": 0, "skipped": 2},
+  "comparison": {
+    "recentAvgSeconds": 11.2,
+    "earlierAvgSeconds": 14.5,
+    "buildsTracked": 10,
+    "trend": "FASTER",
+    "recentDurations": [11.0, 12.3, 10.8, 11.5, 10.4]
+  },
+  "suggestions": [
+    "Consider enabling build cache for faster clean builds"
+  ]
+}
+```
+
+### analyze_build_performance
+
+Analyze build performance from historical data and configuration. Examines build files and past build profiles to suggest optimizations. Does NOT execute any builds — read-only analysis.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `buildToolName` | string | No | One of `"maven"`, `"gradle"`, `"sbt"`. Omit to auto-detect. |
+
+**Returns:** JSON object with optimization suggestions and estimated improvement potential.
+
+**Implementation:** `BuildPerformanceService.java`
+
+---
+
+## check_java_compatibility
+
+Check if a JVM project and its dependencies are compatible with a target Java version. Scans Maven compiler settings, Gradle source/target compatibility, SBT javacOptions, and known framework minimum Java version requirements. Returns compatibility report with warnings for known breaking changes between versions.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Path to the project directory. |
+| `targetJavaVersion` | string | No | Target Java version (8, 11, 17, 21, 22, 23, 24, 25). If omitted, checks against configured version. |
+
+**Returns:** JSON object with compatibility report, dependency checks, breaking changes, and recommendations.
+
+**Key features:**
+- Java lifecycle database (GA/EOL dates, LTS status for Java 8 through 25)
+- Breaking change database for 17-to-21-to-25 transitions
+- Framework minimum Java version database (Spring Boot, Spring Core, Jakarta Servlet, Hibernate, Tomcat, JUnit, Mockito, Logback)
+- Detection from pom.xml, build.gradle/build.gradle.kts, build.sbt
+
+**Implementation:** `JavaVersionService.java`
+
+---
+
+## list_resource_templates / resolve_resource_template
+
+### list_resource_templates
+
+List all available MCP resource templates with their URI patterns and parameter descriptions. Templates follow the `build://{projectName}/...` scheme.
+
+**Parameters:** None
+
+**Returns:** JSON with 5 template definitions (dependencies, config, logs, test-results, summary).
+
+### resolve_resource_template
+
+Resolve a resource template URI by substituting parameter values.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `templateUri` | string | Yes | Template URI pattern (e.g., `"build://{projectName}/dependencies/{buildTool}"`) |
+| `paramsJson` | string | Yes | Parameter values as JSON object |
+
+**Implementation:** `ResourceTemplateService.java`
+
+---
+
+## prompt_build_and_test
+
+Get a prompt template to help an LLM guide a user through building and testing a JVM project. Returns a structured step-by-step prompt for compile, test, and analyze workflows.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | No | Project directory. If omitted, the prompt will ask. |
+| `buildTool` | string | No | Build tool name. If omitted, auto-detection is used. |
+
+**Workflow steps:** Detect build tool, validate configuration, compile, run tests, analyze results with structured JSON, report findings.
+
+**Implementation:** `PromptService.java`
+
+---
+
+## prompt_dependency_audit
+
+Get a prompt template to help an LLM audit and upgrade project dependencies. Returns step-by-step instructions for dependency checking and upgrade recommendations.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | No | Project directory. If omitted, the prompt will ask. |
+
+**Workflow steps:** Detect build tool, extract dependencies, check each dependency on Maven Central, classify upgrades (MAJOR/MINOR/PATCH), prioritize (PATCH first), apply one at a time.
+
+**Implementation:** `PromptService.java`
+
+---
+
+## prompt_build_diagnosis
+
+Get a prompt template to help an LLM diagnose and fix build failures. Structured diagnostic workflow for compilation errors, test failures, and configuration issues.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Project directory path. |
+| `failedCommand` | string | No | The failing command. |
+
+**Workflow:** Validate config, detect build tool, run build with analysis, categorize errors (compilation/dependency/test/config), fix highest priority first, iterate.
+
+**Implementation:** `PromptService.java`
+
+---
+
+## list_build_resources / read_build_resource
+
+### list_build_resources
+
+List all available build resources for a project directory. Resource scheme: `build://{project}/{category}` (output, dependencies, config, test-results).
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+### read_build_resource
+
+Read a specific build resource by URI.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `resourceUri` | string | Yes | Resource URI. |
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Implementation:** `BuildResourceService.java`
+
+---
+
+## list_dependency_resources / read_dependency_resource
+
+### list_dependency_resources
+
+List available dependency resources for a project directory. Returns resource URIs with dependency counts per build tool.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Path to the project directory. |
+
+### read_dependency_resource
+
+Read dependency information for a specific resource URI. Returns structured dependency data extracted from build files.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `resourceUri` | string | Yes | Resource URI (build://{project}/dependencies/{buildTool}). |
+| `projectDir` | string | Yes | Path to the project directory. |
+
+**Implementation:** `DependencyResourceService.java`
+
+---
+
 
 ## Server Card
 
