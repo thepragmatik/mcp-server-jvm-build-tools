@@ -560,10 +560,10 @@ public class BuildCacheService {
         // 5. Skip unnecessary plugins
         optimizations.add(Map.of(
                 "area", "Plugin Management",
-                "priority": "LOW",
-                "recommendation": "Skip plugins that aren't needed for every build",
+                "priority", "LOW",
+                "recommendation", "Skip plugins that aren't needed for every build",
                 "config", "mvn install -DskipTests -Dcheckstyle.skip -Dmaven.javadoc.skip=true",
-                "estimatedImprovement": "10-20% faster for development builds"
+                "estimatedImprovement", "10-20% faster for development builds"
         ));
 
         return optimizations;
@@ -658,7 +658,7 @@ public class BuildCacheService {
                         incOptions := incOptions.value
                           .withRecompileOnMacroDef(false)
                           .withApiDebug(false)""",
-                "estimatedImprovement": "Up to 80% for repeated compilations"
+                "estimatedImprovement", "Up to 80% for repeated compilations"
         ));
 
         optimizations.add(Map.of(
@@ -669,7 +669,7 @@ public class BuildCacheService {
                 "config", """
                         Test / parallelExecution := true
                         Global / concurrentRestrictions += Tags.limit(Tags.Test, 4)""",
-                "estimatedImprovement": "40-60% faster test execution"
+                "estimatedImprovement", "40-60% faster test execution"
         ));
 
         optimizations.add(Map.of(
@@ -680,7 +680,7 @@ public class BuildCacheService {
                 "config", """
                         fork := true
                         javaOptions ++= Seq("-Xmx2g", "-XX:+UseG1GC")""",
-                "estimatedImprovement": "15-25% for JVM-heavy tasks"
+                "estimatedImprovement", "15-25% for JVM-heavy tasks"
         ));
 
         optimizations.add(Map.of(
@@ -689,7 +689,7 @@ public class BuildCacheService {
                 "recommendation", "Enable turbo mode for faster classloading (SBT 2.x)",
                 "configFile", "build.sbt",
                 "config", "Global / turbo := true",
-                "estimatedImprovement": "10-20% classloading speedup"
+                "estimatedImprovement", "10-20% classloading speedup"
         ));
 
         return optimizations;
