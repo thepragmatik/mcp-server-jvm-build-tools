@@ -103,9 +103,27 @@ New build tools (Bazel, Ant, etc.) can be added by implementing this interface.
 - `resolve(name, projectDir)` — explicit lookup or auto-detection by scanning markers
 - `getAllTools()` — read-only view for `list_build_tools`
 
-### 5. MCP Tool Services
+### 5. MCP Tool Services (8 services, 20 tools)
 
-#### `BuildToolsService` (6 tools)
+Services are auto-registered via `MethodToolCallbackProvider` in `BuildToolsApplication`.
+
+#### Service Map
+
+| Service | Tools | Description |
+|---|---|---|
+| `BuildToolsService` | 6 | Build execution, detection, validation, output analysis |
+| `DependencyService` | 1 | Maven Central version lookups |
+| `PromptService` | 3 | Build/test/diagnosis prompt templates |
+| `BuildResourceService` | 2 | Build resource listing and reading |
+| `DependencyResourceService` | 2 | Dependency resource listing and reading |
+| `ResourceTemplateService` | 2 | Parameterized URI template resources |
+| `SbtProjectService` | 3 | SBT module detection, test frameworks, build analysis |
+| `BuildAuthService` | 1 | Maven/Gradle credential status scanning |
+| `DependencyConflictService` | 1 | Dependency version conflict detection |
+
+### 6. MCP Tool Services Detail
+
+#### `BuildToolsService` (20 tools across 8 service classes)
 
 | Tool Name | Description |
 |-----------|-------------|
@@ -169,6 +187,21 @@ Three consistent layers across all build tools:
 2. **Flag Blocklist** — Dangerous flags that enable code execution or file access are blocked
 3. **Safe-Argument Pattern** — All arguments must match regex rejecting shell metacharacters
 
+---
+
+### 7. REST Controllers (Streamable HTTP mode)
+
+#### `ServerCardController`
+
+Exposed when running in Streamable HTTP transport mode:
+
+- `GET /.well-known/mcp-server` — Server metadata for MCP discoverability
+- `GET /health` — Health check endpoint
+
+Used by MCP clients for auto-discovery without requiring full MCP protocol connection. Compatible with MCP Server Card Working Group proposal.
+
+---
+
 Service-layer protections: command length limit, character validation, path canonicalization, directory existence checks, process isolation (out-of-process Maven, --no-daemon Gradle).
 
 ## Technology Stack
@@ -196,6 +229,14 @@ com.pragmatik.buildtools
 ├── BuildToolProvider           # Registry + auto-detection
 ├── BuildToolsService           # MCP tool service (6 tools)
 ├── DependencyService           # MCP tool service (1 tool)
+├── PromptService               # MCP prompt service (3 prompts)
+├── BuildResourceService        # MCP resource service (build configs)
+├── DependencyResourceService   # MCP resource service (dependencies)
+├── ResourceTemplateService     # MCP resource template service
+├── SbtProjectService           # MCP tool service (SBT-specific, 3 tools)
+├── BuildAuthService            # MCP tool service (credential scanning)
+├── DependencyConflictService   # MCP tool service (conflict detection)
+├── ServerCardController        # REST controller (discoverability)
 ├── MavenInvoker                # Maven utilities + security
 ├── BuildOutputParser           # SPI for output parsing
 ├── MavenOutputParser           # Maven output parser

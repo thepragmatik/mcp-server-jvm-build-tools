@@ -1,6 +1,6 @@
 # Tools Reference — mcp-server-jvm-build-tools
 
-Complete reference for all 7 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
+Complete reference for all 20 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
 
 ## Table of Contents
 
@@ -11,6 +11,17 @@ Complete reference for all 7 MCP tools exposed by the server. Each tool is an `@
 - [check_dependency_version](#check_dependency_version)
 - [analyze_build_output](#analyze_build_output)
 - [validate_build_configuration](#validate_build_configuration)
+- [check_credential_status](#check_credential_status)
+- [detect_dependency_conflicts](#detect_dependency_conflicts)
+- [detect_sbt_modules](#detect_sbt_modules)
+- [detect_sbt_test_frameworks](#detect_sbt_test_frameworks)
+- [analyze_sbt_build](#analyze_sbt_build)
+- [prompt_build_and_test](#prompt_build_and_test)
+- [prompt_dependency_audit](#prompt_dependency_audit)
+- [prompt_build_diagnosis](#prompt_build_diagnosis)
+- [list_build_resources / read_build_resource](#list_build_resources)
+- [list_dependency_resources / read_dependency_resource](#list_dependency_resources)
+- [Server Card (.well-known)](#server-card)
 - [Error Handling](#error-handling)
 - [Security Notes](#security-notes)
 
@@ -419,6 +430,67 @@ Response: {"valid":false,"tool":"maven","file":"pom.xml","issueCount":2,
 ```
 
 ---
+
+---
+
+## check_credential_status
+
+Scan project and system for configured Maven and Gradle credentials.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | No | Project directory for local config scanning |
+| `scope` | string | No | `"maven"`, `"gradle"`, or `"all"` (default) |
+
+**Returns:** JSON with Maven settings.xml analysis, Gradle properties analysis, environment variable scan, and credential gaps. All passwords are masked (only last 3 chars shown).
+
+**Security:** Read-only. Never exposes raw passwords or tokens.
+
+**Implementation:** `BuildAuthService.java`
+
+---
+
+## detect_dependency_conflicts
+
+Scan JVM project build files for dependency version conflicts.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `projectDir` | string | Yes | Path to the project directory |
+| `scope` | string | No | `"maven"`, `"gradle"`, `"sbt"`, or `"all"` (default) |
+
+**Returns:** JSON with conflicts list, severity classification (ERROR/WARNING), version details, resolution suggestions, and resolution plan.
+
+**Severity levels:**
+- `ERROR`: Direct declaration has different version than dependencyManagement — resolve immediately
+- `WARNING`: Same dependency declared multiple times with different versions — review
+
+**Implementation:** `DependencyConflictService.java`
+
+**Tests:** `DependencyConflictServiceTest.java` (7 test cases)
+
+---
+
+## Server Card
+
+When running in Streamable HTTP mode, the server exposes discoverability endpoints:
+
+### GET /.well-known/mcp-server
+
+Returns JSON with server metadata: name, version, description, vendor, capabilities, transports, supported build tools, requirements, features, security posture, and registry information.
+
+### GET /health
+
+Returns `{"status":"UP","version":"0.1.1-SNAPSHOT","transport":"streamable-http"}`.
+
+**Implementation:** `ServerCardController.java`
+
+**Use case:** Enables MCP client auto-discovery and MCP Registry integration without requiring a full MCP protocol connection.
+
 
 ## Error Handling
 

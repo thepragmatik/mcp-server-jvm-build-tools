@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded dependency versions (Maven Embedder 3.9.9, Maven Shared Invoker 3.3.0)
 
 ### Added
+- **Dependency Conflict Detection**: detect_dependency_conflicts tool for Maven, Gradle, and SBT. Detects duplicate version declarations (WARNING) and direct-vs-dependencyManagement mismatches (ERROR). Resolves Maven property references. Generates structured resolution plans.
+- **MCP Server Card**: GET /.well-known/mcp-server endpoint for discoverability (capabilities, transports, features, security posture). GET /health endpoint for Streamable HTTP health checks.
+- **Credential Scanning**: check_credential_status tool — read-only scan of Maven settings.xml, Gradle properties, and environment variables with masked credential values.
 - Comprehensive documentation suite: ARCHITECTURE.md, CONTRIBUTING.md, WORKFLOW.md, SECURITY.md, CHANGELOG.md, TOOLS.md, QUICKSTART.md
 - SBT build tool support (build.sbt detection, 11 SBT lifecycle commands, security hardening)
 - Dependency intelligence: check_dependency_version tool with Maven Central REST API integration
@@ -22,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - detect_build_tool tool with structured JSON output and project structure hints
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
-- 262 tests across security, functionality, and integration
+- 262+ tests across security, functionality, and integration
+- 20 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, project analysis, resource exposure, and prompt templates
 
 ## [0.1.0] - 2025-05-23
 
