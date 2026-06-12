@@ -21,7 +21,7 @@ Central documentation hub for the MCP server that gives AI agents hands-on acces
 | [mcp-registry.json](../mcp-registry.json) | MCP Registry manifest for ecosystem discoverability |
 | [scripts/launcher.sh](../scripts/launcher.sh) | CLI launcher with auto-discovery |
 
-## MCP Tools Overview (37 tools)
+## MCP Tools Overview (39 tools)
 
 ### Build Execution (4)
 - `get_build_tool_version` — version query for any registered build tool
@@ -76,6 +76,10 @@ Central documentation hub for the MCP server that gives AI agents hands-on acces
 ### Test Analysis (2)
 - `detect_flaky_tests` — run tests N times to detect flaky test methods
 - `analyze_test_history` — analyze historical test pass/fail trends
+
+### Build Cache Health (2)
+- `analyze_cache_health` — audit caching configuration and effectiveness
+- `optimize_build_cache` — generate cache optimization config snippets
 
 ### Supply Chain (3)
 - `generate_sbom` — generate a CycloneDX or SPDX SBOM for a project

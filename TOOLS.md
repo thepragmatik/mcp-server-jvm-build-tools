@@ -1,6 +1,6 @@
 # Tools Reference — mcp-server-jvm-build-tools
 
-Complete reference for all 37 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
+Complete reference for all 39 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.
 
 ## Table of Contents
 

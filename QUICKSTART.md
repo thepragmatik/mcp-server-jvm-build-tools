@@ -129,7 +129,7 @@ The path doesn't exist. Use absolute paths or verify the directory exists on you
 ## Next Steps
 
 - [README.md](README.md) — Full project overview, features, and client configs
-- [TOOLS.md](TOOLS.md) — Detailed reference for all 37 MCP tools
+- [TOOLS.md](TOOLS.md) — Detailed reference for all 39 MCP tools
 - [SECURITY.md](SECURITY.md) — Security model and vulnerability reporting
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Internal architecture and extending with new build tools
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Development setup and contribution guide
