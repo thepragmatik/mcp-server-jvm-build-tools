@@ -884,7 +884,7 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-307+ tests covering security, functionality, and integration. See `MavenSecurityTest.java`, `MavenInvokerTest.java`, `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `BuildOutputParserTest.java`, `BuildConfigurationValidationTest.java`, and `BuildConfigValidatorTest.java`.
+375+ tests covering security, functionality, and integration across 22 test classes. See `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `ToolAuthorizationServiceTest.java`, `BuildAuthServiceTest.java`, `BuildCacheServiceTest.java`, `MavenInvokerTest.java`, `BuildOutputParserTest.java`, `SupplyChainServiceTest.java`, `MavenIntegrationTest.java`, `BuildConfigurationValidationTest.java`, `MavenSecurityTest.java`, `BuildConfigValidatorTest.java`, `ResourceTemplateServiceTest.java`, `TestFlakinessServiceTest.java`, `AsyncBuildServiceTest.java`, `SbtProjectServiceTest.java`, `DependencyResourceServiceTest.java`, `DependencyConflictServiceTest.java`, `BuildPerformanceServiceTest.java`, `JavaVersionServiceTest.java`, and `TransportConfigTest.java`.
 
 ## CI/CD
 
