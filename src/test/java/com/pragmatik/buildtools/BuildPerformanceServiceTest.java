@@ -38,8 +38,7 @@ class BuildPerformanceServiceTest {
 
     @BeforeEach
     void setUp() {
-        BuildToolProvider provider = new BuildToolProvider(
-                List.of(new MavenBuildTool(), new GradleBuildTool(), new SbtBuildTool()));
+        BuildToolProvider provider = new BuildToolProvider();
         service = new BuildPerformanceService(provider);
     }
 

@@ -152,8 +152,7 @@ public class JavaVersionService {
         result.put("targetJavaVersion", target);
 
         // Build tool detection
-        BuildTool tool = new BuildToolProvider(
-                List.of(new MavenBuildTool(), new GradleBuildTool(), new SbtBuildTool()))
+        BuildTool tool = new BuildToolProvider()
                 .resolve(null, dir);
         result.put("buildTool", tool.getName());
 

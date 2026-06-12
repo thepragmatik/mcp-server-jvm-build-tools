@@ -170,7 +170,12 @@ public class BuildPerformanceService {
         }
 
         // Persist build record and compare with history
-        List<Map<String, Object>> history = loadBuildHistory(dir, tool.getName(), command);
+        List<Map<String, Object>> history;
+        try {
+            history = loadBuildHistory(dir, tool.getName(), command);
+        } catch (IOException e) {
+            history = new ArrayList<>();
+        }
         history.add(Map.of(
                 "timestamp", start.toString(),
                 "durationSeconds", Math.round(totalSeconds * 1000.0) / 1000.0,

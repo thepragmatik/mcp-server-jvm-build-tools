@@ -34,9 +34,7 @@ class DependencyConflictServiceTest {
 
     @BeforeEach
     void setUp() {
-        BuildToolProvider provider = new BuildToolProvider(
-                List.of(new MavenBuildTool(), new GradleBuildTool(), new SbtBuildTool()));
-        service = new DependencyConflictService(provider);
+        service = new DependencyConflictService();
     }
 
     @Test

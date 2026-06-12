@@ -46,10 +46,10 @@ public class DependencyConflictService {
             "<([a-zA-Z0-9._-]+)>([^<]+)</\\1>");
 
     private static final Pattern GRADLE_DEP_PATTERN = Pattern.compile(
-            "(\\w+)\\s+'(\\w+):(\\w+):([^']+)'");
+            "(\\w+)\\s+'([\\w.]+):(\\w+):([^']+)'");
 
     private static final Pattern GRADLE_DEP_KTS_PATTERN = Pattern.compile(
-            "(\\w+)\\s*\\(\\s*\"(\\w+):([^\"]+):([^\"]+)\"\\s*\\)");
+            "(\\w+)\\s*\\(\\s*\"([\\w.]+):([^\"]+):([^\"]+)\"\\s*\\)");
 
     private static final Pattern SBT_DEP_PATTERN = Pattern.compile(
             "\"([^\"]+)\"\\s*(%{1,2})\\s*\"([^\"]+)\"\\s*%\\s*\"([^\"]+)\"");
@@ -194,7 +194,7 @@ public class DependencyConflictService {
             }
             allDeps.computeIfAbsent(groupId, k -> new LinkedHashMap<>())
                     .computeIfAbsent(artifactId, k -> new ArrayList<>())
-                    .add(new VerInfo(version, config, "dependency"));
+                    .add(new VerInfo(version, "dependency", config));
         }
         return detectConflicts(allDeps, "gradle");
     }
@@ -210,7 +210,7 @@ public class DependencyConflictService {
             boolean sv = "%%".equals(m.group(2));
             allDeps.computeIfAbsent(groupId, k -> new LinkedHashMap<>())
                     .computeIfAbsent(artifactId, k -> new ArrayList<>())
-                    .add(new VerInfo(version, sv ? "scala-versioned" : "java", "dependency"));
+                    .add(new VerInfo(version, "dependency", sv ? "scala-versioned" : "java"));
         }
         return detectConflicts(allDeps, "sbt");
     }
@@ -287,7 +287,7 @@ public class DependencyConflictService {
             String es = (scope != null && !scope.isBlank()) ? scope.trim() : "compile";
             allDeps.computeIfAbsent(gid, k -> new LinkedHashMap<>())
                     .computeIfAbsent(aid, k -> new ArrayList<>())
-                    .add(new VerInfo(ev, es, source));
+                    .add(new VerInfo(ev, source, es));
         }
     }
 
