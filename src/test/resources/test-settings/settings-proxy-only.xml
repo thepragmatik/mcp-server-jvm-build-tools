@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <proxies>
+    <proxy>
+      <id>http-proxy</id>
+      <active>true</active>
+      <protocol>http</protocol>
+      <host>gateway.example.com</host>
+      <port>8888</port>
+      <username>gw-user</username>
+      <password>gw-pass-456</password>
+      <nonProxyHosts>localhost</nonProxyHosts>
+    </proxy>
+  </proxies>
+</settings>
