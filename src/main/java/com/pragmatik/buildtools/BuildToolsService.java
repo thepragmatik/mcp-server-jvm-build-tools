@@ -307,6 +307,17 @@ public class BuildToolsService {
                        description = "Build command to execute (e.g., 'clean test' for Maven, 'test' for Gradle)")
             String command) {
 
+        // Validate command (defense-in-depth: mirrors executeBuildCommand checks)
+        if (command == null || command.trim().isEmpty()) {
+            return JsonUtils.errorJson("Command cannot be null or empty.");
+        }
+        if (command.length() > MAX_COMMAND_LENGTH) {
+            return JsonUtils.errorJson("Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
+        }
+        if (!COMMAND_PATTERN.matcher(command).matches()) {
+            return JsonUtils.errorJson("Command contains disallowed characters.");
+        }
+
         // Canonicalize paths
         String validatedHome = null;
         if (buildToolHome != null && !buildToolHome.isBlank()) {

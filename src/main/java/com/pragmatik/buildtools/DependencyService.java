@@ -311,7 +311,7 @@ public class DependencyService {
             }
         } catch (Exception e) {
             // If project context can't be determined, just omit it
-            System.err.println("[DependencyService] Could not enrich project context: " + e.getMessage());
+            // (silently — stderr writes break MCP stdio transport)
         }
     }
 
