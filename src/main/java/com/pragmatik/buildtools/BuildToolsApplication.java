@@ -37,11 +37,12 @@ public class BuildToolsApplication {
                                            PromptService promptService,
                                            BuildResourceService buildResourceService,
                                            DependencyResourceService dependencyResourceService,
-                                           ResourceTemplateService resourceTemplateService) {
+                                           ResourceTemplateService resourceTemplateService,
+                                           SbtProjectService sbtProjectService) {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(buildToolsService, dependencyService, promptService,
                              buildResourceService, dependencyResourceService,
-                             resourceTemplateService)
+                             resourceTemplateService, sbtProjectService)
                 .build();
     }
 }
