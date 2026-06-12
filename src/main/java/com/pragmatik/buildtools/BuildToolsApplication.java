@@ -35,9 +35,10 @@ public class BuildToolsApplication {
     public ToolCallbackProvider buildTools(BuildToolsService buildToolsService,
                                            DependencyService dependencyService,
                                            PromptService promptService,
-                                           BuildResourceService buildResourceService) {
+                                           BuildResourceService buildResourceService,
+                                           DependencyResourceService dependencyResourceService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(buildToolsService, dependencyService, promptService, buildResourceService)
+                .toolObjects(buildToolsService, dependencyService, promptService, buildResourceService, dependencyResourceService)
                 .build();
     }
 }
