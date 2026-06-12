@@ -32,8 +32,8 @@
     <description>MCP Server - Build tools for the JVM.</description>
 
     <scm>
-        <connection>scm:git:git@github.com:thepragmatik/${project.artifactId</connection>
-        <developerConnection>scm:git:git@github.com:thepragmatik/${project.artifactId</developerConnection>
+        <connection>scm:git:git@github.com:thepragmatik/${project.artifactId}</connection>
+        <developerConnection>scm:git:git@github.com:thepragmatik/${project.artifactId}</developerConnection>
         <url>https://github.com/thepragmatik/${project.name}</url>
         <tag>HEAD</tag>
     </scm>

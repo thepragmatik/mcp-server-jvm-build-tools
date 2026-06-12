@@ -4,8 +4,22 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 [![AI](https://img.shields.io/badge/built_by-AI_%2B_human_review-8A2BE2)]()
+[![MCP](https://img.shields.io/badge/MCP-2024--11--05%2B-green)](https://spec.modelcontextprotocol.io)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.14-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.0--RC2-blue)](https://spring.io/projects/spring-ai)
+[![Transport](https://img.shields.io/badge/transport-stdio%20%7C%20HTTP-lightgrey)]()
 
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
+
+
+## What's New (June 2026)
+
+- **Streamable HTTP Transport**: Deploy as a web service with health checks alongside stdio
+- **SBT Output Parser**: Full structured output parsing for Scala/SBT builds
+- **Prompt Templates**: Built-in templates for build and test, dependency audit, and failure diagnosis
+- **Resource Exposure**: Navigate build configs, dependencies, and outputs as MCP resources
+- **Dependency Intelligence**: Version checking, upgrade classification, build-tool-specific syntax
+- **Tool Schema Enhancements**: Enum constraints, shared JSON utilities, improved error handling
 
 ## Table of Contents
 
@@ -313,7 +327,7 @@ check_dependency_version(groupId="com.google.guava", artifactId="guava")
 
 
 ### `analyze_build_output`
-Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven and Gradle (SBT output parsing not yet implemented).
+Execute a build command and return structured JSON output with parsed test results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

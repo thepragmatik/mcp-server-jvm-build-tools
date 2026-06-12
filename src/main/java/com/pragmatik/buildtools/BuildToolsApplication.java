@@ -33,9 +33,11 @@ public class BuildToolsApplication {
 
     @Bean
     public ToolCallbackProvider buildTools(BuildToolsService buildToolsService,
-                                           DependencyService dependencyService) {
+                                           DependencyService dependencyService,
+                                           PromptService promptService,
+                                           BuildResourceService buildResourceService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(buildToolsService, dependencyService)
+                .toolObjects(buildToolsService, dependencyService, promptService, buildResourceService)
                 .build();
     }
 }
