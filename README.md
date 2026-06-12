@@ -15,11 +15,14 @@
 
 ## What's New (June 2026)
 
+- **Dependency Conflict Detection**: Scan Maven/Gradle/SBT builds for version conflicts with severity classification and resolution plans
+- **MCP Server Card**: /.well-known/mcp-server endpoint for discoverability — metadata, capabilities, transports, security posture
 - **Streamable HTTP Transport**: Deploy as a web service with health checks alongside stdio
 - **SBT Output Parser**: Full structured output parsing for Scala/SBT builds
 - **Prompt Templates**: Built-in templates for build and test, dependency audit, and failure diagnosis
 - **Resource Exposure**: Navigate build configs, dependencies, and outputs as MCP resources
 - **Dependency Intelligence**: Version checking, upgrade classification, build-tool-specific syntax
+- **Credential Scanning**: Read-only Maven/Gradle credential status checks (masked, safe)
 - **Tool Schema Enhancements**: Enum constraints, shared JSON utilities, improved error handling
 
 ## Table of Contents
@@ -68,7 +71,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (18 tools) | ✅ PASS |
+| `tools/list` discovery (20 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -449,6 +452,41 @@ Check build tool credential configuration status for Maven and Gradle. Scans ~/.
 
 **Returns:** JSON with `{status, summary: {totalServers, totalMirrors, totalProxies, credentialsFound}, maven: {servers, mirrors, proxies, activeProfiles}, gradle: {credentials, repositories}, environmentVariables: {found, count}, gaps: [...], recommendations: [...]}`. All passwords are masked (e.g., `"****xyz"`), never exposed in plaintext.
 
+### `detect_dependency_conflicts`
+Scan a JVM project for dependency version conflicts across Maven, Gradle, and SBT build files. Detects duplicate dependencies with different versions, conflicts between direct declarations and dependency management/BOM versions, and transitive override risks.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory containing build files. |
+| `scope` | string | No | Build tool scope: `"maven"`, `"gradle"`, `"sbt"`, or `"all"` (default). |
+
+**Returns:** JSON with `{project, filesAnalyzed, conflictCount, conflicts: [{groupId, artifactId, severity, versions: [{version, source, scope}], affectedBuildTool, suggestion}], summary: {errorCount, warningCount, message}, resolutionPlan: {action, steps}}`.
+
+**Severity levels:** `ERROR` for direct-vs-managed version mismatches (resolvable by removing version from direct declaration), `WARNING` for duplicate declarations with different versions.
+
+**Example:**
+```
+detect_dependency_conflicts(projectDir="/home/dev/my-app")
+→ {
+    "conflictCount": 2,
+    "conflicts": [
+      {"groupId":"com.google.guava","artifactId":"guava","severity":"WARNING",
+       "versions":[{"version":"31.0-jre","source":"dependency"},
+                   {"version":"33.0-jre","source":"dependency"}]},
+      {"groupId":"org.slf4j","artifactId":"slf4j-api","severity":"ERROR",
+       "versions":[{"version":"1.7.36","source":"dependency"},
+                   {"version":"2.0.9","source":"dependencyManagement"}]}
+    ]
+  }
+```
+
+### Server Card Endpoint
+When running in Streamable HTTP mode, the server exposes discoverability endpoints:
+
+- `GET /.well-known/mcp-server` — MCP server metadata (name, version, capabilities, transports, features, security posture, registry info)
+- `GET /health` — Health check (`{"status":"UP","version":"0.1.1-SNAPSHOT","transport":"streamable-http"}`)
+
+Compatible with the MCP Server Card Working Group proposal and MCP Registry discoverability mechanisms.
 
 ## Quick Start
 
