@@ -68,7 +68,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (17 tools) | ✅ PASS |
+| `tools/list` discovery (18 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
@@ -438,6 +438,17 @@ Execute an SBT build command and return structured JSON output with parsed resul
 | `command` | string | Yes | SBT command to execute (e.g., `compile`, `test`, `package`). |
 
 **Returns:** JSON with `{success, tool, command, duration, output, errors, warnings}`.
+
+### `check_credential_status`
+Check build tool credential configuration status for Maven and Gradle. Scans ~/.m2/settings.xml, ~/.gradle/gradle.properties, and environment variables for configured credentials. All sensitive values are masked in the output.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | No | Project directory for build-tool-specific context. |
+| `scope` | string | No | `"maven"`, `"gradle"`, or `"all"` (default). Limits which credential sources to check. |
+
+**Returns:** JSON with `{status, summary: {totalServers, totalMirrors, totalProxies, credentialsFound}, maven: {servers, mirrors, proxies, activeProfiles}, gradle: {credentials, repositories}, environmentVariables: {found, count}, gaps: [...], recommendations: [...]}`. All passwords are masked (e.g., `"****xyz"`), never exposed in plaintext.
+
 
 ## Quick Start
 
