@@ -190,7 +190,7 @@ public class BuildPerformanceService {
 
         try {
             saveBuildHistory(dir, tool.getName(), command, history);
-        } catch (IOException ignored) {
+        } catch (IOException e) {
             // Non-critical — just skip persistence
         }
 
@@ -248,7 +248,7 @@ public class BuildPerformanceService {
         Map<String, List<Map<String, Object>>> allHistory = new LinkedHashMap<>();
         try {
             loadAllBuildHistory(dir, tool.getName(), allHistory);
-        } catch (IOException ignored) {}
+        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
 
         // Analyze historical patterns
         if (!allHistory.isEmpty()) {
@@ -306,7 +306,7 @@ public class BuildPerformanceService {
         if (m.find()) {
             try {
                 return Double.parseDouble(m.group(1));
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
         }
         return null;
     }
@@ -387,7 +387,7 @@ public class BuildPerformanceService {
                             String cmd = f.getFileName().toString().replace(".json", "")
                                     .replace(tool + "_", "");
                             all.put(cmd, parseHistoryJson(content));
-                        } catch (IOException ignored) {}
+                        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
                     });
         }
     }
@@ -586,7 +586,7 @@ public class BuildPerformanceService {
             if (content.contains("<skipTests>true</skipTests>")) {
                 suggestions.add("Tests are currently skipped. Enable them periodically to verify correctness.");
             }
-        } catch (IOException ignored) {}
+        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
 
         return suggestions;
     }
@@ -616,7 +616,7 @@ public class BuildPerformanceService {
                 if (!hasConfigCache) {
                     suggestions.add("Enable configuration cache: org.gradle.configuration-cache=true in gradle.properties.");
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
         } else {
             suggestions.add("No gradle.properties found. Create one with org.gradle.parallel=true and org.gradle.caching=true.");
         }
