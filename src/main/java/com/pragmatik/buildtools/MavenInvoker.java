@@ -48,7 +48,7 @@ public class MavenInvoker {
             InvocationResult result = invoker.execute(request);
             if (invocationResultedInError(result)) {
                 if (result.getExecutionException() != null) {
-                    result.getExecutionException().printStackTrace();
+                    System.err.println("[ERROR] Maven execution failed: " + result.getExecutionException().getMessage());
                 }
                 finalResult = errors.toString();
                 throw new RuntimeException(finalResult);
