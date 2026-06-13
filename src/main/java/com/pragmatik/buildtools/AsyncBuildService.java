@@ -467,7 +467,7 @@ public class AsyncBuildService {
                         task.output.append(line).append("\n");
                     }
                 }
-            } catch (IOException ignored) {
+            } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
                 // Process destroyed
             }
         }, "async-stdout-" + task.taskId);
@@ -481,7 +481,7 @@ public class AsyncBuildService {
                         task.output.append(line).append("\n");
                     }
                 }
-            } catch (IOException ignored) {
+            } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
                 // Process destroyed
             }
         }, "async-stderr-" + task.taskId);
@@ -555,7 +555,7 @@ public class AsyncBuildService {
             Path taskFile = tasksDir.resolve(task.taskId + ".json");
             Files.writeString(taskFile, JsonUtils.toJson(summary),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (IOException ignored) {
+        } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
             // Non-critical
         }
     }
