@@ -81,7 +81,7 @@ This server uses standard MCP stdio transport and has been verified via automate
 | Test | Result |
 |---|---|
 | `initialize` handshake | ✅ PASS |
-| `tools/list` discovery (28 tools) | ✅ PASS |
+| `tools/list` discovery (39 tools) | ✅ PASS |
 | `tools/call` get_build_tool_version | ✅ PASS |
 | `tools/call` list_build_tools | ✅ PASS |
 | `tools/call` detect_build_tool | ✅ PASS |
