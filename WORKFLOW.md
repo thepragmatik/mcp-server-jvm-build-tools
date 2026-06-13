@@ -118,3 +118,29 @@ git revert <bad-commit-hash>
 git push origin main
 ```
 Never use `git push --force` or `git reset --hard` on main or staging.
+
+## Swarm Automation Workflow
+
+PRs created by the Metaswarm hierarchical agent swarm follow this process:
+
+1. **Creation**: Engineer agents create feature branches from main, implement changes, and open PRs targeting staging.
+2. **Adversarial Review**: Security-auditor agent reviews every PR for:
+   - Security vulnerabilities (secrets, unsafe code patterns)
+   - Code quality (exception handling, logging)
+   - Conventional commit compliance
+3. **CI Verification**: All PR checks must pass (JDK 21, 23, 25 + Quality checks).
+4. **Remediation**: If CI fails or reviewer requests changes, engineer agents fix issues and push updates.
+5. **Merge to Staging**: Once CI passes and review is complete, PRs are merged to staging.
+6. **Production**: Staging PRs to main are left for human review per the branch strategy.
+
+### Automated PR Naming Convention
+- feat/* for new features
+- fix/* for bug fixes
+- docs/* for documentation
+- chore/* for maintenance
+
+### Agent Roles
+- **mission_controller** (T1A Pro): Strategic planning, architecture decisions
+- **security_auditor** (T1B Flash): Adversarial PR review, security scanning
+- **sandbox_engineer** (T3 Local): Code changes, branch creation
+- **catch_all** (T2 Local): Dead-letter task recovery
