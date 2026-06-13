@@ -350,7 +350,7 @@ public class AsyncBuildService {
                     }
                     task.parsedResult = parser.parse(output, task.exitCode, task.command);
                 } catch (Exception e) {
-                    log.warn("Output parsing failed for {}: {}", task.toolName, e.getMessage());
+                    System.err.println("[WARN] Output parsing failed for " + task.toolName + ": " + e.getMessage());
                 }
             }
 
