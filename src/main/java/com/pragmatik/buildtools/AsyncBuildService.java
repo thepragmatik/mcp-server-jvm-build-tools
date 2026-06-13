@@ -349,8 +349,8 @@ public class AsyncBuildService {
                         output = task.output.toString();
                     }
                     task.parsedResult = parser.parse(output, task.exitCode, task.command);
-                } catch (Exception ignored) {
-                    // Parsing is best-effort
+                } catch (Exception e) {
+                    log.warn("Output parsing failed for {}: {}", task.toolName, e.getMessage());
                 }
             }
 
