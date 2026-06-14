@@ -43,10 +43,15 @@ public class TransportConfig {
                 registry.addMapping("/mcp/**")
                     .allowedOriginPatterns("*")
                     .allowedMethods("GET", "POST", "OPTIONS")
-                    .allowedHeaders("*")
+                    .allowedHeaders("Mcp-Method", "Mcp-Session-Id", "Content-Type", "Authorization", "Accept", "Origin")
                     .allowCredentials(true)
                     .maxAge(3600);
             }
         };
     }
+
+    @Value("${buildtools.cache.ttl-ms:300000}")
+    private long defaultTtlMs;
+    public long getDefaultTtlMs() { return defaultTtlMs; }
+
 }
