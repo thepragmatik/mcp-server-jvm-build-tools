@@ -63,7 +63,7 @@ public class ServerCardController {
         List<String> transports = List.of("stdio", "streamable-http");
         card.put("transports", transports);
 
-        List<String> protocolVersions = List.of("2024-11-05", "2025-03-26");
+        List<String> protocolVersions = List.of("2024-11-05", "2025-03-26", "2026-07-28");
         card.put("mcpVersions", protocolVersions);
 
         Map<String, Object> capabilities = new LinkedHashMap<>();
@@ -71,6 +71,7 @@ public class ServerCardController {
         capabilities.put("resources", true);
         capabilities.put("prompts", true);
         capabilities.put("logging", false);
+        capabilities.put("extensions", Map.of("tasks", true, "mcpApps", true));
         card.put("capabilities", capabilities);
 
         List<Map<String, String>> buildTools = List.of(
