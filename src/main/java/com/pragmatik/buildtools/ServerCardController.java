@@ -103,6 +103,13 @@ public class ServerCardController {
         );
         card.put("features", features);
 
+        // Deprecation notices (MCP 2026-07-28)
+        Map<String, Object> deprecations = new LinkedHashMap<>();
+        deprecations.put("roots", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        deprecations.put("sampling", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        deprecations.put("logging", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        card.put("deprecations", deprecations);
+
         Map<String, Object> security = new LinkedHashMap<>();
         security.put("transportSecurity", "stdio (local, no network surface); Streamable HTTP with Origin validation");
         security.put("inputValidation", "Shell injection blocking, dangerous flag blocking, path canonicalization");
