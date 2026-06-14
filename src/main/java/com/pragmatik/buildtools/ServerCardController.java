@@ -63,7 +63,7 @@ public class ServerCardController {
         List<String> transports = List.of("stdio", "streamable-http");
         card.put("transports", transports);
 
-        List<String> protocolVersions = List.of("2024-11-05", "2025-03-26");
+        List<String> protocolVersions = List.of("2024-11-05", "2025-03-26", "2026-07-28");
         card.put("mcpVersions", protocolVersions);
 
         Map<String, Object> capabilities = new LinkedHashMap<>();
@@ -71,6 +71,7 @@ public class ServerCardController {
         capabilities.put("resources", true);
         capabilities.put("prompts", true);
         capabilities.put("logging", false);
+        capabilities.put("extensions", Map.of("tasks", true, "mcpApps", true));
         card.put("capabilities", capabilities);
 
         List<Map<String, String>> buildTools = List.of(
@@ -101,6 +102,13 @@ public class ServerCardController {
                 "Prompt templates for build analysis, dependency audits, failure diagnosis"
         );
         card.put("features", features);
+
+        // Deprecation notices (MCP 2026-07-28)
+        Map<String, Object> deprecations = new LinkedHashMap<>();
+        deprecations.put("roots", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        deprecations.put("sampling", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        deprecations.put("logging", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
+        card.put("deprecations", deprecations);
 
         Map<String, Object> security = new LinkedHashMap<>();
         security.put("transportSecurity", "stdio (local, no network surface); Streamable HTTP with Origin validation");

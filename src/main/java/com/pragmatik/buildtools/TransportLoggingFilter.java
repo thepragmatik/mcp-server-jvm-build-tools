@@ -50,11 +50,13 @@ public class TransportLoggingFilter implements Filter {
         } finally {
             HttpServletResponse httpRes = (HttpServletResponse) response;
             long elapsed = System.currentTimeMillis() - start;
-            log.debug("{} {} -> {} ({}ms)",
+            String mcpMethod = httpReq.getHeader("Mcp-Method");
+            log.debug("{} {} -> {} ({}ms) Mcp-Method={}",
                 httpReq.getMethod(),
                 httpReq.getRequestURI(),
                 httpRes.getStatus(),
-                elapsed);
+                elapsed,
+                mcpMethod != null ? mcpMethod : "none");
         }
     }
 }
