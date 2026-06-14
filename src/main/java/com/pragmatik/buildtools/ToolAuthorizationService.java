@@ -304,7 +304,7 @@ public class ToolAuthorizationService {
 
                 entries.add(entry);
                 if (entries.size() >= limit) break;
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 // Skip unparseable entries
             }
         }
