@@ -163,9 +163,9 @@ and are never returned in plaintext.
 
 ## Tested attack surface
 
-The test suite covers shell injection, path traversal, blocked plugin goals, behaviour-altering
-Maven `-D` system properties, Unicode / zero-width attacks, null-byte injection, denial-of-service
-via long inputs, dangerous Gradle/SBT flags, and MCP protocol compliance. Representative test
+The test suite covers shell injection, path traversal, blocked plugin goals, Unicode / zero-width
+attacks, null-byte injection, denial-of-service via long inputs, dangerous Gradle/SBT flags, and
+MCP protocol compliance. Representative test
 classes include `MavenSecurityTest`, `GradleServiceTest`, `SbtBuildToolTest`, `MavenInvokerTest`,
 and `MavenIntegrationTest`.
 

@@ -66,7 +66,7 @@ New build tools (Bazel, Ant, Mill, …) are added by implementing this interface
     - Requires a `buildToolHome` pointing at a Maven installation.
     - Detects projects via `pom.xml`.
     - Commands: `clean, compile, test, package, install, deploy, validate`.
-    - Safe flags: `-D` (non-denied keys), `-f`, `-P`, `-q`, `-X`, `-T`, `-B`, `-U`,
+    - Safe flags: `-D` (any key), `-f`, `-P`, `-q`, `-X`, `-T`, `-B`, `-U`,
       `--batch-mode`, `--non-recursive`.
 
 === "GradleBuildTool"
