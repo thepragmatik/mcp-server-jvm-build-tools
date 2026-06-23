@@ -65,12 +65,7 @@ public final class W3CTraceContext {
     private final String baggage;
 
     private W3CTraceContext(
-            String version,
-            String traceId,
-            String parentSpanId,
-            String traceFlags,
-            String traceState,
-            String baggage) {
+            String version, String traceId, String parentSpanId, String traceFlags, String traceState, String baggage) {
         this.version = version;
         this.traceId = traceId;
         this.parentSpanId = parentSpanId;

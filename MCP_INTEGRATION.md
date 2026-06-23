@@ -16,6 +16,7 @@ How to connect the JVM build tools MCP server to every major MCP-compatible clie
 - [LlamaIndex](#llamaindex)
 - [Streamable HTTP Transport](#streamable-http-transport)
 - [Docker Integration](#docker-integration)
+- [Distributed Tracing (W3C Trace Context)](#distributed-tracing-w3c-trace-context)
 - [Verification Checklist](#verification-checklist)
 - [Troubleshooting](#troubleshooting)
 
@@ -274,6 +275,70 @@ docker run -i --rm -v /path/to/projects:/projects -v /opt/maven:/opt/maven -e MA
 # HTTP mode
 docker run -d --rm -p 8080:8080 -v /path/to/projects:/projects -v /opt/maven:/opt/maven -e MAVEN_HOME=/opt/maven -e SPRING_PROFILES_ACTIVE=http mcp-server-jvm-build-tools
 ```
+
+---
+
+## Distributed Tracing (W3C Trace Context)
+
+This server participates in **end-to-end distributed traces** using the
+[W3C Trace Context](https://www.w3.org/TR/trace-context/) conventions that the MCP
+draft standardized for `_meta` (SEP-414). A trace that starts in your host
+application can follow a tool call through the client SDK, this MCP server, and the
+build subprocess (Maven/Gradle/SBT) it shells out to, showing up as a single span
+tree in any OpenTelemetry-compatible backend.
+
+### Supported `_meta` keys
+
+The server reads **exactly** these keys from the incoming request `_meta` (the key
+names are locked to SEP-414):
+
+| `_meta` key   | Meaning                                              | Format |
+|---------------|------------------------------------------------------|--------|
+| `traceparent` | The active span to continue (trace id + parent span) | W3C `version-traceid-spanid-flags`, e.g. `00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01` |
+| `tracestate`  | Vendor-specific trace state (carried opaquely)       | W3C `tracestate` (e.g. `vendor=value`) |
+| `baggage`     | Cross-cutting key/value baggage (carried opaquely)   | W3C `baggage` (e.g. `tenant=acme`) |
+
+**Behaviour:**
+
+- When a **valid `traceparent`** is present, tool calls — in particular
+  `execute_build_command`, `analyze_build_output`, and `execute_build_async` —
+  start a span that **continues that trace** (same trace id, parented by the
+  caller's span).
+- When `traceparent` is **absent or malformed**, the server behaves exactly as
+  before and starts a fresh root span; nothing in the client-visible response
+  changes (no regression).
+- `tracestate` and `baggage` are carried through unmodified and propagated
+  downstream alongside `traceparent`.
+
+### Downstream propagation to the build subprocess
+
+The active span is stamped onto the build subprocess environment using the
+conventional variables that OpenTelemetry-aware tooling reads to continue a trace:
+
+| Environment variable | Value |
+|----------------------|-------|
+| `TRACEPARENT` | `00-<trace-id>-<server-span-id>-<flags>` (this server's span as the parent) |
+| `TRACESTATE`  | the inbound `tracestate`, if any |
+| `BAGGAGE`     | the inbound `baggage`, if any |
+
+This applies to Maven (both the embedded invoker and the out-of-process executor),
+Gradle, and SBT, for synchronous (`execute_build_command`) and asynchronous
+(`execute_build_async`) builds alike. If your build runs OpenTelemetry
+auto-instrumentation (for example the Maven/Gradle OpenTelemetry extensions or an
+`otel-cli`-wrapped step), it will pick up `TRACEPARENT` and emit its spans as
+children of the server's build span.
+
+> **Backward compatibility:** trace propagation is fully additive and opt-in —
+> it activates only when a client supplies the `traceparent` `_meta` key. Clients
+> that send no trace context, and existing clients unaware of `_meta`, are
+> unaffected.
+
+> **SDK note:** the bundled MCP Java SDK (Spring AI 2.0.0-RC2 / SDK 2.0.0-RC1)
+> does not yet surface request `_meta` to `@Tool` methods, so until a host forwards
+> `_meta` (or a future SDK exposes it) the server emits a root span per build.
+> The key names, parsing, and propagation are already locked to SEP-414, so no
+> client change is needed when that gap closes. See
+> [`docs/mcp-trace-context-propagation.md`](docs/mcp-trace-context-propagation.md).
 
 ---
 
