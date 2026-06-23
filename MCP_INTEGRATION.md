@@ -230,6 +230,7 @@ java -jar target/mcp-server-jvm-build-tools.jar -Dspring.profiles.active=http -D
 | `/mcp/message` | POST | MCP message endpoint (JSON-RPC) |
 | `/mcp/discover` | GET / POST | `server/discover`: protocol versions, capabilities, identity |
 | `/.well-known/mcp-server` | GET | Server card / discoverability metadata |
+| `/.well-known/oauth-protected-resource` | GET | OAuth 2.0 Protected Resource Metadata (RFC9728) — see [docs/AUTHORIZATION.md](docs/AUTHORIZATION.md) |
 | `/health` | GET | Health check |
 | `/health/ready` | GET | Readiness probe |
 | `/health/live` | GET | Liveness probe |
@@ -263,6 +264,24 @@ The Streamable HTTP transport is **stateless** (MCP 2026-07-28 RC):
   handshake is no longer required).
 
 See `docs/mcp-2026-07-28-transport-audit.md` for the full framework audit.
+
+### OAuth 2.1 resource-server discovery (RFC9728)
+
+The HTTP transport advertises itself as an **OAuth 2.1 resource server** additively:
+
+- **Protected Resource Metadata** is always served at
+  `/.well-known/oauth-protected-resource` (a new, additive discovery surface). It lists
+  the `resource` identifier, optional `authorization_servers`, the `scopes_supported`
+  (the fine-grained `ToolPermission` scopes — **never `offline_access`**), and
+  `bearer_methods_supported: ["header"]`.
+- **Bearer-token enforcement is opt-in** (`buildtools.oauth.resource-server.enabled`,
+  default `false`). When enabled, a missing/invalid `Authorization: Bearer` token on
+  `/mcp/**` is answered `401` with
+  `WWW-Authenticate: Bearer resource_metadata="..."`; `server/discover` stays open. When
+  disabled (the default) nothing changes for existing clients.
+
+See [docs/AUTHORIZATION.md](docs/AUTHORIZATION.md) for the recorded decision, the local
+opaque-token threat model, and the recommended fronting-gateway topology.
 
 ---
 
@@ -371,6 +390,9 @@ curl http://localhost:8080/.well-known/mcp-server
 
 # 4b. server/discover (stateless RC probe): protocol versions, capabilities, identity
 curl http://localhost:8080/mcp/discover
+
+# 4c. OAuth 2.0 Protected Resource Metadata (RFC9728)
+curl http://localhost:8080/.well-known/oauth-protected-resource
 
 # 5. MCP stdio compliance (requires JAR)
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | java -jar target/mcp-server-jvm-build-tools.jar | head -1
