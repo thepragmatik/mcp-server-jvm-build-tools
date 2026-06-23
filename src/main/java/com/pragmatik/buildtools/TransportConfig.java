@@ -24,10 +24,16 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Transport configuration for MCP streamable HTTP support.
+ * Transport configuration for the MCP <b>stateless Streamable HTTP</b> transport.
  * <p>
- * Configures CORS for web-based MCP clients and dashboards,
- * and provides transport-level settings for the SSE event stream.
+ * Configures CORS for web-based MCP clients and dashboards.
+ * <p>
+ * <b>2026-07-28 RC alignment:</b> the Streamable HTTP transport is now stateless
+ * (no protocol-level sessions, no {@code Mcp-Session-Id}). The CORS allow-list
+ * exposes the standard request headers required by the RC ({@code Mcp-Method} and
+ * {@code Mcp-Name}, SEP-2243) and no longer advertises the removed
+ * {@code Mcp-Session-Id} header (SEP-2575). See
+ * {@code docs/mcp-2026-07-28-transport-audit.md} for the full audit.
  * <p>
  * <b>Secure defaults:</b> cross-origin access is restricted to local origins
  * ({@code http://localhost:8080}, {@code http://127.0.0.1:8080}) unless the
@@ -110,8 +116,11 @@ public class TransportConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 var mapping = registry.addMapping("/mcp/**")
                         .allowedMethods("GET", "POST", "OPTIONS")
-                        .allowedHeaders(
-                                "Mcp-Method", "Mcp-Session-Id", "Content-Type", "Authorization", "Accept", "Origin")
+                        // 2026-07-28 RC: advertise the standard MCP request headers
+                        // (Mcp-Method, Mcp-Name — SEP-2243). The session header
+                        // (Mcp-Session-Id) was removed with protocol-level sessions
+                        // (SEP-2575) and is intentionally NOT advertised here.
+                        .allowedHeaders("Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin")
                         .allowCredentials(true)
                         .maxAge(3600);
                 if (wildcard) {

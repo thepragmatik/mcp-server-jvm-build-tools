@@ -151,8 +151,9 @@ spring.application.name=@project.name@
 # Disable web server — this is a stdio-only MCP server
 spring.main.web-application-type=none
 
-# MCP server metadata reported in initialize handshake
-spring.ai.mcp.server.name=@project.name@ Server
+# MCP server metadata. Single canonical identity shared by the server card,
+# server/discover, and the Mcp-Name HeaderMismatch check (must equal @project.name@).
+spring.ai.mcp.server.name=@project.name@
 spring.ai.mcp.server.version=@project.version@
 
 # Enable stdio transport (the only supported transport)

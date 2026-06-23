@@ -27,9 +27,28 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * Server-Sent Events (SSE) controller for streaming build events
  * to MCP clients and dashboards.
  * <p>
- * Provides real-time build event streaming following the MCP
- * streamable HTTP transport pattern. Clients connect to receive
+ * Provides real-time build event streaming. Clients connect to receive
  * build start, progress, completion, and error events.
+ *
+ * <h2>Relationship to the MCP transport (2026-07-28 RC)</h2>
+ * This is a <b>supplementary telemetry feed</b>, <i>not</i> the MCP protocol
+ * transport. The RC removes protocol-level sessions and SSE-stream resumability
+ * (the {@code Last-Event-ID} header and SSE event IDs, SEP-2575), and reclassifies
+ * the HTTP+SSE protocol transport as Deprecated (SEP-2596). Accordingly:
+ * <ul>
+ *   <li>This channel deliberately carries <b>no event IDs</b> and offers <b>no
+ *       resumability / redelivery</b> — it is a live, best-effort firehose. A
+ *       dropped connection simply re-subscribes; no in-flight protocol request is
+ *       lost because no MCP request is carried here.</li>
+ *   <li>It holds <b>no protocol-level session state</b> and pins nothing to a
+ *       connection, so it stays compatible with the stateless transport and with
+ *       round-robin load balancers (any replica can serve it).</li>
+ *   <li>Cross-call build state uses explicit, server-minted handles instead — see
+ *       {@link AsyncBuildService}'s {@code taskId} (SEP-2567).</li>
+ * </ul>
+ * <b>Decision:</b> retained as an optional, opt-in dashboard/telemetry stream that
+ * is independent of MCP protocol semantics. It is not used to deliver MCP JSON-RPC
+ * responses and must not be relied upon for protocol message delivery.
  */
 @RestController
 @RequestMapping("/mcp/build-events")

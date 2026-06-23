@@ -45,7 +45,7 @@ The shipped `application.properties` is baked into the JAR. Override at runtime 
 |----------|---------|-------------|
 | `spring.application.name` | `@project.name@` | Application identity (filtered at build time). |
 | `spring.main.web-application-type` | `none` | No web server by default — this is a stdio server. |
-| `spring.ai.mcp.server.name` | `@project.name@ Server` | MCP server name reported during `initialize`. |
+| `spring.ai.mcp.server.name` | `@project.name@` | Canonical MCP server name. Single source shared by the server card, `server/discover`, and the `Mcp-Name` HeaderMismatch check (kept identical to `spring.application.name`). |
 | `spring.ai.mcp.server.version` | `@project.version@` | MCP server version reported during `initialize`. |
 | `spring.ai.mcp.server.stdio` | `true` | Enable the stdio transport. |
 | `spring.main.banner-mode` | `off` | Suppress the banner — stdout must carry MCP JSON-RPC only. |
