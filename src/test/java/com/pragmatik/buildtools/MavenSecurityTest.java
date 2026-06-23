@@ -226,6 +226,18 @@ class MavenSecurityTest {
         }
 
         @Test
+        @DisplayName("double-dash --D form of a blocked key is also rejected")
+        void doubleDashFormBlocked() {
+            // Defense-in-depth: SAFE_ARG_PATTERN admits the --Dkey=value form, so
+            // isBlockedSystemProperty also strips a leading '--D'. Pin that branch.
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean --Dmaven.repo.local=/x"))
+                    .withMessageContaining("Blocked system property")
+                    .withMessageContaining("maven.repo.local");
+        }
+
+        @Test
         @DisplayName("legitimate -D flags still pass after hardening")
         void legitimateFlagsStillPass() {
             String[] result = MavenInvoker.getCommands(
