@@ -120,8 +120,7 @@ public class TransportConfig {
                         // (Mcp-Method, Mcp-Name — SEP-2243). The session header
                         // (Mcp-Session-Id) was removed with protocol-level sessions
                         // (SEP-2575) and is intentionally NOT advertised here.
-                        .allowedHeaders(
-                                "Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin")
+                        .allowedHeaders("Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin")
                         .allowCredentials(true)
                         .maxAge(3600);
                 if (wildcard) {

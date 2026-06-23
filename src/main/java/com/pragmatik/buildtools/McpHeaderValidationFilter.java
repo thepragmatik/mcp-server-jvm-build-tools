@@ -243,7 +243,8 @@ public class McpHeaderValidationFilter implements Filter {
 
         @Override
         public BufferedReader getReader() {
-            return new BufferedReader(new InputStreamReader(new ByteArrayInputStream(cachedBody), StandardCharsets.UTF_8));
+            return new BufferedReader(
+                    new InputStreamReader(new ByteArrayInputStream(cachedBody), StandardCharsets.UTF_8));
         }
     }
 

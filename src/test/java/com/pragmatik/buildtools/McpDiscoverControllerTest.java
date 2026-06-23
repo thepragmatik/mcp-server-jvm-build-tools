@@ -63,7 +63,8 @@ class McpDiscoverControllerTest {
     @DisplayName("discover transport metadata reflects the stateless RC")
     @SuppressWarnings("unchecked")
     void transportIsStateless() {
-        Map<String, Object> transport = (Map<String, Object>) controller.discover().get("transport");
+        Map<String, Object> transport =
+                (Map<String, Object>) controller.discover().get("transport");
         assertThat(transport)
                 .containsEntry("type", "streamable-http")
                 .containsEntry("stateless", true)
