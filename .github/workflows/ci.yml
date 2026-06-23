@@ -66,7 +66,7 @@ jobs:
         continue-on-error: true
       - name: Spotless formatting check
         run: ./mvnw -B spotless:check --file pom.xml --no-transfer-progress
-      - name: SpotBugs static analysis
-        run: ./mvnw -B compile spotbugs:check --file pom.xml --no-transfer-progress
-      - name: Compile with warnings
-        run: ./mvnw -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
+      # Compile once (surfacing compiler warnings) and run SpotBugs against that
+      # output in a single Maven invocation to avoid compiling the project twice.
+      - name: Compile (with warnings) and SpotBugs static analysis
+        run: ./mvnw -B compile spotbugs:check -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
