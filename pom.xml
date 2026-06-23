@@ -52,8 +52,8 @@
             buffer below the baseline so the build fails on a real regression
             while tolerating minor variance across the CI JDK matrix (21/23/25).
         -->
-        <jacoco.line.coverage>0.60</jacoco.line.coverage>
-        <jacoco.branch.coverage>0.50</jacoco.branch.coverage>
+        <jacoco.line.coverage.min>0.60</jacoco.line.coverage.min>
+        <jacoco.branch.coverage.min>0.50</jacoco.branch.coverage.min>
     </properties>
     <licenses>
         <license>
@@ -212,12 +212,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>${jacoco.line.coverage}</minimum>
+                                            <minimum>${jacoco.line.coverage.min}</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>${jacoco.branch.coverage}</minimum>
+                                            <minimum>${jacoco.branch.coverage.min}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
