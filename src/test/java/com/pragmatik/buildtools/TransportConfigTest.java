@@ -68,8 +68,7 @@ class TransportConfigTest {
         TransportConfig config = new TransportConfig();
         // The shipped default must never be a wildcard.
         assertFalse(config.usesWildcard(), "default CORS must not use a wildcard");
-        assertThat(config.parsedAllowedOrigins())
-                .containsExactly("http://localhost:8080", "http://127.0.0.1:8080");
+        assertThat(config.parsedAllowedOrigins()).containsExactly("http://localhost:8080", "http://127.0.0.1:8080");
 
         CorsConfiguration cors = corsConfigFor("http://localhost:8080,http://127.0.0.1:8080");
         assertThat(cors.getAllowedOrigins())
