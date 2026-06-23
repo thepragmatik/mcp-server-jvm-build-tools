@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
+
      Copyright 2025 Rahul Thakur
 
      Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,6 +155,12 @@
                         <include>**/*.yaml</include>
                         <include>**/*.properties</include>
                     </includes>
+                    <excludes>
+                        <!-- Sample projects and fixtures used as test data; they
+                             represent external/sample sources and intentionally
+                             do not carry this project's license header. -->
+                        <exclude>src/test/resources/**</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

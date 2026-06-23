@@ -62,8 +62,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: License headers check
-        run: ./mvnw -B license:format --file pom.xml --no-transfer-progress
-        continue-on-error: true
+        run: ./mvnw -B license:check --file pom.xml --no-transfer-progress
       - name: Spotless formatting check
         run: ./mvnw -B spotless:check --file pom.xml --no-transfer-progress
       # Compile once (surfacing compiler warnings) and run SpotBugs against that
