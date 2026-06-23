@@ -76,12 +76,18 @@ plugins:
   - minify:
       minify_html: true
 
-# Legacy stand-alone docs kept in the repo for direct GitHub browsing; they use
-# cross-document relative links that are intentionally excluded from the site build.
+# Legacy / audit stand-alone docs kept in the repo for direct GitHub browsing; they
+# use cross-document relative links (e.g. ../src/...) that are intentionally excluded
+# from the site build. The MCP-RC audit notes (#85-#89) are grounding records browsed
+# on GitHub; their reader-facing content is folded into the Reference pages below.
 exclude_docs: |
   INDEX.md
   AUTHORIZATION.md
   requirements.txt
+  mcp-2026-07-28-transport-audit.md
+  mcp-2026-07-28-tool-schema-audit.md
+  mcp-cacheable-result-gap.md
+  mcp-trace-context-propagation.md
 
 extra:
   social:

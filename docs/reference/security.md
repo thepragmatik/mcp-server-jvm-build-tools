@@ -98,6 +98,26 @@ The server supports two transports with different attack surfaces.
       is added and roles are configured. A wildcard origin (`*`)
       is honoured for local testing only and must never be used in production.
 
+## Header validation (Streamable HTTP)
+
+The 2026-07-28 RC requires the standard request headers `Mcp-Method` and `Mcp-Name` on Streamable
+HTTP POSTs (SEP-2243). `McpHeaderValidationFilter` (servlet filter, `@Order(2)`) defends against
+**header/body mismatch attacks** on `POST /mcp/**`: when those headers are present and *contradict*
+the JSON-RPC body's method, or `Mcp-Name` contradicts the server's own identity, the request is
+rejected with `400` + a JSON-RPC `HeaderMismatchError`. This prevents a proxy/router from acting on
+a header (e.g. for routing or policy) that disagrees with what the server will actually execute.
+
+The check is **purely additive and backward-compatible**:
+
+- **Absent** headers pass through — older clients (2024-11-05, 2025-03-26) that do not send them are
+  unaffected.
+- **Matching** headers pass through.
+- Unparseable bodies are left to the transport — only a genuine self-contradiction is rejected.
+
+The server's single identity (`Mcp-Name`, protocol versions, capabilities) is sourced from
+`McpServerIdentity` and surfaced consistently on the server card and `server/discover`, so the
+header check cannot drift from what discovery advertises.
+
 ## Configuration hardening
 
 The shipped properties already harden the stdio transport:
@@ -155,6 +175,74 @@ The 12 scopes and the tools they grant (from the `ToolPermission` enum):
     The `ToolAuthorizationService` exposes tools to work with this model:
     `check_tool_authorization`, `list_available_scopes`, `audit_tool_access`, and
     `validate_access_token`. See the [Tools reference](tools.md#toolauthorizationservice).
+
+## OAuth 2.1 resource server (HTTP transport)
+
+Under the `http` profile the server aligns with the **MCP OAuth 2.1 resource-server model** — the
+spec profiles an MCP server as an OAuth 2.1 resource server (RFC9728 Protected Resource Metadata,
+RFC6750 `WWW-Authenticate` challenges, access-token validation). The alignment is **additive and
+backward-compatible**:
+
+1. **Protected Resource Metadata (RFC9728)** is **always** served at
+   `GET /.well-known/oauth-protected-resource` (`OAuthProtectedResourceMetadataController`).
+   OAuth-capable clients can discover the resource server; clients that do not speak OAuth simply
+   never request it. `scopes_supported` is derived from the fine-grained `ToolPermission` scopes,
+   and `offline_access` is never advertised.
+2. **Bearer-token enforcement is opt-in** (`buildtools.oauth.resource-server.enabled`, default
+   `false`). When enabled, `OAuthResourceServerFilter` (`@Order(1)`) requires a valid
+   `Authorization: Bearer <token>` on `/mcp/**`; a missing/invalid token returns `401` with an
+   RFC6750 `WWW-Authenticate: Bearer error="invalid_token", … resource_metadata="…"` challenge.
+   The `server/discover` probe is exempt so clients can always learn how to authenticate. With
+   enforcement off, request behaviour is byte-for-byte unchanged for existing clients.
+3. **Tokens are validated locally** as opaque bearer credentials against the configured
+   `BUILDTOOLS_API_KEY_*` store (`ToolAuthorizationService`). This is a deliberate, RFC9728-blessed
+   topology: the resource server advertises metadata and accepts validated bearer tokens, while the
+   heavyweight authorization-server work is delegated to a fronting OAuth gateway.
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer error="invalid_token", error_description="The access token is invalid or expired", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"
+```
+
+!!! warning "Delegated to the deployment"
+    Local opaque-token validation **deliberately diverges** from full authorization-server
+    integration. Token issuance, rotation, revocation and expiry; JWT/JWKS verification and
+    audience/`iss` binding; transport confidentiality (TLS); and replay/mTLS protections are
+    **out of scope for the resource server** and must be handled by a fronting OAuth-aware
+    gateway / reverse proxy. A leaked opaque key grants its scopes until rotated
+    (`BUILDTOOLS_API_KEY_*` + redeploy). Enable enforcement whenever the HTTP transport faces
+    anything other than a trusted local caller. See the configuration
+    [reference](configuration.md#oauth-21-resource-server-http-transport).
+
+!!! note "stdio transport has no token surface"
+    The default **stdio** transport has no network surface — no HTTP, no port, no tokens — so the
+    OAuth resource-server model applies only to the opt-in Streamable HTTP transport.
+
+## W3C Trace Context propagation
+
+For distributed tracing the server adopts the W3C Trace Context / OpenTelemetry `_meta` conventions
+(SEP-414), reading the exact key names `traceparent`, `tracestate`, and `baggage`. A span is opened
+around every build (`BuildTracer`), and the active span is propagated to the build subprocess via
+the conventional `TRACEPARENT` / `TRACESTATE` / `BAGGAGE` environment variables.
+
+This is **additive and opt-in at the protocol level, with no regression for untraced builds**:
+
+- An **inbound** trace is *continued* only when a request carries a valid `traceparent` in `_meta`
+  (or the server's own environment already carries a `TRACEPARENT` from a host/CI runner). When it
+  does, the build joins that existing trace — same `traceId`, with the server's span nested inside
+  — so a host/CI-propagated trace is **preserved, never reparented** onto an unrelated root.
+- A build with **no** inbound or inherited context simply starts a fresh, sampled **root** span, so
+  it stays independently traceable. The server never clobbers a host trace and never corrupts an
+  untraced build's correlation.
+- The active span is stamped onto each build subprocess via `TRACEPARENT` / `TRACESTATE` /
+  `BAGGAGE`; `TRACESTATE` / `BAGGAGE` are *removed* when the span carries none, so a child can never
+  inherit an orphaned value mismatched with a different `TRACEPARENT`. Outside a build (no active
+  span) nothing is injected.
+- Clients that send no trace context — including existing clients unaware of `_meta` — see identical
+  protocol behaviour and responses; trace propagation never changes a tool's result.
+
+Span parentage is resolved deterministically: an active (nested) span → the request `_meta` context
+→ an inherited environment `TRACEPARENT` → otherwise a fresh, sampled root span.
 
 ## Audit logging
 
