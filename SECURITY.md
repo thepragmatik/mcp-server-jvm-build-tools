@@ -8,8 +8,8 @@ This MCP server executes build commands (Maven, Gradle, SBT) on behalf of LLM ag
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | Yes       |
-| < 0.1.0 | No        |
+| 0.2.x   | Yes       |
+| < 0.2.0 | No        |
 
 Only the latest release receives security patches.
 
