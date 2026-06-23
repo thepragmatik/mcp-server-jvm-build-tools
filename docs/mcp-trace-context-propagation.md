@@ -20,7 +20,7 @@
 |----------------------|--------|
 | Read `traceparent`/`tracestate`/`baggage` from request `_meta` (exact key names); absent ⇒ behave as today | **Implemented** — `McpTraceContext.fromMeta(...)` + `W3CTraceContext.parse(...)`; covered by `TraceContextPropagationTest` and `W3CTraceContextTest`. |
 | Span created/continued for tool calls (esp. `execute_build_command` / `execute_build_async`) | **Implemented** — `BuildTracer` opens a span around the build in `BuildToolsService` and `AsyncBuildService`. |
-| Active trace context propagated to downstream tooling (env) | **Implemented** — `TRACEPARENT`/`TRACESTATE`/`BAGGAGE` stamped on every build subprocess (Maven invoker + embedder path, Gradle, SBT; sync and async). |
+| Active trace context propagated to downstream tooling (env) | **Implemented** — the active span (which continues an inbound `_meta` context, or failing that an inherited environment `TRACEPARENT`, or otherwise a fresh root) is stamped via `TRACEPARENT`/`TRACESTATE`/`BAGGAGE` on every build subprocess (Maven invoker + embedder path, Gradle, SBT; sync and async). A host/CI-propagated `TRACEPARENT` in the server's own environment is **preserved**, not clobbered. |
 | Test: inbound `traceparent` parsed ⇒ emitted span carries the same trace id | **Implemented** — `TraceContextPropagationTest.inboundTraceparentContinuedInSpan`. |
 | Document the supported `_meta` trace keys | **Implemented** — `MCP_INTEGRATION.md` → _Distributed Tracing_ + this document. |
 | Automatic activation from real inbound `_meta` on every tool call | **Blocked upstream** — the bundled SDK does not surface `_meta` to `@Tool` methods (see below). The mechanism is ready and tested; activation is a single `McpTraceContext.activateFromMeta(meta)` call once `_meta` is available. |
@@ -75,10 +75,17 @@ into the OpenTelemetry context, and does not expose it to the server either.
 - A complete, dependency-free W3C Trace Context layer: parsing (`W3CTraceContext`), span
   lifecycle (`TraceSpan`, `BuildTracer`), thread-scoped context (`TraceContextHolder`), and a
   `_meta` bridge (`McpTraceContext`) reading the exact SEP-414 keys.
-- A span is opened around every build, so builds are traceable **today** (a fresh root span when
-  there is no inbound context — no regression).
+- A span is opened around every build, so builds are traceable **today**. Span parentage is
+  resolved in order: an active (nested) span → the request `_meta` context → a `TRACEPARENT`
+  already present in the server's own environment (e.g. a CI runner that propagates W3C context to
+  build steps) → otherwise a fresh, sampled root span. The environment fallback means a host/CI
+  trace is **preserved** rather than replaced by an unrelated root (no regression for builds that
+  inherited `TRACEPARENT` before this change).
 - The active span is propagated to the build subprocess via `TRACEPARENT`/`TRACESTATE`/`BAGGAGE`,
-  the conventional environment variables OpenTelemetry tooling reads to continue a trace.
+  the conventional environment variables OpenTelemetry tooling reads to continue a trace. The
+  in-process Maven invoker and every `ProcessBuilder`-based path funnel through the one
+  `TraceContextHolder.applyToEnvironment` mechanism, so stale/orphaned `TRACESTATE`/`BAGGAGE` are
+  cleared symmetrically across all build paths.
 - `McpTraceContext.activateFromMeta(meta)` is the single, tested entry point that continues an
   inbound trace. It is invoked wherever `_meta` is observable; once the SDK forwards request
   `_meta` (or a host populates the `ToolContext`), inbound traces are continued automatically
@@ -86,9 +93,15 @@ into the OpenTelemetry context, and does not expose it to the server either.
 
 ## Backward compatibility
 
-Trace propagation is additive and opt-in: it only activates when a client supplies a valid
-`traceparent` `_meta` key. Clients that send no trace context — including existing clients unaware
-of `_meta` — see identical behaviour and responses.
+Trace propagation is additive and opt-in at the protocol level: it only continues a *client*
+trace when a client supplies a valid `traceparent` `_meta` key. Clients that send no trace context
+— including existing clients unaware of `_meta` — see identical behaviour and responses.
+
+For the build subprocess environment there is **no regression** either: a build that already
+inherited a host/CI `TRACEPARENT` continues to join that trace (the server now inserts its own
+span in between, in the same trace), and a build with no inherited context starts a fresh root
+span exactly as a fresh server would. The server never reparents a host-propagated trace onto an
+unrelated root.
 
 ## Upstream dependency
 

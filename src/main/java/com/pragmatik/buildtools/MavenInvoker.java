@@ -33,18 +33,18 @@ public class MavenInvoker {
         request.setBaseDirectory(new File(currentProjectDirectory));
         request.addArgs(Arrays.asList(commands));
 
-        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess via
-        // the conventional TRACEPARENT/TRACESTATE/BAGGAGE environment variables so any
-        // OpenTelemetry-aware build tooling continues the trace. No-op when untraced.
+        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess
+        // through the SAME mechanism every other build path uses
+        // (TraceContextHolder.applyToEnvironment), so TRACEPARENT is set and stale
+        // TRACESTATE/BAGGAGE are cleared symmetrically. The maven-invoker API can
+        // only ADD shell variables, never remove them, so we materialise the full
+        // subprocess environment from the server's own environment, apply the trace
+        // context to that map, and pass it verbatim with inheritance disabled.
         TraceContextHolder.currentSpan().ifPresent(span -> {
-            request.setShellEnvironmentInherited(true);
-            request.addShellEnvironment(TraceContextHolder.TRACEPARENT_ENV, span.toTraceparent());
-            if (span.traceState() != null && !span.traceState().isBlank()) {
-                request.addShellEnvironment(TraceContextHolder.TRACESTATE_ENV, span.traceState());
-            }
-            if (span.baggage() != null && !span.baggage().isBlank()) {
-                request.addShellEnvironment(TraceContextHolder.BAGGAGE_ENV, span.baggage());
-            }
+            Map<String, String> environment = new HashMap<>(System.getenv());
+            TraceContextHolder.applyToEnvironment(environment);
+            request.setShellEnvironmentInherited(false);
+            environment.forEach(request::addShellEnvironment);
         });
 
         Invoker invoker = new DefaultInvoker();

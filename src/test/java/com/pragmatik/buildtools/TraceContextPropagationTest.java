@@ -146,9 +146,10 @@ class TraceContextPropagationTest {
     }
 
     @Test
-    @DisplayName("with no inbound context a fresh sampled root span is started (no regression)")
+    @DisplayName("with no inbound context and no inherited env a fresh sampled root span is started (no regression)")
     void noInboundStartsRootSpan() {
-        try (TraceScope span = BuildTracer.startSpan("execute_build_command")) {
+        // Empty ambient environment so the test does not depend on the JVM's real env.
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command", Map.of())) {
             TraceSpan active = TraceContextHolder.currentSpan().orElseThrow();
 
             assertThat(active.traceId()).hasSize(32).matches("[0-9a-f]{32}");
@@ -159,6 +160,68 @@ class TraceContextPropagationTest {
             Map<String, String> env = new HashMap<>();
             TraceContextHolder.applyToEnvironment(env);
             assertThat(env.get(TraceContextHolder.TRACEPARENT_ENV)).isEqualTo(active.toTraceparent());
+        }
+    }
+
+    @Test
+    @DisplayName("an inherited environment TRACEPARENT is adopted as the root parent (host/CI correlation preserved)")
+    void inheritedEnvTraceparentAdoptedAsRootParent() {
+        Map<String, String> env = new HashMap<>();
+        env.put(TraceContextHolder.TRACEPARENT_ENV, TRACEPARENT);
+        env.put(TraceContextHolder.TRACESTATE_ENV, "vendor=opaque");
+        env.put(TraceContextHolder.BAGGAGE_ENV, "tenant=acme");
+
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command", env)) {
+            TraceSpan active = TraceContextHolder.currentSpan().orElseThrow();
+
+            // No inbound _meta, but the server env carries a host/CI traceparent:
+            // the span joins THAT trace rather than starting an unrelated root.
+            assertThat(active.traceId()).isEqualTo(TRACE_ID);
+            assertThat(active.parentSpanId()).isEqualTo(PARENT_ID);
+            assertThat(active.hasRemoteParent()).isTrue();
+            assertThat(active.traceState()).isEqualTo("vendor=opaque");
+            assertThat(active.baggage()).isEqualTo("tenant=acme");
+
+            // Stamping back onto the subprocess keeps it in the same trace (preserved,
+            // not clobbered) — the no-regression guarantee for untraced/host-traced builds.
+            TraceContextHolder.applyToEnvironment(env);
+            assertThat(env.get(TraceContextHolder.TRACEPARENT_ENV))
+                    .isEqualTo(active.toTraceparent())
+                    .contains(TRACE_ID);
+            assertThat(env.get(TraceContextHolder.TRACESTATE_ENV)).isEqualTo("vendor=opaque");
+            assertThat(env.get(TraceContextHolder.BAGGAGE_ENV)).isEqualTo("tenant=acme");
+        }
+    }
+
+    @Test
+    @DisplayName("a malformed inherited environment TRACEPARENT is ignored: a fresh root span starts")
+    void malformedEnvTraceparentStartsFreshRoot() {
+        Map<String, String> env = new HashMap<>();
+        env.put(TraceContextHolder.TRACEPARENT_ENV, "not-a-traceparent");
+
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command", env)) {
+            TraceSpan active = TraceContextHolder.currentSpan().orElseThrow();
+            assertThat(active.parentSpanId()).isNull();
+            assertThat(active.hasRemoteParent()).isFalse();
+            assertThat(active.traceId()).hasSize(32).matches("[0-9a-f]{32}");
+        }
+    }
+
+    @Test
+    @DisplayName("request _meta takes precedence over an inherited environment TRACEPARENT")
+    void metaTakesPrecedenceOverEnvironment() {
+        String envTraceId = "11111111111111111111111111111111";
+        Map<String, String> env = new HashMap<>();
+        env.put(TraceContextHolder.TRACEPARENT_ENV, "00-" + envTraceId + "-2222222222222222-01");
+
+        try (TraceScope inbound = McpTraceContext.activateFromMeta(meta());
+                TraceScope span = BuildTracer.startSpan("execute_build_command", env)) {
+            TraceSpan active = TraceContextHolder.currentSpan().orElseThrow();
+
+            // The per-request _meta trace wins over the ambient environment trace.
+            assertThat(active.traceId()).isEqualTo(TRACE_ID).isNotEqualTo(envTraceId);
+            assertThat(active.parentSpanId()).isEqualTo(PARENT_ID);
+            assertThat(active.hasRemoteParent()).isTrue();
         }
     }
 

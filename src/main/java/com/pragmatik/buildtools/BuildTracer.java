@@ -18,6 +18,7 @@ package com.pragmatik.buildtools;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,12 @@ import org.slf4j.LoggerFactory;
  *   <li>Otherwise, if an inbound {@link W3CTraceContext} has been activated for
  *       this thread (from request {@code _meta}), the new span continues that
  *       remote trace — same {@code traceId}, with the caller's span as parent.</li>
+ *   <li>Otherwise, if the server's own environment carries a valid
+ *       {@code TRACEPARENT} (e.g. a CI runner that propagates W3C context to build
+ *       steps via {@code TRACEPARENT}/{@code TRACESTATE}/{@code BAGGAGE}), the new
+ *       span continues <em>that</em> trace, so host-propagated correlation is
+ *       preserved and the build subprocess joins the existing trace rather than an
+ *       unrelated fresh one.</li>
  *   <li>Otherwise a fresh, sampled <em>root</em> span is started, so every tool
  *       call is still traceable even without an inbound context (no regression).</li>
  * </ol>
@@ -66,6 +73,22 @@ public final class BuildTracer {
      * @return a scope that ends the span and restores the previous context on close
      */
     public static TraceScope startSpan(String name) {
+        return startSpan(name, System.getenv());
+    }
+
+    /**
+     * Starts a span resolving the ambient (host/CI) fallback context from the given
+     * environment instead of {@link System#getenv()}.
+     *
+     * <p>Package-private so tests can exercise the inherited-{@code TRACEPARENT}
+     * fallback deterministically without depending on the JVM's real environment.
+     *
+     * @param name the span/operation name
+     * @param environment the ambient process environment consulted only when there
+     *     is no active span and no inbound {@code _meta} context (may be {@code null})
+     * @return a scope that ends the span and restores the previous context on close
+     */
+    static TraceScope startSpan(String name, Map<String, String> environment) {
         TraceSpan parentSpan = TraceContextHolder.currentSpan().orElse(null);
 
         String traceId;
@@ -84,9 +107,13 @@ public final class BuildTracer {
             baggage = parentSpan.baggage();
             remoteParent = false;
         } else {
-            W3CTraceContext inbound = TraceContextHolder.inbound().orElse(null);
+            // Prefer a per-request _meta context; otherwise fall back to an ambient
+            // TRACEPARENT propagated into the server's own environment by a host/CI.
+            W3CTraceContext inbound = TraceContextHolder.inbound()
+                    .or(() -> TraceContextHolder.fromEnvironment(environment))
+                    .orElse(null);
             if (inbound != null) {
-                // Continue the remote trace carried in the request _meta.
+                // Continue the inbound remote trace (request _meta or host/CI env).
                 traceId = inbound.traceId();
                 parentSpanId = inbound.parentSpanId();
                 traceFlags = inbound.traceFlags();

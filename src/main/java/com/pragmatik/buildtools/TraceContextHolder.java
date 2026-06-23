@@ -60,6 +60,30 @@ public final class TraceContextHolder {
     }
 
     /**
+     * Extracts an ambient W3C trace context from a process environment using the
+     * conventional {@code TRACEPARENT}/{@code TRACESTATE}/{@code BAGGAGE} variables.
+     *
+     * <p>This is the fallback source of inbound context for {@link BuildTracer} when
+     * no per-request {@code _meta} context is active: a host or CI runner that
+     * propagates W3C context to build steps via {@code TRACEPARENT} (e.g. GitLab CI,
+     * the Jenkins OpenTelemetry plugin) is honoured so the server's build span — and
+     * the subprocess it spawns — join that host trace rather than starting an
+     * unrelated one. An absent or malformed {@code TRACEPARENT} yields
+     * {@link Optional#empty()} (the server behaves as today).
+     *
+     * @param environment the process environment to read (may be {@code null})
+     * @return the parsed ambient context, or {@link Optional#empty()} when none
+     */
+    static Optional<W3CTraceContext> fromEnvironment(Map<String, String> environment) {
+        if (environment == null) {
+            return Optional.empty();
+        }
+        return W3CTraceContext.parse(environment.get(TRACEPARENT_ENV))
+                .map(ctx -> ctx.withTraceState(environment.get(TRACESTATE_ENV))
+                        .withBaggage(environment.get(BAGGAGE_ENV)));
+    }
+
+    /**
      * Sets the inbound context for this thread.
      *
      * @param context the inbound context (may be {@code null} to clear)
@@ -124,13 +148,22 @@ public final class TraceContextHolder {
 
     /**
      * Stamps the active span's W3C trace context onto the given (mutable) process
-     * environment so a child build process can continue the trace.
+     * environment so a child build process continues the same trace.
      *
-     * <p>When no span is active this is a no-op, so a build started without any
-     * inbound trace context inherits the parent environment unchanged (no
-     * regression). Stale {@code TRACEPARENT}/{@code TRACESTATE}/{@code BAGGAGE}
-     * inherited from the server's own environment are overwritten when a span is
-     * active so the child cannot continue an unrelated trace.
+     * <p>The active span is opened by {@link BuildTracer}, which continues an inbound
+     * trace whenever one is available — from the request {@code _meta} or, failing
+     * that, from a {@code TRACEPARENT} already present in the server's own
+     * environment (see {@link #fromEnvironment(Map)}). As a result a host/CI
+     * -propagated trace is <em>preserved</em>: the child process stays in the same
+     * trace, now beneath this server's span, rather than being reparented onto an
+     * unrelated fresh root. A fresh root trace is started only when there is no
+     * usable inbound context at all.
+     *
+     * <p>{@code TRACEPARENT} is always set to the active span. {@code TRACESTATE}
+     * and {@code BAGGAGE} are set when the span carries them and otherwise
+     * <em>removed</em>, so the child can never inherit an orphaned, mismatched
+     * opaque value paired with a different {@code TRACEPARENT}. When no span is
+     * active (no build in flight) this is a no-op.
      *
      * @param environment a mutable environment map (e.g. {@code ProcessBuilder.environment()})
      */

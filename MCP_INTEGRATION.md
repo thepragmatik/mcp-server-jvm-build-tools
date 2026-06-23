@@ -304,9 +304,14 @@ names are locked to SEP-414):
   `execute_build_command`, `analyze_build_output`, and `execute_build_async` —
   start a span that **continues that trace** (same trace id, parented by the
   caller's span).
-- When `traceparent` is **absent or malformed**, the server behaves exactly as
-  before and starts a fresh root span; nothing in the client-visible response
-  changes (no regression).
+- When no `_meta` `traceparent` is present but the server's **own environment**
+  carries a valid `TRACEPARENT` (e.g. a CI runner that propagates W3C context to
+  build steps, such as GitLab CI or the Jenkins OpenTelemetry plugin), the span
+  **continues that host/CI trace** instead of starting an unrelated root — so a
+  build that previously inherited `TRACEPARENT` keeps joining the same trace.
+- When `traceparent` is **absent or malformed everywhere** (no `_meta`, no
+  inherited environment context), the server behaves exactly as before and starts
+  a fresh root span; nothing in the client-visible response changes (no regression).
 - `tracestate` and `baggage` are carried through unmodified and propagated
   downstream alongside `traceparent`.
 
@@ -321,17 +326,23 @@ conventional variables that OpenTelemetry-aware tooling reads to continue a trac
 | `TRACESTATE`  | the inbound `tracestate`, if any |
 | `BAGGAGE`     | the inbound `baggage`, if any |
 
-This applies to Maven (both the embedded invoker and the out-of-process executor),
+All build paths — the in-process Maven invoker, the out-of-process Maven executor,
 Gradle, and SBT, for synchronous (`execute_build_command`) and asynchronous
-(`execute_build_async`) builds alike. If your build runs OpenTelemetry
+(`execute_build_async`) builds alike — funnel through the same stamping logic, which
+sets `TRACEPARENT` and **clears** any stale/orphaned inherited `TRACESTATE`/`BAGGAGE`
+so the subprocess never carries an opaque value mismatched against its `TRACEPARENT`.
+If your build runs OpenTelemetry
 auto-instrumentation (for example the Maven/Gradle OpenTelemetry extensions or an
 `otel-cli`-wrapped step), it will pick up `TRACEPARENT` and emit its spans as
 children of the server's build span.
 
-> **Backward compatibility:** trace propagation is fully additive and opt-in —
-> it activates only when a client supplies the `traceparent` `_meta` key. Clients
-> that send no trace context, and existing clients unaware of `_meta`, are
-> unaffected.
+> **Backward compatibility:** trace propagation is additive and opt-in at the
+> protocol level — a *client* trace is continued only when a client supplies the
+> `traceparent` `_meta` key, so clients that send no trace context (including those
+> unaware of `_meta`) are unaffected. The build subprocess environment is also
+> non-regressive: a build that already inherited a host/CI `TRACEPARENT` keeps
+> joining that trace (the server inserts its own span in between), and a build with
+> no inherited context starts a fresh root span as before.
 
 > **SDK note:** the bundled MCP Java SDK (Spring AI 2.0.0-RC2 / SDK 2.0.0-RC1)
 > does not yet surface request `_meta` to `@Tool` methods, so until a host forwards
