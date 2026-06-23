@@ -35,7 +35,7 @@ Yes. The primary deployment model is a plain JAR: `java -jar mcp-server-jvm-buil
 
 ### Is this production-ready?
 
-The project is pre-1.0 (v0.1.x) but actively maintained with 397 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
+The project is pre-1.0 (v0.2.x) but actively maintained with 397 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
 
 ### What's the difference between this and arvindand/maven-tools-mcp?
 

@@ -127,7 +127,7 @@
                 <version>3.3.1</version>
                 <configuration>
                     <delimiters>
-                        <delemiter>@</delemiter> <!-- avoid possible conflicts with Spring's property resolution -->
+                        <delimiter>@</delimiter> <!-- avoid possible conflicts with Spring's property resolution -->
                     </delimiters>
                 </configuration>
             </plugin>
