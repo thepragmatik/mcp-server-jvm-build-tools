@@ -89,6 +89,11 @@ The server supports two transports with different attack surfaces.
     - Additional attack surface: network exposure, CORS misconfiguration, unauthenticated endpoints.
     - **Deploy behind a TLS-terminating reverse proxy** for production HTTPS and restrict
       `mcp.transport.cors.allowed-origins` to known domains.
+    - **Safe defaults:** CORS is restricted to local origins
+      (`http://localhost:8080,http://127.0.0.1:8080`) — no wildcard — and
+      `management.endpoint.health.show-details=when-authorized`, so unauthenticated
+      callers never see component-level health internals. A wildcard origin (`*`)
+      is honoured for local testing only and must never be used in production.
 
 ## Configuration hardening
 
