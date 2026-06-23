@@ -37,8 +37,15 @@ finding (CVSS ≥ 7, configurable via `-Dowasp.failBuildOnCVSS`).
     the suppression file, or the workflow itself) — failing fast before merge.
 - **Reports:** HTML, JSON, and SARIF are produced under `target/`. The workflow
   uploads them as artifacts and pushes the SARIF to GitHub code scanning.
-- **NVD API key (optional):** set the `NVD_API_KEY` repository secret to speed up
-  NVD downloads. The scan still works without it (just rate-limited).
+- **NVD API key (required to activate the CI gate):** the OWASP NVD API 2.0 is
+  heavily rate-limited for anonymous access and cold-cache CI runs routinely
+  fail, so the CI scan runs **only when the `NVD_API_KEY` repository secret is
+  configured**. When the secret is absent the scan job is **skipped (not failed)**
+  with a warning — CI stays green and Dependabot remains the active mechanism
+  until a key is provisioned. Get a free key at
+  <https://nvd.nist.gov/developers/request-an-api-key> and add it as the
+  `NVD_API_KEY` repository secret. (Local runs work without a key, just slowly
+  — see the commands below.)
 - **Suppressions:** investigated false positives / accepted risks go in
   [`owasp-suppressions.xml`](../owasp-suppressions.xml), each with a written
   justification and, where possible, an `until` expiry so it gets revisited.

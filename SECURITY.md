@@ -156,8 +156,10 @@ for the full design and the recorded decisions.
   in a dedicated workflow (`.github/workflows/dependency-check.yml`) weekly, on
   manual dispatch, and on PRs/pushes that change the dependency surface. It is
   gated behind the opt-in `owasp` Maven profile so it never slows the default
-  build; run it locally with `./mvnw -Powasp verify`. Documented, expiring
-  suppressions live in `owasp-suppressions.xml`.
+  build; run it locally with `./mvnw -Powasp verify`. Because the NVD API
+  requires a key for reliable CI runs, the CI gate activates only when the
+  `NVD_API_KEY` repository secret is configured (otherwise the scan is skipped,
+  not failed). Documented, expiring suppressions live in `owasp-suppressions.xml`.
 - **Dependabot** (`.github/dependabot.yml`) opens weekly upgrade PRs for the
   `maven` and `github-actions` ecosystems, which then pass through the same CI
   gates (including the OWASP scan) and the standard review process.

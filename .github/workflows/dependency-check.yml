@@ -9,6 +9,13 @@ name: Dependency Scan (OWASP)
 # The scan lives in its own workflow (and behind the `owasp` Maven profile) so it
 # never slows the cross-JDK build/test matrix in ci.yml. See
 # docs/DEPENDENCY_MANAGEMENT.md for the full rationale.
+#
+# IMPORTANT: the OWASP NVD API 2.0 effectively requires an API key for reliable
+# CI runs (anonymous access is heavily rate-limited and cold-cache runs routinely
+# fail). The blocking scan therefore runs only when the `NVD_API_KEY` repository
+# secret is configured. When it is absent the scan is SKIPPED (not failed) with a
+# warning, so CI stays green and Dependabot remains the active mechanism until a
+# key is provisioned. Get a free key at https://nvd.nist.gov/developers/request-an-api-key
 
 on:
   # Weekly so newly-disclosed CVEs against unchanged dependencies are caught.
@@ -39,8 +46,32 @@ permissions:
   security-events: write
 
 jobs:
+  # Determine whether an NVD API key is available. Secrets cannot be read inside a
+  # job-level `if:`, so we surface the result as a job output and gate the scan
+  # job on it. This keeps CI green (the scan is *skipped*, never *failed*) when no
+  # key is configured, instead of crashing on an empty/invalid key.
+  guard:
+    name: Check NVD API key
+    runs-on: ubuntu-latest
+    outputs:
+      run-scan: ${{ steps.check.outputs.run-scan }}
+    steps:
+      - id: check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -n "$NVD_API_KEY" ]; then
+            echo "run-scan=true" >> "$GITHUB_OUTPUT"
+            echo "NVD_API_KEY is configured; the OWASP dependency-check scan will run."
+          else
+            echo "run-scan=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=OWASP scan skipped::NVD_API_KEY secret is not configured, so the OWASP dependency-check scan is skipped. Configure the secret to enable the blocking supply-chain gate (see docs/DEPENDENCY_MANAGEMENT.md). Dependabot still tracks dependency updates."
+          fi
+
   owasp:
     name: OWASP dependency-check
+    needs: guard
+    if: needs.guard.outputs.run-scan == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,8 +90,8 @@ jobs:
           key: owasp-nvd-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             owasp-nvd-${{ runner.os }}-
-      # NVD_API_KEY is optional: without it the scan still runs (just rate-limited
-      # by the NVD API). Configure the repository secret to speed up downloads.
+      # The key is guaranteed non-empty here (the `guard` job gated this job on
+      # it), so passing -Dnvd.api.key is safe and avoids the empty-key error.
       - name: Run OWASP dependency-check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
