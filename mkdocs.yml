@@ -76,6 +76,16 @@ plugins:
   - minify:
       minify_html: true
 
+# Harden internal-link checking. By default MkDocs 1.6 only verifies that a link's
+# target *file* exists, not the `#fragment` (heading anchor) portion. The Reference
+# pages rely on cross-page `#anchor` links, so we ask MkDocs to validate anchors:
+# under `--strict` (used by CI and the Pages deploy) this `warn` is elevated to a
+# build failure, so a future heading rename that breaks an anchor fails the build
+# instead of silently shipping a dead link.
+validation:
+  links:
+    anchors: warn
+
 # Legacy / audit stand-alone docs kept in the repo for direct GitHub browsing; they
 # use cross-document relative links (e.g. ../src/...) that are intentionally excluded
 # from the site build. The MCP-RC audit notes (#85-#89) are grounding records browsed
