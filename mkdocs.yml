@@ -93,6 +93,7 @@ validation:
 exclude_docs: |
   INDEX.md
   AUTHORIZATION.md
+  DEPENDENCY_MANAGEMENT.md
   requirements.txt
   mcp-2026-07-28-transport-audit.md
   mcp-2026-07-28-tool-schema-audit.md

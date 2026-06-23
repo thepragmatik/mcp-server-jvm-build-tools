@@ -58,7 +58,10 @@ adopting it. This is not optional.
 - Add CacheableResult freshness hints on stable responses (version lists, tool lists)
 - Update tool output ordering to be deterministic (for LLM prompt cache hit rates)
 - Remove any dependency on deprecated Roots/Sampling features
-- Bump Spring AI MCP SDK dependency when available
+- Bump Spring AI MCP SDK dependency when available — **track Spring AI 2.0.0 GA
+  as a P1 follow-up** the moment it ships (currently pinned to `2.0.0-RC2`).
+  Recorded decision + GA upgrade runbook: `docs/DEPENDENCY_MANAGEMENT.md`.
+  Dependabot's dedicated `spring-ai` group surfaces the upgrade PR automatically.
 
 **Effort**: High (4-6 weeks). Protocol is fundamentally restructured.
 

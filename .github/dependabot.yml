@@ -1,0 +1,58 @@
+# Dependabot keeps the server's OWN dependencies up to date (issue #78).
+# It opens automated PRs for vulnerable / out-of-date Maven dependencies and
+# GitHub Actions, complementing the OWASP dependency-check scan that runs in CI
+# (.github/workflows/dependency-check.yml). See docs/DEPENDENCY_MANAGEMENT.md.
+version: 2
+updates:
+  # Maven dependencies and plugins declared in the project POM.
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "build(deps)"
+      prefix-development: "build(deps-dev)"
+    # Group related upgrades so a coordinated stack lands in a single PR rather
+    # than several conflicting ones. Spring AI is intentionally grouped on its
+    # own so the GA-tracking upgrade (see docs/DEPENDENCY_MANAGEMENT.md) is easy
+    # to review in isolation.
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+      spring-ai:
+        patterns:
+          - "org.springframework.ai:*"
+      maven-tooling:
+        patterns:
+          - "org.apache.maven:*"
+          - "org.apache.maven.shared:*"
+          - "org.apache.maven.plugins:*"
+      build-quality-plugins:
+        patterns:
+          - "org.jacoco:*"
+          - "com.diffplug.spotless:*"
+          - "com.github.spotbugs:*"
+          - "com.mycila:*"
+          - "org.owasp:*"
+
+  # GitHub Actions used by the CI / Pages / publish workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci(deps)"

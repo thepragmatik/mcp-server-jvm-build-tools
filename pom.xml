@@ -50,6 +50,13 @@
         <palantir-java-format.version>2.50.0</palantir-java-format.version>
         <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
         <spotbugs.version>4.8.6</spotbugs.version>
+        <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
+        <!--
+            CVSS score at/above which the OWASP scan fails the build (issue #78).
+            7.0 = High/Critical. The scan runs behind the `owasp` profile only
+            (see the profile below), so it never slows the default build.
+        -->
+        <owasp.failBuildOnCVSS>7</owasp.failBuildOnCVSS>
         <!--
             Minimum coverage ratios enforced by jacoco:check (bound to verify).
             Baseline at the time of introduction: line ~67%, branch ~57%
@@ -309,4 +316,65 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            OWASP dependency-check: scans the server's own dependencies for known
+            published vulnerabilities (CVEs) — issue #78. It is deliberately
+            gated behind this opt-in profile (and a dedicated CI workflow,
+            .github/workflows/dependency-check.yml) instead of being bound to the
+            default `verify` lifecycle, because the scan downloads the NVD feed
+            and is far slower than the unit/integration tests; running it on every
+            local build and on the whole cross-JDK CI matrix would be wasteful.
+
+            Run locally with:   ./mvnw -Powasp verify
+            (Set -Dnvd.api.key=... or the NVD_API_KEY env var for faster NVD
+            downloads; the scan still works without a key, just rate-limited.)
+        -->
+        <profile>
+            <id>owasp</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>${dependency-check-maven.version}</version>
+                        <configuration>
+                            <!-- Fail the build on any High/Critical vulnerability. -->
+                            <failBuildOnCVSS>${owasp.failBuildOnCVSS}</failBuildOnCVSS>
+                            <!-- Human-readable HTML + machine-readable JSON/SARIF
+                                 (SARIF is uploaded to GitHub code scanning). -->
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                                <format>SARIF</format>
+                            </formats>
+                            <!-- Documented, expiring suppressions for investigated
+                                 false positives / accepted risks. -->
+                            <suppressionFiles>
+                                <suppressionFile>owasp-suppressions.xml</suppressionFile>
+                            </suppressionFiles>
+                            <!-- Test-only dependencies are not shipped, so they
+                                 are out of scope for the supply-chain gate. -->
+                            <skipTestScope>true</skipTestScope>
+                            <!-- Disable analyzers irrelevant to a pure-JVM build
+                                 to cut noise and runtime. -->
+                            <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+                            <nodeAnalyzerEnabled>false</nodeAnalyzerEnabled>
+                            <nodeAuditAnalyzerEnabled>false</nodeAuditAnalyzerEnabled>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>owasp-dependency-check</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
