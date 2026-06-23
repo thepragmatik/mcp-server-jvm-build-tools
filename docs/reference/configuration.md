@@ -81,6 +81,15 @@ java -Dspring.profiles.active=http -Dserver.port=8080 \
   -jar target/mcp-server-jvm-build-tools.jar
 ```
 
+!!! note "Stateless transport (2026-07-28 RC)"
+    The Streamable HTTP transport is **stateless**: no protocol-level sessions, no
+    `Mcp-Session-Id` header, and no SSE-stream resumability. Any replica can serve any request,
+    and cross-call state is carried by explicit server-minted handles (e.g. an async build
+    `taskId`) passed as ordinary tool arguments. The CORS allow-list advertises the standard
+    `Mcp-Method` and `Mcp-Name` request headers (SEP-2243) and no longer the removed
+    `Mcp-Session-Id`. These headers are validated against the request body by
+    `McpHeaderValidationFilter`; absent headers (older clients) pass through unchanged.
+
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.port` | `8080` | HTTP port (effective only with the `http` profile). |
@@ -93,6 +102,21 @@ java -Dspring.profiles.active=http -Dserver.port=8080 \
     Deploy the HTTP transport behind a TLS-terminating reverse proxy and restrict
     `mcp.transport.cors.allowed-origins` to known domains. See the
     [Security reference](security.md#transport-security).
+
+### MCP cache hints (SEP-2549)
+
+The server advertises a per-method `{ttlMs, cacheScope}` caching policy under the `cacheHints` key
+of its discovery surfaces (the server card and `server/discover`). The list surfaces are static for
+the process lifetime, so they use a generous `public` TTL; per-project reads use a short `private`
+TTL. Both TTLs are configurable:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `buildtools.cache.catalog-ttl-ms` | `86400000` | Freshness hint (ms) advertised for `tools/list`, `prompts/list`, `resources/list`, and `resources/templates/list` (`cacheScope: public`). Default 24h. |
+| `buildtools.cache.read-ttl-ms` | `300000` | Freshness hint (ms) advertised for `resources/read` (`cacheScope: private`). Default 5min. |
+
+See the [Tools reference](tools.md#cache-hints-ttlms-cachescope-sep-2549) for the emitted
+`cacheHints` shape and the upstream note on per-result `CacheableResult` fields.
 
 ### Authorization and auditing
 
@@ -123,6 +147,25 @@ catalogued in the [Security reference](security.md#authorization-scopes).
 !!! warning "Never commit secrets"
     Provide API keys via environment variables or system properties only — never in source code,
     commits, or logs.
+
+### OAuth 2.1 resource server (HTTP transport)
+
+Under the `http` profile the server aligns with the MCP OAuth 2.1 resource-server model
+(RFC9728 / RFC6750) **additively**. RFC9728 Protected Resource Metadata is **always** served at
+`GET /.well-known/oauth-protected-resource`; bearer-token **enforcement** on `/mcp/**` is opt-in,
+so the default behaviour is byte-for-byte unchanged for existing clients. See the
+[Security reference](security.md#oauth-21-resource-server-http-transport).
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `buildtools.oauth.resource-server.enabled` | `false` | When `true`, require a valid `Authorization: Bearer <token>` on `/mcp/**`; a missing/invalid token returns `401` with `WWW-Authenticate: Bearer … resource_metadata="…"`. `server/discover` stays open so clients can learn how to authenticate. |
+| `buildtools.oauth.resource` | *(blank)* | Canonical resource identifier advertised in the metadata `resource` field. Blank ⇒ derived per-request as `<scheme>://<host>[:<port>]/mcp`. Behind a reverse proxy set the external URL, e.g. `https://mcp.example.com/mcp`. |
+| `buildtools.oauth.authorization-servers` | *(blank)* | Comma-separated OAuth authorization-server issuer URLs (RFC9728 `authorization_servers`); omitted from the metadata document when blank. |
+
+Tokens are opaque bearer credentials validated locally against the configured
+`BUILDTOOLS_API_KEY_*` store; full authorization-server work (JWT/JWKS, audience binding,
+issuance, rotation, TLS) is delegated to a fronting OAuth-aware gateway. `scopes_supported` is
+derived from the fine-grained `ToolPermission` scopes, and `offline_access` is never advertised.
 
 ## Build-tool command allowlists
 

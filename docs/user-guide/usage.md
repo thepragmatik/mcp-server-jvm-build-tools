@@ -131,6 +131,41 @@ The server is **stateless**: each call is independent and carries its own `proje
 can build a Maven project and then a Gradle project in succession with no state leakage. You can
 also run multiple server instances — each MCP client config entry spawns its own process.
 
+## Transport options: stdio and Streamable HTTP
+
+Most users run the server over **stdio** (the default) — the MCP client launches `java -jar …` and
+talks to it over stdin/stdout, with no network surface. For remote or shared deployments the server
+also offers an opt-in **Streamable HTTP** transport.
+
+=== "stdio (default)"
+
+    Configured automatically by your MCP client (see [Installation](installation.md)). No port,
+    no HTTP, no tokens — ideal for a local desktop agent.
+
+=== "Streamable HTTP (opt-in)"
+
+    Activate the `http` Spring profile (or pass `--http` to the launcher) and choose a port:
+
+    ```bash
+    java -Dspring.profiles.active=http -Dserver.port=8080 \
+      -jar target/mcp-server-jvm-build-tools.jar
+    ```
+
+    The transport is **stateless** (MCP 2026-07-28 RC): no sessions, no `Mcp-Session-Id`, and no
+    SSE-stream resumability, so it sits cleanly behind a load balancer — any replica can serve any
+    request. It also exposes discovery surfaces: the server card
+    (`GET /.well-known/mcp-server`), `server/discover` (`GET`/`POST /mcp/discover`), and OAuth
+    Protected Resource Metadata (`GET /.well-known/oauth-protected-resource`). See the
+    [Configuration reference](../reference/configuration.md#streamable-http-transport).
+
+!!! tip "OAuth 2.1 integration for shared/remote deployments"
+    Under the HTTP profile the server behaves as an **OAuth 2.1 resource server**. Bearer-token
+    enforcement on `/mcp/**` is opt-in (`buildtools.oauth.resource-server.enabled=true`): clients
+    then send `Authorization: Bearer <token>`, and a missing/invalid token gets a `401` with a
+    `WWW-Authenticate` challenge pointing at the metadata document. For untrusted exposure, front
+    the server with a TLS-terminating OAuth gateway. See the
+    [Security reference](../reference/security.md#oauth-21-resource-server-http-transport).
+
 ## Verifying behaviour quickly
 
 Ask the agent to call `list_build_tools` first. If it returns the Maven/Gradle/SBT commands, the

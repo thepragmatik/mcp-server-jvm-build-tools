@@ -26,8 +26,14 @@ SBT — over the Model Context Protocol. It is built with **Spring Boot 3.5.14**
 │   (invoker +      (CLI via         (CLI via                                  │
 │    embedder)       ProcessBuilder)  ProcessBuilder)                          │
 │                                                                             │
-│   REST controllers (Streamable HTTP mode only):                             │
-│     ServerCardController (.well-known + health)   BuildEventController (SSE) │
+│   Servlet filter chain (Streamable HTTP profile only, runs first):          │
+│     (1) OAuthResourceServerFilter   (2) McpHeaderValidationFilter           │
+│                                                                             │
+│   REST controllers (Streamable HTTP profile only):                          │
+│     ServerCardController        (.well-known/mcp-server + health)           │
+│     McpDiscoverController       (server/discover: GET probe + POST)         │
+│     OAuthProtectedResourceMetadataController (RFC9728 metadata)             │
+│     BuildEventController        (supplementary SSE telemetry feed)          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -99,7 +105,18 @@ New build tools (Bazel, Ant, Mill, …) are added by implementing this interface
 
 Tools are registered by passing service beans to `MethodToolCallbackProvider.toolObjects(...)` in
 `BuildToolsApplication`. Spring AI scans each bean's `@Tool` and `@ToolParam` annotations at
-startup and generates the JSON schemas exposed via `tools/list`.
+startup and generates the JSON schemas exposed via `tools/list`. The generated `inputSchema`
+for every tool is **JSON Schema 2020-12** (stamped with the 2020-12 `$schema`); a build-time
+guard, `ToolJsonSchemaComplianceTest`, validates every tool schema against the official 2020-12
+meta-schema (SEP-2106 — see the [Tools reference](tools.md#json-schema-2020-12-and-deterministic-ordering)).
+
+!!! note "Deterministic `tools/list` ordering (SEP-2549)"
+    The provider bean is wrapped by `DeterministicToolCallbackProvider`, which returns the
+    catalogue **sorted by tool name** on every call. `MethodToolCallbackProvider` discovers
+    `@Tool` methods reflectively, and `Class.getDeclaredMethods()` has no ordering guarantee
+    across JVMs/restarts; sorting at the provider boundary makes `tools/list` order a stable
+    function of the (unique) tool names, improving client-side and LLM prompt-cache hit rates.
+    No tool is added, removed, renamed, or changed — only the iteration order is normalised.
 
 | Service | Tools | Responsibility |
 |---------|:-----:|----------------|
@@ -149,15 +166,70 @@ Low-level Maven execution with two modes plus security parsing:
 - `getCommands()` — command parsing that enforces the allowlist and rejects shell metacharacters.
   Maven `-D` system properties are passed through verbatim (no key deny-list).
 
-## REST controllers (Streamable HTTP mode)
+## Streamable HTTP transport components
 
-Only active when the `http` profile is enabled:
+The Streamable HTTP transport is **stateless** (MCP 2026-07-28 RC): no protocol-level sessions,
+no `Mcp-Session-Id` header, and no SSE-stream resumability, so any replica can serve any request
+and cross-call state is carried by explicit server-minted handles (e.g. an async build `taskId`)
+passed as ordinary tool arguments. The following components are active only when the `http`
+profile is enabled.
+
+### Servlet filters (run before the controllers)
+
+A short filter chain guards `/mcp/**`, ordered by `@Order`:
+
+- **`OAuthResourceServerFilter`** (`@Order(1)`) — the OAuth 2.1 resource-server gate. **Inert by
+  default**; when `buildtools.oauth.resource-server.enabled=true` it requires an
+  `Authorization: Bearer <token>` on `/mcp/**`, validating the opaque token locally via
+  `ToolAuthorizationService`. A missing/invalid token yields `401` with an RFC6750
+  `WWW-Authenticate: Bearer … resource_metadata="…"` challenge. The `server/discover` probe is
+  exempt so clients can always learn how to authenticate.
+- **`McpHeaderValidationFilter`** (`@Order(2)`) — validates the 2026-07-28 RC request headers
+  `Mcp-Method` / `Mcp-Name` (SEP-2243) against the JSON-RPC body on `POST /mcp/**`. It is purely
+  additive: **absent** headers pass through (older clients are unaffected) and **matching**
+  headers pass through; only a genuine self-contradiction is rejected with `400` + a JSON-RPC
+  `HeaderMismatchError`.
+
+### REST controllers
 
 - **`ServerCardController`** — `GET /.well-known/mcp-server` (server metadata for discoverability),
   `GET /health`, `GET /health/ready`, `GET /health/live`.
-- **`BuildEventController`** — `GET /mcp/build-events/stream` (Server-Sent Events for build events).
+- **`McpDiscoverController`** — `server/discover` at `GET /mcp/discover` (probe) and
+  `POST /mcp/discover` (JSON-RPC), advertising server identity, supported protocol versions
+  (`2024-11-05`, `2025-03-26`, `2026-07-28`), capabilities, stateless-transport characteristics,
+  and the `cacheHints` block. The payload is identical on every call (no per-connection variance).
+- **`OAuthProtectedResourceMetadataController`** — `GET /.well-known/oauth-protected-resource`
+  (RFC9728 Protected Resource Metadata). **Always served** under the HTTP profile (additive
+  discovery surface) regardless of whether bearer enforcement is enabled.
+- **`BuildEventController`** — `GET /mcp/build-events/stream` (a supplementary, **non-protocol**
+  Server-Sent Events telemetry feed for dashboards; it carries no MCP JSON-RPC traffic and has no
+  resumability).
 
-`TransportConfig` configures CORS for the `/mcp/**` paths.
+`McpServerIdentity` is the single source of truth that every discovery surface reads — the server
+card, `server/discover`, and the `Mcp-Name` header check — so server name, protocol versions,
+capabilities, and `cacheHints` cannot drift between them. `TransportConfig` configures CORS for the
+`/mcp/**` paths (advertising the standard `Mcp-Method` / `Mcp-Name` request headers and no longer
+the removed `Mcp-Session-Id`).
+
+## W3C Trace Context propagation
+
+For distributed tracing (W3C Trace Context / OpenTelemetry, SEP-414), a dependency-free trace
+layer spans build execution:
+
+| Component | Role |
+|-----------|------|
+| `W3CTraceContext` | Parse/format `traceparent` / `tracestate` / `baggage` values. |
+| `McpTraceContext` | Read the exact SEP-414 `_meta` keys and continue an inbound trace. |
+| `BuildTracer` | Open a `TraceSpan` around every build in `BuildToolsService` / `AsyncBuildService`. |
+| `TraceSpan` / `TraceScope` | Span lifecycle and scoped activation. |
+| `TraceContextHolder` | Thread-scoped active context; stamps `TRACEPARENT` / `TRACESTATE` / `BAGGAGE` onto each build subprocess's environment. |
+
+Span parentage is resolved in order: an active (nested) span → the request `_meta` context → a
+`TRACEPARENT` already present in the server's own environment (e.g. a CI runner) → otherwise a
+fresh, sampled root span. An inbound trace is *continued* only when a request (or the server's
+environment) carries one; an untraced build simply gets a fresh root span and is **never
+reparented** onto an unrelated trace — so a host/CI trace is preserved and there is **no regression
+for untraced builds**. See the [Security reference](security.md#w3c-trace-context-propagation).
 
 ## Request flow
 
@@ -167,9 +239,11 @@ tools/call ─▶ Spring AI MCP SDK ─▶ @Tool method on a service bean
                                       ├─ validate inputs (length, characters, path canonicalisation)
                                       ├─ resolve build tool (explicit or auto-detect)
                                       ├─ apply allowlist + flag checks
+                                      ├─ open trace span (BuildTracer; continues inbound context)
                                       ▼
                               spawn isolated build process
-                                      │
+                                      │   (active span's TRACEPARENT/TRACESTATE/BAGGAGE
+                                      │    stamped on the subprocess env)
                                       ├─ (analyze_build_output) parse output → JSON
                                       ▼
                               return result to the client
