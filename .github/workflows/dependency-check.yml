@@ -83,6 +83,11 @@ jobs:
           cache: maven
       # Cache the NVD vulnerability database between runs so the scan does not
       # re-download the full feed every time (much faster, kinder to the NVD API).
+      # The primary `key` embeds github.run_id, so it is unique per run and never
+      # restores — each run writes a fresh cache entry and reuses the prior NVD
+      # feed via the `restore-keys` prefix below (write-new / restore-by-prefix).
+      # This is intentional: it always refreshes the feed from NVD while leaning
+      # on the previous cache to avoid a full re-download on every run.
       - name: Cache OWASP NVD database
         uses: actions/cache@v4
         with:

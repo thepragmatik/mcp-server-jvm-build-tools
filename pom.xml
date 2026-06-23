@@ -53,8 +53,10 @@
         <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
         <!--
             CVSS score at/above which the OWASP scan fails the build (issue #78).
-            7.0 = High/Critical. The scan runs behind the `owasp` profile only
-            (see the profile below), so it never slows the default build.
+            7.0 is the High threshold under CVSS v3 (7.0–8.9 = High, 9.0–10.0 =
+            Critical), so the gate fails on any High or Critical finding. The scan
+            runs behind the `owasp` profile only (see the profile below), so it
+            never slows the default build.
         -->
         <owasp.failBuildOnCVSS>7</owasp.failBuildOnCVSS>
         <!--

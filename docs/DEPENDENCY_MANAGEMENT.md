@@ -75,8 +75,15 @@ out-of-date / vulnerable dependencies, covering two ecosystems:
 - **`github-actions`** — the actions pinned in the CI / Pages / publish
   workflows.
 
-Dependabot PRs go through the same CI gates (including the OWASP scan, since they
-touch `pom.xml`) and the standard two-reviewer process in `AGENTS.md`.
+Dependabot PRs go through the standard two-reviewer process in `AGENTS.md` and
+trigger the OWASP scan workflow (they touch `pom.xml`). **Caveat:** Dependabot-
+raised `pull_request` runs receive **Dependabot secrets**, not Actions secrets,
+so `secrets.NVD_API_KEY` is empty in that context unless the key is *also* added
+as a Dependabot secret — in which case the `guard` job skips the OWASP scan for
+the bump PR itself. Coverage is preserved by the weekly schedule and the
+post-merge `push: main` run, so no vulnerable dependency ships either way; but
+to make the PR-time gate active on Dependabot bumps, mirror `NVD_API_KEY` into
+the Dependabot secret store alongside the Actions secret (§1.1).
 
 ## 2. Decision: track Spring AI GA when released
 
