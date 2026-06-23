@@ -110,6 +110,11 @@ public class McpDiscoverController {
         // single shared source so the card and this surface use one identical shape.
         result.put("capabilities", identity.capabilities());
 
+        // MCP RC (SEP-2549): recommended per-method caching policy ({ttlMs, cacheScope}) for the
+        // list/read surfaces, from the single shared source so it cannot drift from the server card.
+        // Additive and backward-compatible; see docs/mcp-cacheable-result-gap.md for the upstream gap.
+        result.put("cacheHints", identity.cacheHints());
+
         // Transport characteristics (RC: stateless Streamable HTTP, no sessions/SSE-resumability).
         result.put("transport", identity.transportProfile());
 

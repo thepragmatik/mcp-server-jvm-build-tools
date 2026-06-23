@@ -15,7 +15,8 @@ Clients negotiate their preferred version during `initialize`.
 |--------|----------------------|----------------------|
 | Added 2026-07-28 to mcpVersions | None — non-breaking addition | Enables 2026-07-28 negotiation |
 | Added Mcp-Method header support | None — header is optional | Enables stateless routing |
-| Added ttlMs configuration | None — default 5min cache TTL | Enables response caching |
+| Advertised cacheHints (ttlMs/cacheScope, SEP-2549) | None — unknown `cacheHints` key is ignored | Enables response/catalogue caching |
+| Deterministic `tools/list` ordering (SEP-2549) | None — same tools, only the order is normalised | Improves client/prompt cache hit rates |
 | Added extensions capability | None — descriptive only | Enables Tasks and MCP Apps |
 
 ### Breaking Changes (NOT YET Implemented)
@@ -28,6 +29,17 @@ and would BREAK existing clients:
 - Deprecating Roots/Sampling/Logging
 
 These will be implemented in future phases with a deprecation window.
+
+### Cache Hints — Advertised, Not Yet Emitted Per Result (SEP-2549)
+The MCP RC `CacheableResult` interface adds top-level `ttlMs`/`cacheScope` fields to
+`tools/list`, `prompts/list`, `resources/list`, `resources/read`, and
+`resources/templates/list` results. The bundled MCP SDK
+(`io.modelcontextprotocol.sdk` `2.0.0-RC1`, via `spring-ai-mcp` `2.0.0-RC2`) does **not**
+yet model these as typed result fields, so the server advertises its caching policy on the
+discovery surfaces (server card `cacheHints` + `server/discover`) as an additive,
+backward-compatible interim. It will move to per-result `CacheableResult` fields once the
+upstream SDK exposes them. See `docs/mcp-cacheable-result-gap.md` (upstream dependency
+tracked with the Spring AI RC pin, #78).
 
 ### Testing Old Client Compatibility
 ```bash

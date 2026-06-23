@@ -189,6 +189,29 @@ spring.jackson.deserialization.fail-on-unknown-properties=false
 
 Without this property, any MCP client sending protocol extensions (like the `extensions` field in the initialize request) would cause a Jackson deserialization error, breaking the handshake.
 
+### Cache Hints (MCP RC, SEP-2549)
+
+The MCP upcoming spec adds `ttlMs` (freshness hint, in milliseconds) and `cacheScope`
+(`public`/`private`) to list/read results so clients and gateways can cache them. This server's
+tool/prompt/resource catalogue is static for the lifetime of the process, so the list surfaces
+advertise a generous, `public` TTL while per-project content reads advertise a short, `private` TTL.
+
+```properties
+# Freshness hint (ms) for the static catalogue list surfaces (tools/list, prompts/list,
+# resources/list, resources/templates/list). Advertised as cacheScope "public". Default: 24h.
+buildtools.cache.catalog-ttl-ms=86400000
+
+# Freshness hint (ms) for per-project content reads (resources/read). Advertised as
+# cacheScope "private" because reads reflect mutable on-disk project state. Default: 5min.
+buildtools.cache.read-ttl-ms=300000
+```
+
+These values are surfaced as per-method `{ttlMs, cacheScope}` hints under the `cacheHints` key of
+the server card (`/.well-known/mcp-server`) and the `server/discover` result. The bundled MCP SDK
+does not yet model `ttlMs`/`cacheScope` as typed fields on its result records, so the hints are
+advertised on the discovery surfaces (additive, backward-compatible) rather than emitted on each
+individual result. See `docs/mcp-cacheable-result-gap.md` for the upstream dependency.
+
 ### Overriding Properties at Runtime
 
 Any Spring Boot property can be overridden via the `-D` flag in the MCP client args:
