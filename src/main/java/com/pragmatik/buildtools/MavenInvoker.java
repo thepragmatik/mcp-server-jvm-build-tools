@@ -66,23 +66,14 @@ public class MavenInvoker {
 
     static String executeUsingMavenEmbedder(String[] command, String currentProjectDirectory) {
         String finalResult;
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
 
-        OutputStream outputStream = new OutputStream() {
-            @Override
-            public void write(int b) {
-                output.append((char) b);
-            }
-        };
-
-        OutputStream errorStream = new OutputStream() {
-
-            @Override
-            public void write(int b) throws IOException {
-                errors.append((char) b);
-            }
-        };
+        // Capture the embedder's stdout/stderr as raw bytes so the UTF-8 encoding
+        // applied by the PrintStreams below is decoded back symmetrically. The
+        // previous sink appended one Java char per byte, which reinterpreted each
+        // byte as Latin-1 and mojibake'd any multi-byte UTF-8 output. Buffering the
+        // bytes and decoding once via toString(UTF_8) keeps the round-trip lossless.
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
 
         PrintStream outPrintStream = new PrintStream(outputStream, false, StandardCharsets.UTF_8);
         PrintStream errPrintStream = new PrintStream(errorStream, false, StandardCharsets.UTF_8);
@@ -91,11 +82,18 @@ public class MavenInvoker {
 
         int exitCode = mavenCli.doMain(command, currentProjectDirectory, outPrintStream, errPrintStream);
 
+        // Flush so all buffered, encoded bytes reach the backing buffers before decode.
+        outPrintStream.flush();
+        errPrintStream.flush();
+
+        String outText = outputStream.toString(StandardCharsets.UTF_8);
+        String errText = errorStream.toString(StandardCharsets.UTF_8);
+
         if (exitCode != 0) {
-            finalResult = errors.toString();
+            finalResult = errText;
             throw new RuntimeException("Maven embedder exited with code " + exitCode + ": " + finalResult);
         } else {
-            finalResult = output.toString();
+            finalResult = outText;
         }
         return finalResult;
     }
