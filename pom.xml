@@ -44,6 +44,16 @@
         <maven.compiler.target>21</maven.compiler.target>
         <spring-ai.version>2.0.0-RC2</spring-ai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <jacoco.version>0.8.13</jacoco.version>
+        <!--
+            Minimum coverage ratios enforced by jacoco:check (bound to verify).
+            Baseline at the time of introduction: line ~67%, branch ~57%
+            (excluding the bootstrap class). Thresholds are set with a small
+            buffer below the baseline so the build fails on a real regression
+            while tolerating minor variance across the CI JDK matrix (21/23/25).
+        -->
+        <jacoco.line.coverage.min>0.60</jacoco.line.coverage.min>
+        <jacoco.branch.coverage.min>0.50</jacoco.branch.coverage.min>
     </properties>
     <licenses>
         <license>
@@ -160,6 +170,61 @@
                 <configuration>
                     <skip>true</skip>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <!-- Application bootstrap class has no meaningful unit-testable logic. -->
+                        <exclude>com/pragmatik/buildtools/BuildToolsApplication.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <!-- Instrument tests so coverage data (jacoco.exec) is collected. -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- Produce the HTML/XML/CSV report under target/site/jacoco. -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <!-- Fail the build when coverage drops below the agreed thresholds. -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.line.coverage.min}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.branch.coverage.min}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

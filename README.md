@@ -884,11 +884,11 @@ The server enforces multiple layers of defense:
 
 **Tested against:** Shell injection (`&&`, `|`, `;`, `$()`, backticks), path traversal (`../`), blocked plugin goals (`exec:exec`), Unicode/zero-width attacks, null-byte injection, denial-of-service via extremely long inputs.
 
-375+ tests covering security, functionality, and integration across 22 test classes. See `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `ToolAuthorizationServiceTest.java`, `BuildAuthServiceTest.java`, `BuildCacheServiceTest.java`, `MavenInvokerTest.java`, `BuildOutputParserTest.java`, `SupplyChainServiceTest.java`, `MavenIntegrationTest.java`, `BuildConfigurationValidationTest.java`, `MavenSecurityTest.java`, `BuildConfigValidatorTest.java`, `ResourceTemplateServiceTest.java`, `TestFlakinessServiceTest.java`, `AsyncBuildServiceTest.java`, `SbtProjectServiceTest.java`, `DependencyResourceServiceTest.java`, `DependencyConflictServiceTest.java`, `BuildPerformanceServiceTest.java`, `JavaVersionServiceTest.java`, and `TransportConfigTest.java`.
+397 tests covering security, functionality, and integration across 23 test classes. See `GradleServiceTest.java`, `SbtBuildToolTest.java`, `DependencyServiceTest.java`, `ToolAuthorizationServiceTest.java`, `BuildAuthServiceTest.java`, `BuildCacheServiceTest.java`, `MavenInvokerTest.java`, `BuildOutputParserTest.java`, `SupplyChainServiceTest.java`, `MavenIntegrationTest.java`, `BuildConfigurationValidationTest.java`, `MavenSecurityTest.java`, `BuildConfigValidatorTest.java`, `ResourceTemplateServiceTest.java`, `TestFlakinessServiceTest.java`, `AsyncBuildServiceTest.java`, `SbtProjectServiceTest.java`, `DependencyResourceServiceTest.java`, `DependencyConflictServiceTest.java`, `BuildPerformanceServiceTest.java`, `JavaVersionServiceTest.java`, `SyncProcessRunnerTest.java`, and `TransportConfigTest.java`.
 
 ## CI/CD
 
-Every PR runs on 3 JDK versions (21, 23, 25) with test coverage reporting (48% instruction, 33% branch, 46% line). CI file: `.github/workflows/ci.yml`.
+Every PR runs on 3 JDK versions (21, 23, 25) with enforced test coverage (67% instruction, 57% branch, 67% line; build fails below 60% line / 50% branch). CI file: `.github/workflows/ci.yml`.
 
 ## Contributing
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Coverage Gate**: JaCoCo `report` and `check` bound to `verify`; the build now fails below 60% line / 50% branch coverage (baseline 67% instruction / 57% branch / 67% line, excluding the bootstrap class). Thresholds are externalized as POM properties (`jacoco.line.coverage.min`, `jacoco.branch.coverage.min`)
 - **Container Probes**: /health/ready (readiness) and /health/live (liveness) endpoints for Kubernetes and Docker orchestration
 - **CLI Launcher Script**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT installations. Supports `--http` flag for Streamable HTTP mode
 - **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability — tools, resources, prompts, transports, runtime requirements
@@ -36,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - detect_build_tool tool with structured JSON output and project structure hints
 - Docker support with multi-stage build
 - Maven Release Package workflow for tagged releases
-- 375 tests across security, functionality, integration, and MCP protocol compliance
+- 397 tests across security, functionality, integration, and MCP protocol compliance
 - 39 MCP tools total: build execution, version queries, output analysis, dependency management, credential scanning, conflict detection, Java version compatibility, build performance profiling, SBT project analysis, resource exposure, prompt templates, resource template management, async build tasks, tool authorization, security auditing, build cache health analysis, SBOM generation, test flakiness detection
 
 - **SBOM Generation & Supply Chain Audit**: 3 new tools — `generate_sbom` (CycloneDX/SPDX SBOM generation for Maven/Gradle/SBT), `audit_supply_chain` (OSV.dev vulnerability cross-referencing with CVE severity and remediation), `check_license_compliance` (license classification: permissive/copyleft/restricted with risk assessment). Includes CycloneDX plugin detection, pre-existing SBOM discovery, dependency file parsing, and batch vulnerability lookups.

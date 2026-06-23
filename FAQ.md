@@ -35,7 +35,7 @@ Yes. The primary deployment model is a plain JAR: `java -jar mcp-server-jvm-buil
 
 ### Is this production-ready?
 
-The project is pre-1.0 (v0.1.x) but actively maintained with 375 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
+The project is pre-1.0 (v0.1.x) but actively maintained with 397 tests, a CI matrix across JDK 21/23/25, and a layered security model. It's used in real agentic workflows. Breaking changes may occur before 1.0.
 
 ### What's the difference between this and arvindand/maven-tools-mcp?
 
@@ -233,11 +233,11 @@ cd mcp-server-jvm-build-tools
 mvn verify
 ```
 
-375 tests across 22 test classes covering security, functionality, integration, SBT project analysis, dependency conflict detection, build performance profiling, credential scanning, Java version compatibility, build cache health analysis, and MCP protocol compliance. Tests do NOT require actual Maven/Gradle/SBT installations — the security and validation tests are unit tests.
+397 tests across 23 test classes covering security, functionality, integration, SBT project analysis, dependency conflict detection, build performance profiling, credential scanning, Java version compatibility, build cache health analysis, and MCP protocol compliance. Tests do NOT require actual Maven/Gradle/SBT installations — the security and validation tests are unit tests.
 
 ### What's the coverage?
 
-48% instruction, 33% branch, 46% line coverage (JaCoCo). Enforcement thresholds are not yet configured in the POM. The lower branch coverage is expected — many branches handle edge cases and error paths that are tested indirectly through security and integration tests.
+67% instruction, 57% branch, 67% line coverage (JaCoCo), measured excluding the bootstrap class. Enforcement thresholds are configured in the POM and checked during `verify`: the build fails below 60% line or 50% branch coverage. The lower branch coverage is expected — many branches handle edge cases and error paths that are tested indirectly through security and integration tests.
 
 ### Where do I report bugs or request features?
 
