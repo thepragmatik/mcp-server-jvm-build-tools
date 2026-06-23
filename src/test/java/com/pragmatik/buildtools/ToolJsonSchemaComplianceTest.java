@@ -62,10 +62,13 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>When a {@code $schema} keyword is present it declares 2020-12 (the spec default when absent).
  *   <li>Each schema validates against the official JSON Schema 2020-12 meta-schema, within a bounded
  *       validation time budget.
- *   <li>Each schema compiles cleanly under the 2020-12 dialect, proving every {@code $ref} resolves.
+ *   <li>Each schema compiles cleanly under the 2020-12 dialect (it loads/parses without error under
+ *       the official dialect; note {@code com.networknt} v3 resolves {@code $ref} lazily, so compilation
+ *       alone does not eagerly resolve references — real local {@code $ref} resolution is proven by the
+ *       composition guard test via instance validation).
  *   <li>No schema relies on auto-dereferencing of <strong>external</strong> {@code $ref} URIs — only
  *       local fragment references ({@code #...}) are permitted.
- *   <li>Schema nesting depth and {@code $defs} count are bounded (defense for composition keywords such
+ *   <li>Schema container-nesting depth and {@code $defs} count are bounded (defense for composition keywords such
  *       as {@code oneOf}/{@code anyOf}/{@code allOf}), bounding resource and validation cost.
  * </ul>
  *
@@ -81,7 +84,7 @@ class ToolJsonSchemaComplianceTest {
     /** Canonical JSON Schema 2020-12 dialect identifier. */
     private static final String DIALECT_2020_12 = "https://json-schema.org/draft/2020-12/schema";
 
-    /** Upper bound on schema nesting depth (bounds composition-keyword resource cost). */
+    /** Upper bound on schema container-nesting depth (bounds composition-keyword resource cost). */
     private static final int MAX_SCHEMA_DEPTH = 20;
 
     /** Upper bound on the total number of {@code $defs}/{@code definitions} entries. */
@@ -182,7 +185,10 @@ class ToolJsonSchemaComplianceTest {
                 .as("schema must validate against the JSON Schema 2020-12 meta-schema")
                 .isEmpty();
 
-        // Compiling under the 2020-12 dialect proves every local $ref resolves.
+        // Compiling under the 2020-12 dialect proves the schema loads/parses without error. Note that
+        // com.networknt v3 resolves $ref lazily (at validate() time), so this does not by itself prove
+        // local $ref resolution; that guarantee is exercised by the composition guard test via instance
+        // validation. External $ref dereferencing is forbidden by the explicit local-ref check below.
         assertDoesNotThrow(() -> registry.getSchema(root), "schema must compile under the 2020-12 dialect");
 
         // No external $ref dereferencing: only local fragment references are allowed.
@@ -195,7 +201,9 @@ class ToolJsonSchemaComplianceTest {
         }
 
         // Bound resource cost for composition / deeply nested schemas.
-        assertThat(maxDepth(root)).as("schema nesting depth must be bounded").isLessThanOrEqualTo(MAX_SCHEMA_DEPTH);
+        assertThat(maxDepth(root))
+                .as("schema container-nesting depth must be bounded")
+                .isLessThanOrEqualTo(MAX_SCHEMA_DEPTH);
         assertThat(countDefsEntries(root))
                 .as("schema $defs count must be bounded")
                 .isLessThanOrEqualTo(MAX_DEFS);
