@@ -19,7 +19,6 @@ package com.pragmatik.buildtools;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,18 +36,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ServerCardController {
 
-    @Value("${spring.application.name:mcp-server-jvm-build-tools}")
-    private String applicationName;
+    private final McpServerIdentity identity;
 
-    @Value("${buildtools.version:0.1.1-SNAPSHOT}")
-    private String version;
+    public ServerCardController(McpServerIdentity identity) {
+        this.identity = identity;
+    }
 
     @GetMapping(value = "/.well-known/mcp-server", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> serverCard() {
         Map<String, Object> card = new LinkedHashMap<>();
 
-        card.put("name", applicationName);
-        card.put("version", version);
+        card.put("name", identity.name());
+        card.put("version", identity.version());
         card.put(
                 "description",
                 "MCP Server for JVM build tools: Maven, Gradle, and SBT. "
@@ -56,30 +55,23 @@ public class ServerCardController {
                         + "analyze build output, validate configurations, scan credentials, "
                         + "and detect dependency conflicts — all through a unified MCP API.");
 
-        card.put("vendor", "The Pragmatik");
+        card.put("vendor", identity.vendor());
         card.put("homepage", "https://github.com/thepragmatik/mcp-server-jvm-build-tools");
         card.put("license", "Apache-2.0");
 
         List<String> transports = List.of("stdio", "streamable-http");
         card.put("transports", transports);
 
-        List<String> protocolVersions = List.of("2024-11-05", "2025-03-26", "2026-07-28");
-        card.put("mcpVersions", protocolVersions);
+        card.put("mcpVersions", identity.protocolVersions());
 
         // 2026-07-28 RC: stateless Streamable HTTP transport (no sessions / no SSE
         // resumability) and the server/discover RPC for up-front version selection.
         card.put("discover", "/mcp/discover");
-        Map<String, Object> transportInfo = new LinkedHashMap<>();
-        transportInfo.put("type", "streamable-http");
-        transportInfo.put("stateless", true);
-        transportInfo.put("sessions", false);
-        transportInfo.put("sseResumability", false);
-        card.put("transportProfile", transportInfo);
+        card.put("transportProfile", identity.transportProfile());
 
-        Map<String, Object> capabilities = new LinkedHashMap<>();
-        capabilities.put("tools", true);
-        capabilities.put("resources", true);
-        capabilities.put("prompts", true);
+        // Core MCP capabilities come from the single shared source (same object shape as
+        // server/discover); logging/extensions are card-only metadata layered on top.
+        Map<String, Object> capabilities = identity.capabilities();
         capabilities.put("logging", false);
         capabilities.put("extensions", Map.of("tasks", true, "mcpApps", true));
         card.put("capabilities", capabilities);
@@ -138,7 +130,7 @@ public class ServerCardController {
     public Map<String, Object> health() {
         Map<String, Object> h = new LinkedHashMap<>();
         h.put("status", "UP");
-        h.put("version", version);
+        h.put("version", identity.version());
         h.put("transport", "streamable-http");
         return h;
     }
@@ -147,7 +139,7 @@ public class ServerCardController {
     public Map<String, Object> readiness() {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("status", "READY");
-        r.put("version", version);
+        r.put("version", identity.version());
         r.put("availableBuildTools", List.of("maven", "gradle", "sbt"));
         return r;
     }

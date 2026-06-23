@@ -17,9 +17,7 @@
 package com.pragmatik.buildtools;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,22 +41,22 @@ import org.springframework.web.bind.annotation.RestController;
  *       echoing the request {@code id}.</li>
  * </ul>
  * The payload is stateless and identical on every call (no per-connection variance),
- * consistent with the RC's stateless transport. When the Spring AI MCP server starter
- * is wired in, the framework routes the {@code server/discover} JSON-RPC method through
+ * consistent with the RC's stateless transport. Server identity, protocol versions,
+ * transport profile, and capabilities are all resolved from the shared
+ * {@link McpServerIdentity}, so this surface can never drift from the server card or
+ * the {@code Mcp-Name} HeaderMismatch check. When the Spring AI MCP server starter is
+ * wired in, the framework routes the {@code server/discover} JSON-RPC method through
  * the transport; this controller provides the reachable, dependency-free surface today.
  */
 @RestController
 @RequestMapping("/mcp/discover")
 public class McpDiscoverController {
 
-    /** Protocol versions this server can speak (oldest to newest). */
-    static final List<String> SUPPORTED_PROTOCOL_VERSIONS = List.of("2024-11-05", "2025-03-26", "2026-07-28");
+    private final McpServerIdentity identity;
 
-    @Value("${spring.ai.mcp.server.name:${spring.application.name:mcp-server-jvm-build-tools}}")
-    private String serverName = "mcp-server-jvm-build-tools";
-
-    @Value("${spring.ai.mcp.server.version:${buildtools.version:0.1.1-SNAPSHOT}}")
-    private String serverVersion = "0.1.1-SNAPSHOT";
+    public McpDiscoverController(McpServerIdentity identity) {
+        this.identity = identity;
+    }
 
     /**
      * Plain-JSON probe form of {@code server/discover}.
@@ -99,29 +97,21 @@ public class McpDiscoverController {
         Map<String, Object> result = new LinkedHashMap<>();
 
         Map<String, Object> serverInfo = new LinkedHashMap<>();
-        serverInfo.put("name", serverName);
-        serverInfo.put("version", serverVersion);
-        serverInfo.put("vendor", "The Pragmatik");
+        serverInfo.put("name", identity.name());
+        serverInfo.put("version", identity.version());
+        serverInfo.put("vendor", identity.vendor());
         result.put("serverInfo", serverInfo);
 
-        result.put("protocolVersions", SUPPORTED_PROTOCOL_VERSIONS);
+        result.put("protocolVersions", identity.protocolVersions());
         // Latest version this server prefers, for clients that want a single value.
-        result.put("latestProtocolVersion", SUPPORTED_PROTOCOL_VERSIONS.get(SUPPORTED_PROTOCOL_VERSIONS.size() - 1));
+        result.put("latestProtocolVersion", identity.latestProtocolVersion());
 
-        // Capabilities advertised as MCP capability objects ({} == supported).
-        Map<String, Object> capabilities = new LinkedHashMap<>();
-        capabilities.put("tools", Map.of("listChanged", false));
-        capabilities.put("resources", Map.of("listChanged", false, "subscribe", false));
-        capabilities.put("prompts", Map.of("listChanged", false));
-        result.put("capabilities", capabilities);
+        // Capabilities advertised as MCP capability objects ({} == supported), from the
+        // single shared source so the card and this surface use one identical shape.
+        result.put("capabilities", identity.capabilities());
 
         // Transport characteristics (RC: stateless Streamable HTTP, no sessions/SSE-resumability).
-        Map<String, Object> transport = new LinkedHashMap<>();
-        transport.put("type", "streamable-http");
-        transport.put("stateless", true);
-        transport.put("sessions", false);
-        transport.put("sseResumability", false);
-        result.put("transport", transport);
+        result.put("transport", identity.transportProfile());
 
         return result;
     }

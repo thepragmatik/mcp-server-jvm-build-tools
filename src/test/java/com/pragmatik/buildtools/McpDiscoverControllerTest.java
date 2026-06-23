@@ -23,7 +23,6 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Tests for {@link McpDiscoverController} — the {@code server/discover} RPC
@@ -36,9 +35,7 @@ class McpDiscoverControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new McpDiscoverController();
-        ReflectionTestUtils.setField(controller, "serverName", "test-server");
-        ReflectionTestUtils.setField(controller, "serverVersion", "9.9.9");
+        controller = new McpDiscoverController(new McpServerIdentity("test-server", "9.9.9"));
     }
 
     @Test
@@ -99,6 +96,6 @@ class McpDiscoverControllerTest {
     @Test
     @DisplayName("supported protocol versions include the 2026-07-28 RC")
     void supportedVersionsConstant() {
-        assertThat(McpDiscoverController.SUPPORTED_PROTOCOL_VERSIONS).contains("2026-07-28");
+        assertThat(McpServerIdentity.SUPPORTED_PROTOCOL_VERSIONS).contains("2026-07-28");
     }
 }
