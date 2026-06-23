@@ -277,7 +277,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 | "Connection refused" | JAR not built | Run `mvn clean package -DskipTests` |
 | "Java not found" | Java 21+ not installed | Install JDK 21+ and set `JAVA_HOME` |
 | Tools not appearing | Client not restarted | Restart client after adding config |
-| CORS errors | Allowed origins not set | Set `mcp.transport.cors.allowed-origins=*` |
+| CORS errors | Calling origin not allowed | Add your origin to `mcp.transport.cors.allowed-origins` (e.g. `https://dashboard.example.com`). Defaults to local origins only; `*` is for local testing only, never production. |
 | "Command not allowed" | Command not in allowlist | Use supported commands for your build tool |
 | SSE disconnects | Timeout too short | Increase `mcp.transport.sse.timeout-ms` |
 | Slow startup | JVM cold start | Use `-Xmx256m -XX:TieredStopAtLevel=1` |

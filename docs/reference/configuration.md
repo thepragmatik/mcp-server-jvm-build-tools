@@ -68,7 +68,7 @@ The shipped `application.properties` is baked into the JAR. Override at runtime 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `management.endpoints.web.exposure.include` | `health,info` | Exposed Actuator endpoints. |
-| `management.endpoint.health.show-details` | `always` | Include health details. |
+| `management.endpoint.health.show-details` | `when-authorized` | Expose detailed health information only to authorized principals. Because Spring Security is not on the classpath by default, no principal is ever authorized, so details are hidden from everyone (effectively `never`) until you add `spring-boot-starter-security` and configure roles. Set to `always` for unauthenticated local debugging (not recommended in production). |
 | `management.endpoint.health.probes.enabled` | `true` | Enable readiness/liveness probes. |
 
 ### Streamable HTTP transport
@@ -84,7 +84,7 @@ java -Dspring.profiles.active=http -Dserver.port=8080 \
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.port` | `8080` | HTTP port (effective only with the `http` profile). |
-| `mcp.transport.cors.allowed-origins` | `*` | Comma-separated CORS origins. Use `*` for development only. |
+| `mcp.transport.cors.allowed-origins` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated CORS origins permitted to call `/mcp/**`. Restricted to local origins by default (no wildcard). List specific origins to widen for development; `*` is honoured for local testing only and must never be used in production. |
 | `mcp.transport.sse.timeout-ms` | `1800000` | SSE stream timeout in milliseconds (30 minutes). |
 | `mcp.transport.sse.max-subscribers` | `100` | Maximum concurrent SSE subscribers. |
 | `mcp.transport.include-timing` | `true` | Include timing info in response headers. |

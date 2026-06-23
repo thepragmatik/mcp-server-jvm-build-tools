@@ -138,8 +138,11 @@ Relevant properties (see the [Configuration Reference](../reference/configuratio
 for the complete set):
 
 ```properties
-# Comma-separated CORS origins ("*" for development only).
-mcp.transport.cors.allowed-origins=*
+# Comma-separated CORS origins. Restricted to local origins by default (no wildcard).
+# Widen for development by listing specific origins, e.g.:
+#   mcp.transport.cors.allowed-origins=https://dashboard.example.com
+# "*" is honoured for local testing only and must never be used in production.
+mcp.transport.cors.allowed-origins=http://localhost:8080,http://127.0.0.1:8080
 # SSE stream timeout in milliseconds (default: 30 minutes).
 mcp.transport.sse.timeout-ms=1800000
 # Maximum concurrent SSE subscribers.

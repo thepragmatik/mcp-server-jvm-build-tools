@@ -83,14 +83,38 @@ The server supports two transport modes with different attack surfaces:
 
 - **stdio** — Default. No network port, no HTTP endpoint, no TLS. Attack surface: MCP JSON-RPC messages (stdin/stdout), filesystem paths, spawned processes.
 
-- **Streamable HTTP** — Enabled via `--http` flag. HTTP server on port 8081 (configurable) with SSE, CORS, health endpoints. Additional attack surface: network exposure, CORS misconfiguration, unauthenticated endpoints. Deploy behind a TLS-terminating reverse proxy for production HTTPS.
+- **Streamable HTTP** — Opt-in via the `http` Spring profile (the launcher's `--http` flag). An embedded servlet container listens on `server.port` (default `8080`) with SSE, CORS, and health endpoints. Additional attack surface: network exposure, CORS misconfiguration, unauthenticated endpoints. **Deploy behind a TLS-terminating reverse proxy** for production HTTPS.
+
+### Safe HTTP defaults
+
+The HTTP transport ships with hardened defaults so that enabling it does not
+silently widen the attack surface:
+
+- **Restricted CORS (no wildcard).** Cross-origin access defaults to local
+  origins only — `mcp.transport.cors.allowed-origins=http://localhost:8080,http://127.0.0.1:8080`.
+  This is enforced in code via `allowedOrigins(...)` (exact match), not
+  `allowedOriginPatterns("*")`.
+  - **Widen for development** by listing specific origins, e.g.
+    `mcp.transport.cors.allowed-origins=https://dashboard.example.com`.
+  - A wildcard (`mcp.transport.cors.allowed-origins=*`) is honoured **for local
+    testing only** and is applied via `allowedOriginPatterns` to remain valid
+    alongside credentialed requests. Never use `*` in production.
+- **Health details gated.** `management.endpoint.health.show-details=when-authorized`
+  so unauthenticated callers see only `UP`/`DOWN`, never component-level
+  internals (disk paths, dependency status, etc.). Because Spring Security is not
+  on the classpath by default, no principal is ever authorized, so details are
+  hidden from everyone (effectively `never`) until `spring-boot-starter-security`
+  is added and roles are configured. Set it to `always` only for trusted local
+  debugging.
 
 ## Configuration Hardening
 
-- spring.main.web-application-type=none (no web server)
+- spring.main.web-application-type=none (no web server unless the `http` profile is active)
 - spring.main.banner-mode=off (clean stdio)
 - logging.level.org.springframework=WARN (minimal noise)
 - spring.jackson.deserialization.fail-on-unknown-properties=false (MCP forward-compat)
+- mcp.transport.cors.allowed-origins=http://localhost:8080,http://127.0.0.1:8080 (restricted CORS; no wildcard by default)
+- management.endpoint.health.show-details=when-authorized (no health internals to unauthenticated callers; hidden from everyone until Spring Security is added)
 
 ## Security Update Process
 
