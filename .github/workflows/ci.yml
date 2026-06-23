@@ -27,8 +27,12 @@ jobs:
           java-version: ${{ matrix.java }}
           distribution: temurin
           cache: maven
+      # Spotless and SpotBugs are JDK-independent and are run authoritatively
+      # once in the single-JDK `quality` job below. They are skipped here so the
+      # cross-JDK runtime/test matrix never breaks on formatter/analyzer JDK
+      # compatibility (they still run in a plain local `mvn verify`).
       - name: Build, test, and verify coverage
-        run: ./mvnw -B verify --file pom.xml --no-transfer-progress
+        run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
