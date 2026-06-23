@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Security and adversarial tests for command parsing and input validation.
@@ -155,6 +156,93 @@ class MavenSecurityTest {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> MavenInvoker.getCommands("mvn clean && rm -rf /"))
                     .withMessageContaining("Command not allowed");
+        }
+    }
+
+    @Nested
+    @DisplayName("-D system-property deny-list (issue #79)")
+    class SystemPropertyDenyList {
+
+        @Test
+        @DisplayName("-Dmaven.ext.class.path is rejected")
+        void mavenExtClassPathBlocked() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean -Dmaven.ext.class.path=/tmp/evil.jar"))
+                    .withMessageContaining("Blocked system property")
+                    .withMessageContaining("maven.ext.class.path");
+        }
+
+        @Test
+        @DisplayName("-Dmaven.repo.local is rejected")
+        void mavenRepoLocalBlocked() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean -Dmaven.repo.local=/tmp/pwned-repo"))
+                    .withMessageContaining("Blocked system property")
+                    .withMessageContaining("maven.repo.local");
+        }
+
+        @Test
+        @DisplayName("-Dmaven.multiModuleProjectDirectory is rejected")
+        void mavenMultiModuleProjectDirectoryBlocked() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/sneaky"))
+                    .withMessageContaining("Blocked system property")
+                    .withMessageContaining("maven.multiModuleProjectDirectory");
+        }
+
+        @Test
+        @DisplayName("blocked -D key is rejected even without a value")
+        void blockedKeyWithoutValue() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean -Dmaven.repo.local"))
+                    .withMessageContaining("Blocked system property");
+        }
+
+        @Test
+        @DisplayName("blocked -D key is rejected among other legitimate flags")
+        void blockedKeyAmongLegitFlags() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands(
+                            "mvn clean install -DskipTests -Dmaven.repo.local=/x -B"))
+                    .withMessageContaining("Blocked system property");
+        }
+
+        @Test
+        @DisplayName("deny-list matches the exact key only (prefix/suffix variants pass)")
+        void exactKeyMatchOnly() {
+            // A key that merely starts with a blocked name must NOT be rejected.
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean -Dmaven.repo.local.backup=/tmp/x");
+            assertThat(result).containsExactly("clean", "-Dmaven.repo.local.backup=/tmp/x");
+
+            // A key that merely ends with a blocked name must NOT be rejected.
+            String[] result2 = MavenInvoker.getCommands(
+                    "mvn clean -Dnot.maven.repo.local=/tmp/x");
+            assertThat(result2).containsExactly("clean", "-Dnot.maven.repo.local=/tmp/x");
+        }
+
+        @Test
+        @DisplayName("legitimate -D flags still pass after hardening")
+        void legitimateFlagsStillPass() {
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean install -DskipTests -Dmaven.test.failure.ignore=true -B");
+            assertThat(result).containsExactly(
+                    "clean", "install", "-DskipTests",
+                    "-Dmaven.test.failure.ignore=true", "-B");
+        }
+
+        @Test
+        @DisplayName("error message names the offending token and the denied keys")
+        void errorMessageIsInformative() {
+            assertThatThrownBy(() -> MavenInvoker.getCommands(
+                    "mvn clean -Dmaven.ext.class.path=/tmp/x"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("-Dmaven.ext.class.path=/tmp/x")
+                    .hasMessageContaining("maven.ext.class.path");
         }
     }
 }

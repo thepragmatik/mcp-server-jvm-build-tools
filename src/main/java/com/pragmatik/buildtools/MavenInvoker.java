@@ -117,6 +117,44 @@ public class MavenInvoker {
     private static final Pattern SAFE_ARG_PATTERN =
             Pattern.compile("^-{1,2}[A-Za-z0-9][A-Za-z0-9._-]*(=[A-Za-z0-9._/:@\\-]*)?$");
 
+    // Behavior-altering Maven system properties that must NOT be settable via -D.
+    // Although SAFE_ARG_PATTERN blocks shell metacharacters, it admits any -Dkey=value.
+    // These keys can redirect class loading (maven.ext.class.path), the artifact
+    // repository location (maven.repo.local), or multi-module project root
+    // detection (maven.multiModuleProjectDirectory), letting an operator alter build
+    // behavior beyond the allowlisted lifecycle phases. Match is case-sensitive and
+    // exact on the property key (the part between '-D' and '='), consistent with
+    // Maven's own case-sensitive system-property handling.
+    private static final Set<String> BLOCKED_SYSTEM_PROPERTY_KEYS = Set.of(
+            "maven.ext.class.path",
+            "maven.repo.local",
+            "maven.multiModuleProjectDirectory"
+    );
+
+    /**
+     * Returns {@code true} when the token is a {@code -D} (or {@code --D}) system
+     * property whose key is on the {@link #BLOCKED_SYSTEM_PROPERTY_KEYS} deny-list.
+     * The key is the substring between the leading dashes + {@code D} and the first
+     * {@code =} (or the whole remainder when no {@code =} is present); a bare
+     * {@code -D} with no key is not a property and is not blocked here.
+     */
+    private static boolean isBlockedSystemProperty(String token) {
+        String body;
+        if (token.startsWith("--D")) {
+            body = token.substring(3);
+        } else if (token.startsWith("-D")) {
+            body = token.substring(2);
+        } else {
+            return false;
+        }
+        if (body.isEmpty()) {
+            return false;
+        }
+        int eq = body.indexOf('=');
+        String key = (eq < 0) ? body : body.substring(0, eq);
+        return BLOCKED_SYSTEM_PROPERTY_KEYS.contains(key);
+    }
+
     static String[] getCommands(String command) {
         Objects.requireNonNull(command, "command must not be null");
 
@@ -163,6 +201,16 @@ public class MavenInvoker {
                 throw new IllegalArgumentException(
                         "Invalid flag/argument: " + token);
             }
+
+            // Deny-list behavior-altering -D system properties by key. This is a
+            // targeted hardening on top of SAFE_ARG_PATTERN, which otherwise admits
+            // any well-formed -Dkey=value.
+            if (isBlockedSystemProperty(token)) {
+                throw new IllegalArgumentException(
+                        "Blocked system property: " + token +
+                                ". Denied -D keys: " + BLOCKED_SYSTEM_PROPERTY_KEYS);
+            }
+
             validated.add(token);
         }
 
