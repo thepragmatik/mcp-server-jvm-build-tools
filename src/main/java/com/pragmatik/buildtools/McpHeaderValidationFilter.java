@@ -31,7 +31,9 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
@@ -39,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StreamUtils;
 
 /**
  * Validates the standard MCP request headers ({@code Mcp-Method}, {@code Mcp-Name})
@@ -53,6 +54,11 @@ import org.springframework.util.StreamUtils;
  *   <li>{@code Mcp-Method} must equal the JSON-RPC {@code method} of the body.</li>
  *   <li>{@code Mcp-Name} must equal this server's configured name (identity).</li>
  * </ul>
+ * The server identity used for the {@code Mcp-Name} check is resolved from the
+ * shared {@link McpServerIdentity}, which is the same single source the server card
+ * ({@code /.well-known/mcp-server}) and {@code server/discover} advertise. A client
+ * that reads the card's {@code name} and echoes it as {@code Mcp-Name} therefore
+ * always matches — the three surfaces cannot drift.
  *
  * <h2>Backward compatibility (additive / opt-in)</h2>
  * The headers are <b>required</b> only by the 2026-07-28 RC. Older MCP clients
@@ -68,6 +74,13 @@ import org.springframework.util.StreamUtils;
  * </ul>
  * It therefore never changes the behaviour seen by an existing, well-formed client;
  * it only catches genuinely self-contradictory requests.
+ *
+ * <h2>Bounded buffering</h2>
+ * To inspect the body the filter buffers it, but only up to a configurable cap
+ * ({@code mcp.transport.max-validation-body-bytes}, default 1 MiB). A request that
+ * exceeds the cap is rejected with HTTP {@code 413} before the whole body is
+ * materialised, so the opt-in HTTP transport has no unbounded memory-amplification
+ * surface. The buffered bytes are parsed in place (no defensive array copy).
  *
  * <p>The filter is dormant unless the HTTP transport is active (it only acts on
  * {@code POST /mcp/**}); in the default stdio mode there is no servlet container.
@@ -87,16 +100,32 @@ public class McpHeaderValidationFilter implements Filter {
     /** JSON-RPC "Invalid Request" code, reused for the HeaderMismatch error. */
     static final int JSONRPC_INVALID_REQUEST = -32600;
 
+    /** Default body-buffer cap for validation: 1 MiB. */
+    static final int DEFAULT_MAX_VALIDATION_BODY_BYTES = 1_048_576;
+
     private final ObjectMapper objectMapper =
             new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     /**
-     * The server identity advertised to clients. {@code Mcp-Name}, when present,
-     * must match this value. Resolved from the MCP server name (falling back to the
-     * application name) so it stays consistent with the rest of the server card.
+     * The shared server identity. {@code Mcp-Name}, when present, must equal
+     * {@link McpServerIdentity#name()} — the same value the server card and
+     * {@code server/discover} publish.
      */
-    @Value("${spring.ai.mcp.server.name:${spring.application.name:mcp-server-jvm-build-tools}}")
-    private String serverName = "mcp-server-jvm-build-tools";
+    private final McpServerIdentity identity;
+
+    /**
+     * Maximum number of body bytes buffered for validation. A larger body is rejected
+     * with HTTP {@code 413} before being fully read, capping memory use.
+     */
+    private final int maxValidationBodyBytes;
+
+    public McpHeaderValidationFilter(
+            McpServerIdentity identity,
+            @Value("${mcp.transport.max-validation-body-bytes:1048576}") int maxValidationBodyBytes) {
+        this.identity = identity;
+        this.maxValidationBodyBytes =
+                maxValidationBodyBytes > 0 ? maxValidationBodyBytes : DEFAULT_MAX_VALIDATION_BODY_BYTES;
+    }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -121,16 +150,22 @@ public class McpHeaderValidationFilter implements Filter {
             return;
         }
 
-        // Buffer the body so we can inspect it and still forward it downstream.
-        final CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(httpReq);
+        // Buffer the body (bounded) so we can inspect it and still forward it downstream.
+        final CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(httpReq, maxValidationBodyBytes);
+
+        // Reject oversized bodies before materialising the whole payload (DoS guard).
+        if (cached.exceedsLimit()) {
+            rejectTooLarge(httpRes);
+            return;
+        }
 
         String bodyMethod = null;
         Object bodyId = null;
         boolean parsed = false;
         try {
-            byte[] body = cached.getCachedBody();
-            if (body.length > 0) {
-                JsonNode root = objectMapper.readTree(body);
+            if (!cached.isBodyEmpty()) {
+                // Parse the buffered bytes in place (no defensive copy).
+                JsonNode root = objectMapper.readTree(cached.getInputStream());
                 if (root != null && root.isObject()) {
                     parsed = true;
                     JsonNode methodNode = root.get("method");
@@ -161,7 +196,7 @@ public class McpHeaderValidationFilter implements Filter {
         }
 
         // Mcp-Name disagreement: header must match this server's configured identity.
-        final String configuredName = trimToNull(serverName);
+        final String configuredName = trimToNull(identity.name());
         if (headerName != null && configuredName != null && !headerName.equals(configuredName)) {
             rejectMismatch(
                     httpRes,
@@ -192,10 +227,31 @@ public class McpHeaderValidationFilter implements Filter {
         response.getWriter().write(buildErrorBody(id, detail));
     }
 
+    private void rejectTooLarge(HttpServletResponse response) throws IOException {
+        log.debug("Rejecting MCP request: body exceeds {}-byte validation cap", maxValidationBodyBytes);
+        response.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter()
+                .write(buildJsonRpcError(
+                        null,
+                        "PayloadTooLargeError",
+                        "Request body exceeds the " + maxValidationBodyBytes
+                                + "-byte limit for MCP header validation"));
+    }
+
     /**
      * Build a JSON-RPC error envelope for the HeaderMismatch. Visible for testing.
      */
     static String buildErrorBody(Object id, String detail) {
+        return buildJsonRpcError(id, "HeaderMismatchError", detail);
+    }
+
+    /**
+     * Build a JSON-RPC error envelope with the given {@code message} and {@code detail}.
+     * The {@code id} is rendered as a number, a quoted/escaped string, or {@code null}.
+     */
+    private static String buildJsonRpcError(Object id, String message, String detail) {
         String idJson;
         if (id == null) {
             idJson = "null";
@@ -205,8 +261,8 @@ public class McpHeaderValidationFilter implements Filter {
             idJson = "\"" + JsonUtils.escapeJson(id.toString()) + "\"";
         }
         return "{\"jsonrpc\":\"2.0\",\"id\":" + idJson + ",\"error\":{\"code\":" + JSONRPC_INVALID_REQUEST
-                + ",\"message\":\"HeaderMismatchError\",\"data\":{\"detail\":\"" + JsonUtils.escapeJson(detail)
-                + "\"}}}";
+                + ",\"message\":\"" + JsonUtils.escapeJson(message) + "\",\"data\":{\"detail\":\""
+                + JsonUtils.escapeJson(detail) + "\"}}}";
     }
 
     private static String trimToNull(String value) {
@@ -218,22 +274,49 @@ public class McpHeaderValidationFilter implements Filter {
     }
 
     /**
-     * Wraps a request so its body can be read for validation and then replayed to
-     * the downstream transport. The body is buffered once in the constructor and
-     * every {@link #getInputStream()} / {@link #getReader()} call serves a fresh
-     * stream over that buffer.
+     * Wraps a request so its body can be read for validation and then replayed to the
+     * downstream transport. The body is buffered once in the constructor — bounded by a
+     * byte cap — and every {@link #getInputStream()} / {@link #getReader()} call serves a
+     * fresh stream over that buffer. If the body exceeds the cap, reading stops early and
+     * {@link #exceedsLimit()} reports {@code true}; callers must reject such a request
+     * (the buffered prefix must not be forwarded as if it were a complete body).
      */
     static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
         private final byte[] cachedBody;
+        private final boolean exceedsLimit;
 
-        CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
+        CachedBodyHttpServletRequest(HttpServletRequest request, int maxBytes) throws IOException {
             super(request);
-            this.cachedBody = StreamUtils.copyToByteArray(request.getInputStream());
+            int cap = maxBytes > 0 ? maxBytes : DEFAULT_MAX_VALIDATION_BODY_BYTES;
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            boolean over = false;
+            InputStream in = request.getInputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = in.read(chunk)) != -1) {
+                int remaining = cap - buffer.size();
+                if (read > remaining) {
+                    if (remaining > 0) {
+                        buffer.write(chunk, 0, remaining);
+                    }
+                    over = true;
+                    break;
+                }
+                buffer.write(chunk, 0, read);
+            }
+            this.cachedBody = buffer.toByteArray();
+            this.exceedsLimit = over;
         }
 
-        byte[] getCachedBody() {
-            return cachedBody.clone();
+        /** Whether the request body exceeded the validation byte cap. */
+        boolean exceedsLimit() {
+            return exceedsLimit;
+        }
+
+        /** Whether the buffered body is empty. */
+        boolean isBodyEmpty() {
+            return cachedBody.length == 0;
         }
 
         @Override

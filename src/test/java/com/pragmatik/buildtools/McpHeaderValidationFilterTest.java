@@ -17,7 +17,9 @@
 package com.pragmatik.buildtools;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.StreamUtils;
 
 /**
@@ -37,14 +38,15 @@ import org.springframework.util.StreamUtils;
 @DisplayName("McpHeaderValidationFilter")
 class McpHeaderValidationFilterTest {
 
-    private static final String SERVER_NAME = "MCP Server - Build Tools for the JVM Server";
+    private static final String SERVER_NAME = "MCP Server - Build Tools for the JVM";
 
     private McpHeaderValidationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new McpHeaderValidationFilter();
-        ReflectionTestUtils.setField(filter, "serverName", SERVER_NAME);
+        filter = new McpHeaderValidationFilter(
+                new McpServerIdentity(SERVER_NAME, "9.9.9"),
+                McpHeaderValidationFilter.DEFAULT_MAX_VALIDATION_BODY_BYTES);
     }
 
     private static MockHttpServletRequest mcpPost(String body) {
@@ -163,7 +165,7 @@ class McpHeaderValidationFilterTest {
             MockHttpServletRequest req = mcpPost("{\"method\":\"tools/list\"}");
             MockFilterChain chain = new MockFilterChain();
 
-            filter.doFilter(req, new NotHttpResponse(), chain);
+            filter.doFilter(req, mock(ServletResponse.class), chain);
 
             assertThat(chain.getRequest()).isSameAs(req);
         }
@@ -242,68 +244,48 @@ class McpHeaderValidationFilterTest {
         }
     }
 
-    /** Minimal non-HTTP servlet response used to exercise the early pass-through branch. */
-    private static final class NotHttpResponse implements jakarta.servlet.ServletResponse {
-        @Override
-        public String getCharacterEncoding() {
-            return StandardCharsets.UTF_8.name();
+    @Nested
+    @DisplayName("bounded body buffering")
+    class BodySizeCap {
+
+        /** A filter with a deliberately tiny cap so we don't need a megabyte-sized body. */
+        private McpHeaderValidationFilter cappedFilter(int maxBytes) {
+            return new McpHeaderValidationFilter(new McpServerIdentity(SERVER_NAME, "9.9.9"), maxBytes);
         }
 
-        @Override
-        public String getContentType() {
-            return "application/octet-stream";
+        @Test
+        @DisplayName("a body over the cap is rejected with 413 before being fully buffered")
+        void oversizedBodyRejected() throws Exception {
+            McpHeaderValidationFilter small = cappedFilter(8);
+            String body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"; // > 8 bytes
+            MockHttpServletRequest req = mcpPost(body);
+            req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            small.doFilter(req, res, chain);
+
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+            assertThat(res.getContentType()).contains("application/json");
+            assertThat(res.getContentAsString()).contains("PayloadTooLargeError");
+            // Oversized request must NOT reach downstream.
+            assertThat(chain.getRequest()).isNull();
         }
 
-        @Override
-        public jakarta.servlet.ServletOutputStream getOutputStream() {
-            return null;
-        }
+        @Test
+        @DisplayName("a body at/under the cap is validated and replayed unchanged")
+        void bodyWithinCapPassesThrough() throws Exception {
+            String body = "{\"method\":\"tools/list\"}";
+            McpHeaderValidationFilter small = cappedFilter(body.getBytes(StandardCharsets.UTF_8).length);
+            MockHttpServletRequest req = mcpPost(body);
+            req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
 
-        @Override
-        public java.io.PrintWriter getWriter() {
-            return null;
-        }
+            small.doFilter(req, res, chain);
 
-        @Override
-        public void setCharacterEncoding(String charset) {}
-
-        @Override
-        public void setContentLength(int len) {}
-
-        @Override
-        public void setContentLengthLong(long len) {}
-
-        @Override
-        public void setContentType(String type) {}
-
-        @Override
-        public void setBufferSize(int size) {}
-
-        @Override
-        public int getBufferSize() {
-            return 0;
-        }
-
-        @Override
-        public void flushBuffer() {}
-
-        @Override
-        public void resetBuffer() {}
-
-        @Override
-        public boolean isCommitted() {
-            return false;
-        }
-
-        @Override
-        public void reset() {}
-
-        @Override
-        public void setLocale(java.util.Locale loc) {}
-
-        @Override
-        public java.util.Locale getLocale() {
-            return java.util.Locale.getDefault();
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            assertThat(bodyOf(chain)).isEqualTo(body);
         }
     }
 }
