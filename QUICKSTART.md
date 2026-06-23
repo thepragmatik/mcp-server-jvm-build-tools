@@ -13,7 +13,7 @@ Get the MCP server running in 5 minutes. For detailed docs, see [README.md](READ
 ```bash
 git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
 cd mcp-server-jvm-build-tools
-./mvnw clean package -DskipTests
+./mvnw clean package -DskipTests      # use mvnw.cmd on Windows
 ```
 
 The JAR is at `target/mcp-server-jvm-build-tools.jar`.
