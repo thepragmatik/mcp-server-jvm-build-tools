@@ -68,7 +68,7 @@ The shipped `application.properties` is baked into the JAR. Override at runtime 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `management.endpoints.web.exposure.include` | `health,info` | Exposed Actuator endpoints. |
-| `management.endpoint.health.show-details` | `when-authorized` | Expose detailed health information only to authenticated principals. Set to `always` for unauthenticated local debugging (not recommended in production). |
+| `management.endpoint.health.show-details` | `when-authorized` | Expose detailed health information only to authorized principals. Because Spring Security is not on the classpath by default, no principal is ever authorized, so details are hidden from everyone (effectively `never`) until you add `spring-boot-starter-security` and configure roles. Set to `always` for unauthenticated local debugging (not recommended in production). |
 | `management.endpoint.health.probes.enabled` | `true` | Enable readiness/liveness probes. |
 
 ### Streamable HTTP transport

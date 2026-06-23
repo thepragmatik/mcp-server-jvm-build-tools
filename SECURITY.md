@@ -101,8 +101,11 @@ silently widen the attack surface:
     alongside credentialed requests. Never use `*` in production.
 - **Health details gated.** `management.endpoint.health.show-details=when-authorized`
   so unauthenticated callers see only `UP`/`DOWN`, never component-level
-  internals (disk paths, dependency status, etc.). Set it to `always` only for
-  trusted local debugging.
+  internals (disk paths, dependency status, etc.). Because Spring Security is not
+  on the classpath by default, no principal is ever authorized, so details are
+  hidden from everyone (effectively `never`) until `spring-boot-starter-security`
+  is added and roles are configured. Set it to `always` only for trusted local
+  debugging.
 
 ## Configuration Hardening
 
@@ -111,7 +114,7 @@ silently widen the attack surface:
 - logging.level.org.springframework=WARN (minimal noise)
 - spring.jackson.deserialization.fail-on-unknown-properties=false (MCP forward-compat)
 - mcp.transport.cors.allowed-origins=http://localhost:8080,http://127.0.0.1:8080 (restricted CORS; no wildcard by default)
-- management.endpoint.health.show-details=when-authorized (no health internals to unauthenticated callers)
+- management.endpoint.health.show-details=when-authorized (no health internals to unauthenticated callers; hidden from everyone until Spring Security is added)
 
 ## Security Update Process
 
