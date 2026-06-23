@@ -1,0 +1,12 @@
+# Pinned documentation build dependencies for the MkDocs Material site.
+#
+# Pinned for reproducible builds and supply-chain safety: the GitHub Pages
+# workflow installs exactly these versions instead of "whatever is latest",
+# so a yanked or compromised upstream release cannot silently land in a deploy.
+#
+# To refresh: bump the pins below, run `mkdocs build --strict` locally to
+# confirm the site still builds, then commit the change.
+mkdocs==1.6.1
+mkdocs-material==9.7.6
+mkdocs-minify-plugin==0.8.0
+pymdown-extensions==11.0

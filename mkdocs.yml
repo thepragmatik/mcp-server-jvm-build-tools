@@ -81,6 +81,7 @@ plugins:
 exclude_docs: |
   INDEX.md
   AUTHORIZATION.md
+  requirements.txt
 
 extra:
   social:
