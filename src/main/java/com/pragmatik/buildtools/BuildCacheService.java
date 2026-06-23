@@ -17,17 +17,14 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * MCP service for analyzing and optimizing build caching across JVM build tools.
@@ -48,16 +45,15 @@ public class BuildCacheService {
 
     // Gradle cache-related settings
     private static final Set<String> GRADLE_CACHE_PROPERTIES = Set.of(
-            "org.gradle.caching", "org.gradle.parallel",
-            "org.gradle.configureondemand", "org.gradle.configuration-cache",
-            "org.gradle.configuration-cache.problems"
-    );
+            "org.gradle.caching",
+            "org.gradle.parallel",
+            "org.gradle.configureondemand",
+            "org.gradle.configuration-cache",
+            "org.gradle.configuration-cache.problems");
 
     // Maven cache-related extensions
-    private static final Set<String> MAVEN_CACHE_EXTENSIONS = Set.of(
-            "maven-build-cache-extension", "takari-lifecycle",
-            "gradle-enterprise-maven-extension"
-    );
+    private static final Set<String> MAVEN_CACHE_EXTENSIONS =
+            Set.of("maven-build-cache-extension", "takari-lifecycle", "gradle-enterprise-maven-extension");
 
     private final BuildToolProvider toolProvider;
 
@@ -73,17 +69,17 @@ public class BuildCacheService {
      * opportunities. For Gradle, parses --info output for cache hit/miss
      * statistics when available.
      */
-    @Tool(name = "analyze_cache_health",
-          description = "Analyze build caching health across Maven, Gradle, and SBT projects. " +
-                        "Checks configuration for cache settings, detects cache-related plugins, " +
-                        "and identifies optimization opportunities. Returns JSON with " +
-                        "{tool, cacheHealth: {status, findings, recommendations, score}}.")
+    @Tool(
+            name = "analyze_cache_health",
+            description = "Analyze build caching health across Maven, Gradle, and SBT projects. "
+                    + "Checks configuration for cache settings, detects cache-related plugins, "
+                    + "and identifies optimization opportunities. Returns JSON with "
+                    + "{tool, cacheHealth: {status, findings, recommendations, score}}.")
     public String analyzeCacheHealth(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Build tool to analyze. Omit to auto-detect.")
-            String buildToolName) {
+                    @ToolParam(required = false, description = "Build tool to analyze. Omit to auto-detect.")
+                    String buildToolName) {
 
         Path dir;
         try {
@@ -113,17 +109,17 @@ public class BuildCacheService {
      * enabling and optimizing build caching, parallel execution,
      * incremental compilation, and daemon usage.
      */
-    @Tool(name = "optimize_build_cache",
-          description = "Generate cache optimization config snippets for a project. " +
-                        "Produces build-tool-specific recommendations for caching, " +
-                        "parallel execution, incremental compilation, and daemon usage. " +
-                        "Returns JSON with {tool, optimizations: [{area, recommendation, config}]}.")
+    @Tool(
+            name = "optimize_build_cache",
+            description = "Generate cache optimization config snippets for a project. "
+                    + "Produces build-tool-specific recommendations for caching, "
+                    + "parallel execution, incremental compilation, and daemon usage. "
+                    + "Returns JSON with {tool, optimizations: [{area, recommendation, config}]}.")
     public String optimizeBuildCache(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Build tool. Omit to auto-detect.")
-            String buildToolName) {
+                    @ToolParam(required = false, description = "Build tool. Omit to auto-detect.")
+                    String buildToolName) {
 
         Path dir;
         try {
@@ -172,8 +168,7 @@ public class BuildCacheService {
             case "maven" -> analyzeMavenCache(dir);
             case "gradle" -> analyzeGradleCache(dir);
             case "sbt" -> analyzeSbtCache(dir);
-            default -> Map.of("status", "UNKNOWN", "findings", List.of(
-                    "Unsupported build tool: " + toolName));
+            default -> Map.of("status", "UNKNOWN", "findings", List.of("Unsupported build tool: " + toolName));
         };
     }
 
@@ -214,8 +209,8 @@ public class BuildCacheService {
             }
 
             if (!hasCacheExt) {
-                findings.add("No build cache extension detected. " +
-                        "Consider maven-build-cache-extension for up to 90% faster incremental builds.");
+                findings.add("No build cache extension detected. "
+                        + "Consider maven-build-cache-extension for up to 90% faster incremental builds.");
             }
 
             // Check for parallel builds
@@ -227,8 +222,7 @@ public class BuildCacheService {
             }
 
             // Check for Maven 4 features
-            if (pom.contains("4.0.0") && (pom.contains("<mavenVersion>4") ||
-                    pom.contains("maven.compiler.release"))) {
+            if (pom.contains("4.0.0") && (pom.contains("<mavenVersion>4") || pom.contains("maven.compiler.release"))) {
                 findings.add("Using modern Maven features (Java release flag)");
                 score += 10;
             }
@@ -236,13 +230,12 @@ public class BuildCacheService {
             // Check for incremental compilation
             boolean hasCompilerPlugin = pom.contains("maven-compiler-plugin");
             if (hasCompilerPlugin) {
-                if (pom.contains("useIncrementalCompilation") &&
-                        pom.contains("true")) {
+                if (pom.contains("useIncrementalCompilation") && pom.contains("true")) {
                     findings.add("Incremental compilation enabled (good)");
                     score += 15;
                 } else {
-                    findings.add("Incremental compilation not explicitly enabled. " +
-                            "Configure <useIncrementalCompilation>true</useIncrementalCompilation>.");
+                    findings.add("Incremental compilation not explicitly enabled. "
+                            + "Configure <useIncrementalCompilation>true</useIncrementalCompilation>.");
                 }
             }
 
@@ -258,7 +251,8 @@ public class BuildCacheService {
                 }
             }
 
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
 
         // Status
         if (score >= 70) {
@@ -290,10 +284,13 @@ public class BuildCacheService {
                     if (line.isEmpty() || line.startsWith("#")) continue;
                     int eq = line.indexOf('=');
                     if (eq > 0) {
-                        props.put(line.substring(0, eq).trim(), line.substring(eq + 1).trim());
+                        props.put(
+                                line.substring(0, eq).trim(),
+                                line.substring(eq + 1).trim());
                     }
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
 
         // Build cache
@@ -312,8 +309,8 @@ public class BuildCacheService {
             findings.add("Configuration cache partially enabled. Set org.gradle.configuration-cache=true.");
             score += 10;
         } else {
-            findings.add("Configuration cache not enabled. " +
-                    "Set org.gradle.configuration-cache=true for up to 90% faster configuration.");
+            findings.add("Configuration cache not enabled. "
+                    + "Set org.gradle.configuration-cache=true for up to 90% faster configuration.");
         }
 
         // Parallel
@@ -346,8 +343,8 @@ public class BuildCacheService {
         }
 
         // Check for remote build cache
-        if (props.containsKey("org.gradle.cache.remote.push") ||
-                props.containsKey("org.gradle.enterprise.cache.remote")) {
+        if (props.containsKey("org.gradle.cache.remote.push")
+                || props.containsKey("org.gradle.enterprise.cache.remote")) {
             findings.add("Remote build cache configured (excellent for team builds)");
             score += 10;
         }
@@ -365,7 +362,8 @@ public class BuildCacheService {
                     score += 5;
                 }
             }
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
 
         // Status
         if (score >= 70) {
@@ -380,7 +378,9 @@ public class BuildCacheService {
         health.put("findings", findings);
 
         // Cache hit rate estimation (from --info output if available)
-        health.put("note", "For accurate cache hit rates, run: ./gradlew build --info | grep -E '(FROM-CACHE|UP-TO-DATE)'");
+        health.put(
+                "note",
+                "For accurate cache hit rates, run: ./gradlew build --info | grep -E '(FROM-CACHE|UP-TO-DATE)'");
 
         return health;
     }
@@ -412,9 +412,9 @@ public class BuildCacheService {
                 findings.add("Coursier dependency resolution detected (good)");
                 score += 15;
             } else {
-                findings.add("Coursier not explicitly configured. " +
-                        "Add 'addSbtPlugin(\"io.get-coursier\" % \"sbt-coursier\" % \"2.1.0\")' " +
-                        "for parallel dependency downloads.");
+                findings.add("Coursier not explicitly configured. "
+                        + "Add 'addSbtPlugin(\"io.get-coursier\" % \"sbt-coursier\" % \"2.1.0\")' "
+                        + "for parallel dependency downloads.");
             }
 
             // Incremental compilation (default in SBT 2.x)
@@ -422,18 +422,17 @@ public class BuildCacheService {
                 findings.add("Incremental compilation settings found (good)");
                 score += 25;
             } else {
-                findings.add("SBT incremental compilation uses defaults. " +
-                        "Enable explicitly with: incOptions := incOptions.value.withRecompileOnMacroDef(false)");
+                findings.add("SBT incremental compilation uses defaults. "
+                        + "Enable explicitly with: incOptions := incOptions.value.withRecompileOnMacroDef(false)");
             }
 
             // Parallel execution
-            if (content.contains("Global / concurrentRestrictions") ||
-                    content.contains("parallelExecution")) {
+            if (content.contains("Global / concurrentRestrictions") || content.contains("parallelExecution")) {
                 findings.add("Parallel test execution configured (good)");
                 score += 15;
             } else {
-                findings.add("Parallel execution not configured. " +
-                        "Use: Test / parallelExecution := true, Global / concurrentRestrictions := ...");
+                findings.add("Parallel execution not configured. "
+                        + "Use: Test / parallelExecution := true, Global / concurrentRestrictions := ...");
             }
 
             // Cross-build caching (Scala)
@@ -445,8 +444,8 @@ public class BuildCacheService {
             // Execution log analysis
             if (hasExecLog) {
                 try (Stream<Path> logs = Files.list(execLogDir)) {
-                    List<Path> logFiles = logs
-                            .filter(f -> f.getFileName().toString().startsWith("exec-"))
+                    List<Path> logFiles = logs.filter(
+                                    f -> f.getFileName().toString().startsWith("exec-"))
                             .toList();
 
                     if (!logFiles.isEmpty()) {
@@ -466,12 +465,13 @@ public class BuildCacheService {
                     }
                 }
             } else if (content.contains("2.")) {
-                findings.add("SBT 2.x detected. Execution logs for cache analysis " +
-                        "available at target/global-logging/exec-*.log. " +
-                        "Run a build first to populate.");
+                findings.add("SBT 2.x detected. Execution logs for cache analysis "
+                        + "available at target/global-logging/exec-*.log. "
+                        + "Run a build first to populate.");
             }
 
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
 
         // Status
         if (score >= 60) {
@@ -508,8 +508,7 @@ public class BuildCacheService {
                 "recommendation", "Use mvnd (Maven Daemon) for faster builds",
                 "command", "brew install mvndaemon/homebrew-mvnd/mvnd  # or sdk install mvnd",
                 "usage", "mvnd clean install  # instead of mvn clean install",
-                "estimatedImprovement", "50-80% faster for incremental builds"
-        ));
+                "estimatedImprovement", "50-80% faster for incremental builds"));
 
         // 2. Parallel builds
         optimizations.add(Map.of(
@@ -518,8 +517,7 @@ public class BuildCacheService {
                 "recommendation", "Enable parallel builds with thread count",
                 "configFile", ".mvn/maven.config",
                 "config", "-T1C  # Uses 1 thread per CPU core\n--no-transfer-progress  # Reduces log noise",
-                "estimatedImprovement", "30-60% faster on multi-core machines"
-        ));
+                "estimatedImprovement", "30-60% faster on multi-core machines"));
 
         // 3. Build cache extension
         optimizations.add(Map.of(
@@ -527,7 +525,8 @@ public class BuildCacheService {
                 "priority", "HIGH",
                 "recommendation", "Add maven-build-cache-extension for incremental build caching",
                 "configFile", "pom.xml (build/extensions)",
-                "config", """
+                "config",
+                        """
                         <build>
                           <extensions>
                             <extension>
@@ -537,8 +536,7 @@ public class BuildCacheService {
                             </extension>
                           </extensions>
                         </build>""",
-                "estimatedImprovement", "Up to 90% for repeated builds"
-        ));
+                "estimatedImprovement", "Up to 90% for repeated builds"));
 
         // 4. Incremental compilation
         optimizations.add(Map.of(
@@ -546,7 +544,8 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Enable incremental compilation in maven-compiler-plugin",
                 "configFile", "pom.xml (build/plugins)",
-                "config", """
+                "config",
+                        """
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-compiler-plugin</artifactId>
@@ -554,8 +553,7 @@ public class BuildCacheService {
                             <useIncrementalCompilation>true</useIncrementalCompilation>
                           </configuration>
                         </plugin>""",
-                "estimatedImprovement", "20-40% faster compilation"
-        ));
+                "estimatedImprovement", "20-40% faster compilation"));
 
         // 5. Skip unnecessary plugins
         optimizations.add(Map.of(
@@ -563,8 +561,7 @@ public class BuildCacheService {
                 "priority", "LOW",
                 "recommendation", "Skip plugins that aren't needed for every build",
                 "config", "mvn install -DskipTests -Dcheckstyle.skip -Dmaven.javadoc.skip=true",
-                "estimatedImprovement", "10-20% faster for development builds"
-        ));
+                "estimatedImprovement", "10-20% faster for development builds"));
 
         return optimizations;
     }
@@ -578,8 +575,7 @@ public class BuildCacheService {
                 "recommendation", "Enable local build cache for task output reuse",
                 "configFile", "gradle.properties",
                 "config", "org.gradle.caching=true",
-                "estimatedImprovement", "30-50% for repeated tasks"
-        ));
+                "estimatedImprovement", "30-50% for repeated tasks"));
 
         optimizations.add(Map.of(
                 "area", "Configuration Cache",
@@ -587,8 +583,7 @@ public class BuildCacheService {
                 "recommendation", "Enable configuration cache to skip configuration phase",
                 "configFile", "gradle.properties",
                 "config", "org.gradle.configuration-cache=true",
-                "estimatedImprovement", "Up to 90% faster configuration phase"
-        ));
+                "estimatedImprovement", "Up to 90% faster configuration phase"));
 
         optimizations.add(Map.of(
                 "area", "Parallel Execution",
@@ -596,8 +591,7 @@ public class BuildCacheService {
                 "recommendation", "Enable parallel project execution for multi-module builds",
                 "configFile", "gradle.properties",
                 "config", "org.gradle.parallel=true",
-                "estimatedImprovement", "30-50% for multi-module projects"
-        ));
+                "estimatedImprovement", "30-50% for multi-module projects"));
 
         optimizations.add(Map.of(
                 "area", "Configure on Demand",
@@ -605,34 +599,33 @@ public class BuildCacheService {
                 "recommendation", "Only configure projects that are needed for the requested tasks",
                 "configFile", "gradle.properties",
                 "config", "org.gradle.configureondemand=true",
-                "estimatedImprovement", "20-30% for large multi-module projects"
-        ));
+                "estimatedImprovement", "20-30% for large multi-module projects"));
 
         optimizations.add(Map.of(
                 "area", "JVM Daemon",
                 "priority", "MEDIUM",
                 "recommendation", "Optimize Gradle daemon JVM memory and GC settings",
                 "configFile", "gradle.properties",
-                "config", """
+                "config",
+                        """
                         org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m \\
                           -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8""",
-                "estimatedImprovement", "10-20% for memory-intensive builds"
-        ));
+                "estimatedImprovement", "10-20% for memory-intensive builds"));
 
         optimizations.add(Map.of(
                 "area", "Remote Cache",
                 "priority", "MEDIUM",
                 "recommendation", "Configure remote build cache for team-wide caching",
                 "configFile", "settings.gradle",
-                "config", """
+                "config",
+                        """
                         buildCache {
                           remote(HttpBuildCache) {
                             url = 'https://your-build-cache.example.com/cache/'
                             credentials { username = 'ci' }
                           }
                         }""",
-                "estimatedImprovement", "50-80% shared across team"
-        ));
+                "estimatedImprovement", "50-80% shared across team"));
 
         return optimizations;
     }
@@ -646,42 +639,41 @@ public class BuildCacheService {
                 "recommendation", "Use Coursier for parallel dependency downloads",
                 "configFile", "project/plugins.sbt",
                 "config", "addSbtPlugin(\"io.get-coursier\" % \"sbt-coursier\" % \"2.1.0\")",
-                "estimatedImprovement", "30-50% faster dependency resolution"
-        ));
+                "estimatedImprovement", "30-50% faster dependency resolution"));
 
         optimizations.add(Map.of(
                 "area", "Incremental Compilation",
                 "priority", "HIGH",
                 "recommendation", "Optimize incremental compilation settings",
                 "configFile", "build.sbt",
-                "config", """
+                "config",
+                        """
                         incOptions := incOptions.value
                           .withRecompileOnMacroDef(false)
                           .withApiDebug(false)""",
-                "estimatedImprovement", "Up to 80% for repeated compilations"
-        ));
+                "estimatedImprovement", "Up to 80% for repeated compilations"));
 
         optimizations.add(Map.of(
                 "area", "Parallel Testing",
                 "priority", "MEDIUM",
                 "recommendation", "Enable parallel test execution",
                 "configFile", "build.sbt",
-                "config", """
+                "config",
+                        """
                         Test / parallelExecution := true
                         Global / concurrentRestrictions += Tags.limit(Tags.Test, 4)""",
-                "estimatedImprovement", "40-60% faster test execution"
-        ));
+                "estimatedImprovement", "40-60% faster test execution"));
 
         optimizations.add(Map.of(
                 "area", "JVM Forking",
                 "priority", "MEDIUM",
                 "recommendation", "Configure JVM forking to reuse JVM across runs",
                 "configFile", "build.sbt",
-                "config", """
+                "config",
+                        """
                         fork := true
                         javaOptions ++= Seq("-Xmx2g", "-XX:+UseG1GC")""",
-                "estimatedImprovement", "15-25% for JVM-heavy tasks"
-        ));
+                "estimatedImprovement", "15-25% for JVM-heavy tasks"));
 
         optimizations.add(Map.of(
                 "area", "Turbo Mode",
@@ -689,8 +681,7 @@ public class BuildCacheService {
                 "recommendation", "Enable turbo mode for faster classloading (SBT 2.x)",
                 "configFile", "build.sbt",
                 "config", "Global / turbo := true",
-                "estimatedImprovement", "10-20% classloading speedup"
-        ));
+                "estimatedImprovement", "10-20% classloading speedup"));
 
         return optimizations;
     }

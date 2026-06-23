@@ -45,6 +45,10 @@
         <spring-ai.version>2.0.0-RC2</spring-ai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacoco.version>0.8.13</jacoco.version>
+        <spotless.version>2.44.5</spotless.version>
+        <palantir-java-format.version>2.50.0</palantir-java-format.version>
+        <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
+        <spotbugs.version>4.8.6</spotbugs.version>
         <!--
             Minimum coverage ratios enforced by jacoco:check (bound to verify).
             Baseline at the time of introduction: line ~67%, branch ~57%
@@ -223,6 +227,76 @@
                                 </rule>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                Spotless: enforce a consistent, automatically-applied code style.
+                Palantir Java Format matches the existing 4-space indentation, so
+                the one-time baseline reformat is minimal. `spotless:check` is bound
+                to verify; run `mvn spotless:apply` to auto-fix violations locally.
+            -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <importOrder />
+                        <removeUnusedImports />
+                        <palantirJavaFormat>
+                            <version>${palantir-java-format.version}</version>
+                        </palantirJavaFormat>
+                        <formatAnnotations />
+                        <trimTrailingWhitespace />
+                        <endWithNewline />
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                SpotBugs: static analysis on compiled bytecode. Runs at maximum
+                effort but only fails the build on High-priority (high-severity)
+                findings, so CI fails on new high-severity defects. Pre-existing
+                findings are captured in spotbugs-exclude.xml (the baseline).
+            -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>High</threshold>
+                    <failOnError>true</failOnError>
+                    <includeTests>false</includeTests>
+                    <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs</artifactId>
+                        <version>${spotbugs.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

@@ -16,17 +16,16 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for {@code validate_build_configuration} tool.
@@ -55,7 +54,8 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates a well-formed pom.xml as valid")
         void validatesWellFormedPom() throws Exception {
-            String pom = """
+            String pom =
+                    """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -83,7 +83,8 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags missing required elements in pom.xml")
         void flagsMissingRequiredElements() throws Exception {
-            String pom = """
+            String pom =
+                    """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -101,7 +102,8 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags duplicate dependency declarations")
         void flagsDuplicateDependencies() throws Exception {
-            String pom = """
+            String pom =
+                    """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -155,15 +157,16 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates a well-formed build.gradle")
         void validatesWellFormedBuildGradle() throws Exception {
-            String gradle = """
+            String gradle =
+                    """
                     plugins {
                         id 'java'
                     }
-                                        
+
                     repositories {
                         mavenCentral()
                     }
-                                        
+
                     dependencies {
                         implementation 'com.google.guava:guava:31.1-jre'
                         testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
@@ -180,11 +183,12 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags unbalanced braces in build.gradle")
         void flagsUnbalancedBraces() throws Exception {
-            String gradle = """
+            String gradle =
+                    """
                     plugins {
                         id 'java'
                     // missing closing brace for plugins block
-                                        
+
                     dependencies {
                         implementation 'com.google.guava:guava:31.1-jre'
                     }
@@ -211,15 +215,16 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates build.gradle.kts")
         void validatesBuildGradleKts() throws Exception {
-            String gradleKts = """
+            String gradleKts =
+                    """
                     plugins {
                         id("java")
                     }
-                                        
+
                     repositories {
                         mavenCentral()
                     }
-                                        
+
                     dependencies {
                         implementation("com.google.guava:guava:31.1-jre")
                     }
@@ -243,8 +248,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("returns error for nonexistent project directory")
         void returnsErrorForNonexistentDir() {
-            String result = buildToolsService.validateBuildConfiguration(
-                    "/nonexistent/path/12345");
+            String result = buildToolsService.validateBuildConfiguration("/nonexistent/path/12345");
 
             assertThat(result).contains("\"error\"");
         }

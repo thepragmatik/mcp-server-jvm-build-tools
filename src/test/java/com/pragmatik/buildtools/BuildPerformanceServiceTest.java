@@ -16,21 +16,16 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class BuildPerformanceServiceTest {
 
@@ -54,7 +49,8 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testAnalyzeBuildPerformanceMaven(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -73,58 +69,49 @@ class BuildPerformanceServiceTest {
                 """;
         Files.writeString(tempDir.resolve("pom.xml"), pom);
 
-        String result = service.analyzeBuildPerformance(
-                tempDir.toString(), "maven");
+        String result = service.analyzeBuildPerformance(tempDir.toString(), "maven");
         assertNotNull(result);
         assertTrue(result.contains("suggestions"));
     }
 
     @Test
     void testAnalyzeBuildPerformanceGradleWithProperties(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"),
-                "plugins { id 'java' }");
+        Files.writeString(tempDir.resolve("build.gradle"), "plugins { id 'java' }");
         Files.writeString(tempDir.resolve("settings.gradle"), "");
-        Files.writeString(tempDir.resolve("gradle.properties"),
-                "org.gradle.parallel=true\norg.gradle.caching=true\n");
+        Files.writeString(tempDir.resolve("gradle.properties"), "org.gradle.parallel=true\norg.gradle.caching=true\n");
 
-        String result = service.analyzeBuildPerformance(
-                tempDir.toString(), "gradle");
+        String result = service.analyzeBuildPerformance(tempDir.toString(), "gradle");
         assertNotNull(result);
         assertTrue(result.contains("suggestions"));
         // Should NOT suggest parallel/caching since already configured
-        assertFalse(result.contains("org.gradle.parallel=true"),
-                "Should not suggest parallel when already configured");
+        assertFalse(result.contains("org.gradle.parallel=true"), "Should not suggest parallel when already configured");
     }
 
     @Test
     void testAnalyzeBuildPerformanceGradleMissingProperties(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"),
-                "plugins { id 'java' }");
+        Files.writeString(tempDir.resolve("build.gradle"), "plugins { id 'java' }");
         Files.writeString(tempDir.resolve("settings.gradle"), "");
 
-        String result = service.analyzeBuildPerformance(
-                tempDir.toString(), "gradle");
+        String result = service.analyzeBuildPerformance(tempDir.toString(), "gradle");
         assertNotNull(result);
-        assertTrue(result.contains("No gradle.properties found"),
-                "Should suggest creating gradle.properties");
+        assertTrue(result.contains("No gradle.properties found"), "Should suggest creating gradle.properties");
     }
 
     @Test
     void testAnalyzeBuildPerformanceSbt(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.sbt"),
-                "name := \"test\"\nversion := \"1.0\"");
+        Files.writeString(tempDir.resolve("build.sbt"), "name := \"test\"\nversion := \"1.0\"");
 
-        String result = service.analyzeBuildPerformance(
-                tempDir.toString(), "sbt");
+        String result = service.analyzeBuildPerformance(tempDir.toString(), "sbt");
         assertNotNull(result);
-        assertTrue(result.contains("Coursier"),
-                "SBT should suggest Coursier for faster resolution");
+        assertTrue(result.contains("Coursier"), "SBT should suggest Coursier for faster resolution");
     }
 
     @Test
     void testOptimizationPotentialLevels(@TempDir Path tempDir) throws IOException {
         // Maven with standard POM — should have MEDIUM potential
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>

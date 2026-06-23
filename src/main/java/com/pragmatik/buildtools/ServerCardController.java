@@ -16,14 +16,13 @@
  */
 package com.pragmatik.buildtools;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * MCP Server Card endpoint for discoverability, plus health/readiness/liveness endpoints.
@@ -50,11 +49,12 @@ public class ServerCardController {
 
         card.put("name", applicationName);
         card.put("version", version);
-        card.put("description",
-                "MCP Server for JVM build tools: Maven, Gradle, and SBT. " +
-                "Execute builds, detect project types, check dependency versions, " +
-                "analyze build output, validate configurations, scan credentials, " +
-                "and detect dependency conflicts — all through a unified MCP API.");
+        card.put(
+                "description",
+                "MCP Server for JVM build tools: Maven, Gradle, and SBT. "
+                        + "Execute builds, detect project types, check dependency versions, "
+                        + "analyze build output, validate configurations, scan credentials, "
+                        + "and detect dependency conflicts — all through a unified MCP API.");
 
         card.put("vendor", "The Pragmatik");
         card.put("homepage", "https://github.com/thepragmatik/mcp-server-jvm-build-tools");
@@ -77,8 +77,7 @@ public class ServerCardController {
         List<Map<String, String>> buildTools = List.of(
                 Map.of("name", "maven", "minVersion", "3.6+", "detectionFile", "pom.xml"),
                 Map.of("name", "gradle", "minVersion", "7.0+", "detectionFile", "build.gradle(.kts)"),
-                Map.of("name", "sbt", "minVersion", "1.0+", "detectionFile", "build.sbt")
-        );
+                Map.of("name", "sbt", "minVersion", "1.0+", "detectionFile", "build.sbt"));
         card.put("supportedBuildTools", buildTools);
 
         Map<String, Object> requirements = new LinkedHashMap<>();
@@ -99,8 +98,7 @@ public class ServerCardController {
                 "Resource exposure for build configs and dependencies",
                 "SBT project structure analysis (modules, test frameworks)",
                 "Streamable HTTP transport with health check endpoint",
-                "Prompt templates for build analysis, dependency audits, failure diagnosis"
-        );
+                "Prompt templates for build analysis, dependency audits, failure diagnosis");
         card.put("features", features);
 
         // Deprecation notices (MCP 2026-07-28)

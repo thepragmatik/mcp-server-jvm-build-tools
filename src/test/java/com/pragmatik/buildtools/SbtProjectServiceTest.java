@@ -16,16 +16,15 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class SbtProjectServiceTest {
 
@@ -43,7 +42,8 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects multi-module project with lazy vals")
         void detectsMultiModule(@TempDir Path tmp) throws Exception {
-            String buildSbt = """
+            String buildSbt =
+                    """
                 lazy val root = project.in(file("."))
                   .aggregate(core, api)
                   .settings(name := "myapp")
@@ -71,8 +71,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects single-module project")
         void detectsSingleModule(@TempDir Path tmp) throws Exception {
-            Files.writeString(tmp.resolve("build.sbt"),
-                "name := \"myapp\"\nscalaVersion := \"2.13.15\"");
+            Files.writeString(tmp.resolve("build.sbt"), "name := \"myapp\"\nscalaVersion := \"2.13.15\"");
 
             String result = service.detectSbtModules(tmp.toString());
 
@@ -96,7 +95,8 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects ScalaTest and specs2")
         void detectsTestFrameworks(@TempDir Path tmp) throws Exception {
-            String buildSbt = """
+            String buildSbt =
+                    """
                 scalaVersion := "2.13.15"
                 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test
                 libraryDependencies += "org.specs2" %% "specs2-core" % "4.20.0" % Test
@@ -114,7 +114,8 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects test settings")
         void detectsTestSettings(@TempDir Path tmp) throws Exception {
-            String buildSbt = """
+            String buildSbt =
+                    """
                 scalaVersion := "2.13.15"
                 Test / fork := true
                 Test / parallelExecution := false
@@ -131,8 +132,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("returns empty when no test frameworks")
         void noTestFrameworks(@TempDir Path tmp) throws Exception {
-            Files.writeString(tmp.resolve("build.sbt"),
-                "name := \"myapp\"\nscalaVersion := \"2.13.15\"");
+            Files.writeString(tmp.resolve("build.sbt"), "name := \"myapp\"\nscalaVersion := \"2.13.15\"");
 
             String result = service.detectSbtTestFrameworks(tmp.toString());
 
@@ -147,7 +147,9 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("analyzes complete build configuration")
         void analyzesBuild(@TempDir Path tmp) throws Exception {
-            Files.writeString(tmp.resolve("build.sbt"), """
+            Files.writeString(
+                    tmp.resolve("build.sbt"),
+                    """
                 organization := "com.example"
                 name := "myapp"
                 scalaVersion := "2.13.15"
@@ -172,8 +174,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("handles missing project/build.properties gracefully")
         void missingProperties(@TempDir Path tmp) throws Exception {
-            Files.writeString(tmp.resolve("build.sbt"),
-                "name := \"simple\"\nscalaVersion := \"3.3.4\"");
+            Files.writeString(tmp.resolve("build.sbt"), "name := \"simple\"\nscalaVersion := \"3.3.4\"");
 
             String result = service.analyzeSbtBuild(tmp.toString());
 

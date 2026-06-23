@@ -16,10 +16,9 @@
  */
 package com.pragmatik.buildtools;
 
-import org.springframework.stereotype.Component;
-
 import java.nio.file.Path;
 import java.util.*;
+import org.springframework.stereotype.Component;
 
 /**
  * Registry and auto-detection provider for {@link BuildTool} implementations.

@@ -35,32 +35,27 @@ import java.util.regex.Pattern;
 public class GradleOutputParser implements BuildOutputParser {
 
     // Build result: "BUILD SUCCESSFUL in 5s" or "BUILD FAILED in 5s"
-    private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile(
-            "BUILD\\s+(SUCCESSFUL|FAILED)\\s+in\\s+([0-9]+(?:\\.[0-9]+)?)(ms|s|m|min)");
+    private static final Pattern BUILD_RESULT_PATTERN =
+            Pattern.compile("BUILD\\s+(SUCCESSFUL|FAILED)\\s+in\\s+([0-9]+(?:\\.[0-9]+)?)(ms|s|m|min)");
 
     // Test summary: "25 tests completed, 0 failed"
-    private static final Pattern TEST_SUMMARY_PATTERN = Pattern.compile(
-            "(\\d+)\\s+test(?:s)?\\s+completed,\\s*(\\d+)\\s+failed");
+    private static final Pattern TEST_SUMMARY_PATTERN =
+            Pattern.compile("(\\d+)\\s+test(?:s)?\\s+completed,\\s*(\\d+)\\s+failed");
 
     // Individual test failure: "com.example.ServiceTest > testMethod() FAILED"
-    private static final Pattern TEST_FAILURE_PATTERN = Pattern.compile(
-            "^\\s*(\\S+)\\s+>\\s+(\\S+)\\(\\)\\s+FAILED");
+    private static final Pattern TEST_FAILURE_PATTERN = Pattern.compile("^\\s*(\\S+)\\s+>\\s+(\\S+)\\(\\)\\s+FAILED");
 
     // Task failure: "> Task :compileJava FAILED"
-    private static final Pattern TASK_FAILED_PATTERN = Pattern.compile(
-            ">\\s+Task\\s+(\\S+)\\s+FAILED");
+    private static final Pattern TASK_FAILED_PATTERN = Pattern.compile(">\\s+Task\\s+(\\S+)\\s+FAILED");
 
     // What went wrong section
-    private static final Pattern WHAT_WENT_WRONG_PATTERN = Pattern.compile(
-            "Execution failed for task\\s+'([^']+)'");
+    private static final Pattern WHAT_WENT_WRONG_PATTERN = Pattern.compile("Execution failed for task\\s+'([^']+)'");
 
     // Warning pattern
-    private static final Pattern WARNING_PATTERN = Pattern.compile(
-            "(?i)(?:warn(?:ing)?|deprecated)\\b[:\\s]*(.*)");
+    private static final Pattern WARNING_PATTERN = Pattern.compile("(?i)(?:warn(?:ing)?|deprecated)\\b[:\\s]*(.*)");
 
     // Stack trace file location
-    private static final Pattern STACK_TRACE_FILE_PATTERN = Pattern.compile(
-            "at\\s+\\S+\\(([^:]+):(\\d+)\\)");
+    private static final Pattern STACK_TRACE_FILE_PATTERN = Pattern.compile("at\\s+\\S+\\(([^:]+):(\\d+)\\)");
 
     @Override
     public String getToolName() {
@@ -120,8 +115,9 @@ public class GradleOutputParser implements BuildOutputParser {
                 testErr.put("class", testFailMatcher.group(1));
                 testErr.put("test", testFailMatcher.group(2));
                 testErr.put("severity", "ERROR");
-                testErr.put("message", "Test " + testFailMatcher.group(2) + "() in "
-                        + testFailMatcher.group(1) + " FAILED");
+                testErr.put(
+                        "message",
+                        "Test " + testFailMatcher.group(2) + "() in " + testFailMatcher.group(1) + " FAILED");
 
                 // Try to extract file:line from subsequent stack trace lines
                 for (int j = i + 1; j < Math.min(i + 5, lines.length); j++) {
@@ -173,7 +169,8 @@ public class GradleOutputParser implements BuildOutputParser {
                 }
                 // Don't add duplicate error messages
                 boolean alreadyAdded = errors.stream()
-                        .anyMatch(e -> e.get("message") != null && e.get("message").toString().contains("Execution failed"));
+                        .anyMatch(e -> e.get("message") != null
+                                && e.get("message").toString().contains("Execution failed"));
                 if (!alreadyAdded && detail.length() > 0) {
                     Map<String, Object> execErr = new LinkedHashMap<>();
                     execErr.put("severity", "ERROR");

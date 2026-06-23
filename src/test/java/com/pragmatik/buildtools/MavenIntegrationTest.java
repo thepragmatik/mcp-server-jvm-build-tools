@@ -16,6 +16,11 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
+import java.nio.file.Path;
+import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,12 +29,6 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.nio.file.Path;
-import java.util.Arrays;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 @SpringBootTest
 @DisplayName("Maven application integration tests")
@@ -63,8 +62,8 @@ class MavenIntegrationTest {
             assertThat(toolCallbacks).isNotNull();
             assertThat(toolCallbacks).isNotEmpty();
 
-            boolean hasVersionTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "get_build_tool_version".equals(tc.getToolDefinition().name()));
+            boolean hasVersionTool = Arrays.stream(toolCallbacks).anyMatch(tc -> "get_build_tool_version"
+                    .equals(tc.getToolDefinition().name()));
             assertThat(hasVersionTool).isTrue();
         }
 
@@ -72,8 +71,8 @@ class MavenIntegrationTest {
         @DisplayName("ToolCallbackProvider resolves execute_build_command tool")
         void resolvesExecuteBuildCommandTool() {
             ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-            boolean hasExecTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "execute_build_command".equals(tc.getToolDefinition().name()));
+            boolean hasExecTool = Arrays.stream(toolCallbacks).anyMatch(tc -> "execute_build_command"
+                    .equals(tc.getToolDefinition().name()));
             assertThat(hasExecTool).isTrue();
         }
 
@@ -81,8 +80,8 @@ class MavenIntegrationTest {
         @DisplayName("ToolCallbackProvider resolves list_build_tools tool")
         void resolvesListBuildToolsTool() {
             ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-            boolean hasListTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "list_build_tools".equals(tc.getToolDefinition().name()));
+            boolean hasListTool = Arrays.stream(toolCallbacks).anyMatch(tc -> "list_build_tools"
+                    .equals(tc.getToolDefinition().name()));
             assertThat(hasListTool).isTrue();
         }
 
@@ -90,8 +89,8 @@ class MavenIntegrationTest {
         @DisplayName("ToolCallbackProvider resolves detect_build_tool tool (Phase 1)")
         void resolvesDetectBuildToolTool() {
             ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-            boolean hasDetectTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "detect_build_tool".equals(tc.getToolDefinition().name()));
+            boolean hasDetectTool = Arrays.stream(toolCallbacks).anyMatch(tc -> "detect_build_tool"
+                    .equals(tc.getToolDefinition().name()));
             assertThat(hasDetectTool).isTrue();
         }
 
@@ -99,8 +98,8 @@ class MavenIntegrationTest {
         @DisplayName("ToolCallbackProvider resolves check_dependency_version tool (Phase 1)")
         void resolvesCheckDependencyVersionTool() {
             ToolCallback[] toolCallbacks = toolCallbackProvider.getToolCallbacks();
-            boolean hasDepTool = Arrays.stream(toolCallbacks)
-                    .anyMatch(tc -> "check_dependency_version".equals(tc.getToolDefinition().name()));
+            boolean hasDepTool = Arrays.stream(toolCallbacks).anyMatch(tc -> "check_dependency_version"
+                    .equals(tc.getToolDefinition().name()));
             assertThat(hasDepTool).isTrue();
         }
     }
@@ -177,10 +176,7 @@ class MavenIntegrationTest {
         @DisplayName("get_maven_version returns valid version string")
         void getMavenVersionReturnsValidString() {
             String version = buildToolsService.getBuildToolVersion("maven");
-            assertThat(version)
-                    .isNotNull()
-                    .isNotEmpty()
-                    .contains("Apache Maven");
+            assertThat(version).isNotNull().isNotEmpty().contains("Apache Maven");
         }
 
         @Test

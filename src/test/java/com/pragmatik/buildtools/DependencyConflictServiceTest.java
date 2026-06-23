@@ -16,17 +16,16 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class DependencyConflictServiceTest {
 
@@ -39,7 +38,8 @@ class DependencyConflictServiceTest {
 
     @Test
     void testNoConflictsInCleanPom(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -64,7 +64,8 @@ class DependencyConflictServiceTest {
 
     @Test
     void testDuplicateDependencyWithDifferentVersions(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -98,7 +99,8 @@ class DependencyConflictServiceTest {
 
     @Test
     void testDependencyVsManagementConflict(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -128,13 +130,13 @@ class DependencyConflictServiceTest {
         List<Map<String, Object>> conflicts = service.analyzeMavenConflicts(tempDir.resolve("pom.xml"));
         assertFalse(conflicts.isEmpty(), "Should detect dep vs management conflict");
         Map<String, Object> c = conflicts.get(0);
-        assertEquals("ERROR", c.get("severity"),
-                "Direct vs managed version conflict should be ERROR severity");
+        assertEquals("ERROR", c.get("severity"), "Direct vs managed version conflict should be ERROR severity");
     }
 
     @Test
     void testMavenPropertiesResolution(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -163,15 +165,16 @@ class DependencyConflictServiceTest {
         List<Map<String, Object>> conflicts = service.analyzeMavenConflicts(tempDir.resolve("pom.xml"));
         assertFalse(conflicts.isEmpty());
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> versions = (List<Map<String, Object>>) conflicts.get(0).get("versions");
-        boolean hasResolved = versions.stream()
-                .anyMatch(v -> "6.1.0".equals(v.get("version")));
+        List<Map<String, Object>> versions =
+                (List<Map<String, Object>>) conflicts.get(0).get("versions");
+        boolean hasResolved = versions.stream().anyMatch(v -> "6.1.0".equals(v.get("version")));
         assertTrue(hasResolved, "Property ${spring.version} should resolve to 6.1.0");
     }
 
     @Test
     void testGradleConflictDetection(@TempDir Path tempDir) throws IOException {
-        String gradle = """
+        String gradle =
+                """
                 dependencies {
                     implementation 'com.google.guava:guava:31.0-jre'
                     testImplementation 'com.google.guava:guava:33.0-jre'
@@ -186,7 +189,8 @@ class DependencyConflictServiceTest {
 
     @Test
     void testSbtConflictDetection(@TempDir Path tempDir) throws IOException {
-        String sbt = """
+        String sbt =
+                """
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.9.0"
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
                 """;
@@ -199,7 +203,8 @@ class DependencyConflictServiceTest {
 
     @Test
     void testNoSbtConflicts(@TempDir Path tempDir) throws IOException {
-        String sbt = """
+        String sbt =
+                """
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
                 libraryDependencies += "org.typelevel" %% "cats-effect" % "3.5.0"
                 """;

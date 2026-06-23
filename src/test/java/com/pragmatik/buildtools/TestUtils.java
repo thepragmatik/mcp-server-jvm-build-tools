@@ -53,9 +53,8 @@ public final class TestUtils {
         }
 
         // 3. PATH lookup: resolve symlinks to find Maven installation dir
-        String[] pathDirs = System.getenv("PATH") != null
-                ? System.getenv("PATH").split(File.pathSeparator)
-                : new String[0];
+        String[] pathDirs =
+                System.getenv("PATH") != null ? System.getenv("PATH").split(File.pathSeparator) : new String[0];
         for (String dir : pathDirs) {
             Path mvnPath = Path.of(dir, "mvn");
             if (Files.isExecutable(mvnPath)) {
@@ -87,8 +86,7 @@ public final class TestUtils {
             }
         }
 
-        throw new IllegalStateException(
-                "Cannot find Maven installation. Set MAVEN_HOME environment variable, " +
-                "add mvn to PATH, or install Maven to a common location.");
+        throw new IllegalStateException("Cannot find Maven installation. Set MAVEN_HOME environment variable, "
+                + "add mvn to PATH, or install Maven to a common location.");
     }
 }

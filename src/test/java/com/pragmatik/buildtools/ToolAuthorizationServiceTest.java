@@ -16,15 +16,13 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for ToolPermission, ToolAuditLogger, and ToolAuthorizationService.
@@ -80,71 +78,55 @@ class ToolAuthorizationServiceTest {
     @Test
     void testSpecificScopeAuthorization() {
         // build:read covers detection tools
-        assertTrue(ToolPermission.isToolAuthorized("detect_build_tool",
-                List.of("build:read")));
-        assertTrue(ToolPermission.isToolAuthorized("get_build_tool_version",
-                List.of("build:read")));
-        assertTrue(ToolPermission.isToolAuthorized("list_build_tools",
-                List.of("build:read")));
-        assertTrue(ToolPermission.isToolAuthorized("validate_build_configuration",
-                List.of("build:read")));
+        assertTrue(ToolPermission.isToolAuthorized("detect_build_tool", List.of("build:read")));
+        assertTrue(ToolPermission.isToolAuthorized("get_build_tool_version", List.of("build:read")));
+        assertTrue(ToolPermission.isToolAuthorized("list_build_tools", List.of("build:read")));
+        assertTrue(ToolPermission.isToolAuthorized("validate_build_configuration", List.of("build:read")));
 
         // build:read does NOT cover execute
-        assertFalse(ToolPermission.isToolAuthorized("execute_build_command",
-                List.of("build:read")));
+        assertFalse(ToolPermission.isToolAuthorized("execute_build_command", List.of("build:read")));
     }
 
     @Test
     void testBuildExecuteScope() {
-        assertTrue(ToolPermission.isToolAuthorized("execute_build_command",
-                List.of("build:execute")));
-        assertFalse(ToolPermission.isToolAuthorized("get_build_tool_version",
-                List.of("build:execute")));
+        assertTrue(ToolPermission.isToolAuthorized("execute_build_command", List.of("build:execute")));
+        assertFalse(ToolPermission.isToolAuthorized("get_build_tool_version", List.of("build:execute")));
     }
 
     @Test
     void testMultipleScopesGrantAccess() {
         // With build:read + dependency:read, both should work
-        assertTrue(ToolPermission.isToolAuthorized("detect_build_tool",
-                List.of("build:read", "dependency:read")));
-        assertTrue(ToolPermission.isToolAuthorized("check_dependency_version",
-                List.of("build:read", "dependency:read")));
-        assertFalse(ToolPermission.isToolAuthorized("execute_build_command",
-                List.of("build:read", "dependency:read")));
+        assertTrue(ToolPermission.isToolAuthorized("detect_build_tool", List.of("build:read", "dependency:read")));
+        assertTrue(
+                ToolPermission.isToolAuthorized("check_dependency_version", List.of("build:read", "dependency:read")));
+        assertFalse(ToolPermission.isToolAuthorized("execute_build_command", List.of("build:read", "dependency:read")));
     }
 
     @Test
     void testBuildProfileScope() {
-        assertTrue(ToolPermission.isToolAuthorized("profile_build",
-                List.of("build:profile")));
-        assertTrue(ToolPermission.isToolAuthorized("analyze_build_performance",
-                List.of("build:profile")));
+        assertTrue(ToolPermission.isToolAuthorized("profile_build", List.of("build:profile")));
+        assertTrue(ToolPermission.isToolAuthorized("analyze_build_performance", List.of("build:profile")));
     }
 
     @Test
     void testCredentialReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("check_credential_status",
-                List.of("credential:read")));
+        assertTrue(ToolPermission.isToolAuthorized("check_credential_status", List.of("credential:read")));
     }
 
     @Test
     void testJavaReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("check_java_compatibility",
-                List.of("java:read")));
+        assertTrue(ToolPermission.isToolAuthorized("check_java_compatibility", List.of("java:read")));
     }
 
     @Test
     void testResourceReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("list_build_resources",
-                List.of("resource:read")));
-        assertTrue(ToolPermission.isToolAuthorized("read_build_resource",
-                List.of("resource:read")));
+        assertTrue(ToolPermission.isToolAuthorized("list_build_resources", List.of("resource:read")));
+        assertTrue(ToolPermission.isToolAuthorized("read_build_resource", List.of("resource:read")));
     }
 
     @Test
     void testPromptReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("get_build_tool_prompt",
-                List.of("prompt:read")));
+        assertTrue(ToolPermission.isToolAuthorized("get_build_tool_prompt", List.of("prompt:read")));
     }
 
     // === ToolAuthorizationService tests ===
@@ -159,15 +141,13 @@ class ToolAuthorizationServiceTest {
 
     @Test
     void testCheckToolAuthorizationDenied() {
-        String result = service.checkToolAuthorization("execute_build_command",
-                "dependency:read");
+        String result = service.checkToolAuthorization("execute_build_command", "dependency:read");
         assertTrue(result.contains("\"authorized\":false"));
     }
 
     @Test
     void testCheckToolAuthorizationSpecificScope() {
-        String result = service.checkToolAuthorization("detect_build_tool",
-                "build:read");
+        String result = service.checkToolAuthorization("detect_build_tool", "build:read");
         assertTrue(result.contains("\"authorized\":true"));
         assertTrue(result.contains("build:read"));
     }
@@ -192,8 +172,7 @@ class ToolAuthorizationServiceTest {
     @Test
     void testValidateAccessTokenDefaultKey() {
         // The default dev key (if no env vars set) should validate
-        String result = service.validateAccessToken(
-                "dev-key-unsafe-do-not-use-in-production");
+        String result = service.validateAccessToken("dev-key-unsafe-do-not-use-in-production");
         assertTrue(result.contains("\"valid\":true"));
         assertTrue(result.contains("\"identity\":\"default\""));
         assertTrue(result.contains("\"hasWildcard\":true"));
@@ -232,8 +211,7 @@ class ToolAuthorizationServiceTest {
         String result = testService.auditToolAccess(10, "all");
         assertTrue(result.contains("\"entryCount\""));
         // Should have at least 3 entries
-        assertTrue(result.contains("\"check_tool_authorization\"") ||
-                   result.contains("\"list_available_scopes\""));
+        assertTrue(result.contains("\"check_tool_authorization\"") || result.contains("\"list_available_scopes\""));
     }
 
     @Test

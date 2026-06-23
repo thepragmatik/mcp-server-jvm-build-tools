@@ -17,10 +17,6 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +27,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * MCP service for analyzing build performance and suggesting optimizations.
@@ -52,20 +51,18 @@ import java.util.stream.Collectors;
 @Service
 public class BuildPerformanceService {
 
-    private static final Pattern MAVEN_TIME_PATTERN = Pattern.compile(
-            "Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*s");
+    private static final Pattern MAVEN_TIME_PATTERN = Pattern.compile("Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*s");
 
-    private static final Pattern GRADLE_TIME_PATTERN = Pattern.compile(
-            "BUILD (?:SUCCESSFUL|FAILED) in ([0-9]+(?:\\.[0-9]+)?)s");
+    private static final Pattern GRADLE_TIME_PATTERN =
+            Pattern.compile("BUILD (?:SUCCESSFUL|FAILED) in ([0-9]+(?:\\.[0-9]+)?)s");
 
-    private static final Pattern MAVEN_PHASE_PATTERN = Pattern.compile(
-            "\\[INFO\\] --- ([a-zA-Z0-9._-]+):([0-9.]+):([a-zA-Z-]+)\\s.*---");
+    private static final Pattern MAVEN_PHASE_PATTERN =
+            Pattern.compile("\\[INFO\\] --- ([a-zA-Z0-9._-]+):([0-9.]+):([a-zA-Z-]+)\\s.*---");
 
-    private static final Pattern SBT_TIME_PATTERN = Pattern.compile(
-            "Total time:\\s*([0-9]+)\\s*s");
+    private static final Pattern SBT_TIME_PATTERN = Pattern.compile("Total time:\\s*([0-9]+)\\s*s");
 
-    private static final Pattern GRADLE_TASK_TIME = Pattern.compile(
-            "(?:> Task|:)[\\w:]+\\s*(?:UP-TO-DATE|SKIPPED|FAILED)?\\s*");
+    private static final Pattern GRADLE_TASK_TIME =
+            Pattern.compile("(?:> Task|:)[\\w:]+\\s*(?:UP-TO-DATE|SKIPPED|FAILED)?\\s*");
 
     private final BuildToolProvider toolProvider;
 
@@ -76,24 +73,22 @@ public class BuildPerformanceService {
     /**
      * Run a build command with timing instrumentation and return performance metrics.
      */
-    @Tool(name = "profile_build",
-          description = "Execute a build command with timing instrumentation. " +
-                        "Returns detailed performance metrics including total duration, " +
-                        "phase/task breakdown (for Maven/Gradle), and comparison against " +
-                        "previous builds. Use this to identify slow build phases and " +
-                        "track build performance over time. " +
-                        "Returns JSON with {success, tool, command, duration, durationFormatted, " +
-                        "phases: [{name, duration}], comparison: {trend, previousDurations}}.")
+    @Tool(
+            name = "profile_build",
+            description = "Execute a build command with timing instrumentation. "
+                    + "Returns detailed performance metrics including total duration, "
+                    + "phase/task breakdown (for Maven/Gradle), and comparison against "
+                    + "previous builds. Use this to identify slow build phases and "
+                    + "track build performance over time. "
+                    + "Returns JSON with {success, tool, command, duration, durationFormatted, "
+                    + "phases: [{name, duration}], comparison: {trend, previousDurations}}.")
     public String profileBuild(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Build tool name. Omit to auto-detect.")
-            String buildToolName,
-            @ToolParam(required = false, description = "Path to build tool installation.")
-            String buildToolHome,
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
-            @ToolParam(required = true, description = "Build command to profile")
-            String command) {
+                    @ToolParam(required = false, description = "Build tool name. Omit to auto-detect.")
+                    String buildToolName,
+            @ToolParam(required = false, description = "Path to build tool installation.") String buildToolHome,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
+            @ToolParam(required = true, description = "Build command to profile") String command) {
 
         Path dir;
         try {
@@ -158,8 +153,7 @@ public class BuildPerformanceService {
             // Find slowest phase
             phases.stream()
                     .filter(p -> p.containsKey("durationSeconds"))
-                    .max(Comparator.comparingDouble(p ->
-                            ((Number) p.get("durationSeconds")).doubleValue()))
+                    .max(Comparator.comparingDouble(p -> ((Number) p.get("durationSeconds")).doubleValue()))
                     .ifPresent(slowest -> result.put("slowestPhase", slowest));
         }
 
@@ -177,11 +171,14 @@ public class BuildPerformanceService {
             history = new ArrayList<>();
         }
         history.add(Map.of(
-                "timestamp", start.toString(),
-                "durationSeconds", Math.round(totalSeconds * 1000.0) / 1000.0,
-                "success", exitCode == 0,
-                "phases", phases.size()
-        ));
+                "timestamp",
+                start.toString(),
+                "durationSeconds",
+                Math.round(totalSeconds * 1000.0) / 1000.0,
+                "success",
+                exitCode == 0,
+                "phases",
+                phases.size()));
 
         // Trim to last 20 builds
         if (history.size() > 20) {
@@ -201,8 +198,7 @@ public class BuildPerformanceService {
         }
 
         // Optimization suggestions
-        List<String> suggestions = generateSuggestions(tool.getName(), command,
-                totalSeconds, phases, testCounts);
+        List<String> suggestions = generateSuggestions(tool.getName(), command, totalSeconds, phases, testCounts);
         if (!suggestions.isEmpty()) {
             result.put("suggestions", suggestions);
         }
@@ -214,18 +210,18 @@ public class BuildPerformanceService {
      * Analyze build performance without executing a build.
      * Looks at historical data and build configuration to suggest optimizations.
      */
-    @Tool(name = "analyze_build_performance",
-          description = "Analyze build performance from historical data and configuration. " +
-                        "Examines build files and past build profiles to suggest optimizations " +
-                        "like parallel builds, build caching, incremental compilation, and daemon usage. " +
-                        "Does NOT execute any builds — read-only analysis. " +
-                        "Returns JSON with {suggestions, buildToolPattern, optimizationPotential}.")
+    @Tool(
+            name = "analyze_build_performance",
+            description = "Analyze build performance from historical data and configuration. "
+                    + "Examines build files and past build profiles to suggest optimizations "
+                    + "like parallel builds, build caching, incremental compilation, and daemon usage. "
+                    + "Does NOT execute any builds — read-only analysis. "
+                    + "Returns JSON with {suggestions, buildToolPattern, optimizationPotential}.")
     public String analyzeBuildPerformance(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Build tool to analyze. Omit to auto-detect.")
-            String buildToolName) {
+                    @ToolParam(required = false, description = "Build tool to analyze. Omit to auto-detect.")
+                    String buildToolName) {
 
         Path dir;
         try {
@@ -248,7 +244,9 @@ public class BuildPerformanceService {
         Map<String, List<Map<String, Object>>> allHistory = new LinkedHashMap<>();
         try {
             loadAllBuildHistory(dir, tool.getName(), allHistory);
-        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
+        } catch (IOException e) {
+            System.err.println("[WARN] Build performance: " + e.getMessage());
+        }
 
         // Analyze historical patterns
         if (!allHistory.isEmpty()) {
@@ -281,11 +279,12 @@ public class BuildPerformanceService {
 
         // Optimization potential estimate
         Map<String, Object> potential = new LinkedHashMap<>();
-        potential.put("level", suggestions.size() >= 4 ? "HIGH" :
-                suggestions.size() >= 2 ? "MEDIUM" : "LOW");
-        potential.put("estimatedImprovement", suggestions.size() >= 4 ?
-                "30-60% reduction possible" : suggestions.size() >= 2 ?
-                "15-30% reduction possible" : "Minimal optimization headroom");
+        potential.put("level", suggestions.size() >= 4 ? "HIGH" : suggestions.size() >= 2 ? "MEDIUM" : "LOW");
+        potential.put(
+                "estimatedImprovement",
+                suggestions.size() >= 4
+                        ? "30-60% reduction possible"
+                        : suggestions.size() >= 2 ? "15-30% reduction possible" : "Minimal optimization headroom");
         result.put("optimizationPotential", potential);
 
         return JsonUtils.toJson(result);
@@ -294,19 +293,22 @@ public class BuildPerformanceService {
     // ─── Time extraction ────────────────────────────────────────────────
 
     private Double extractToolReportedTime(String output, String toolName) {
-        Pattern pattern = switch (toolName) {
-            case "maven" -> MAVEN_TIME_PATTERN;
-            case "gradle" -> GRADLE_TIME_PATTERN;
-            case "sbt" -> SBT_TIME_PATTERN;
-            default -> null;
-        };
+        Pattern pattern =
+                switch (toolName) {
+                    case "maven" -> MAVEN_TIME_PATTERN;
+                    case "gradle" -> GRADLE_TIME_PATTERN;
+                    case "sbt" -> SBT_TIME_PATTERN;
+                    default -> null;
+                };
         if (pattern == null) return null;
 
         Matcher m = pattern.matcher(output);
         if (m.find()) {
             try {
                 return Double.parseDouble(m.group(1));
-            } catch (NumberFormatException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
+            } catch (NumberFormatException e) {
+                System.err.println("[WARN] Build performance: " + e.getMessage());
+            }
         }
         return null;
     }
@@ -345,7 +347,8 @@ public class BuildPerformanceService {
         Map<String, Integer> counts = new LinkedHashMap<>();
 
         if ("maven".equals(toolName) || "gradle".equals(toolName)) {
-            Pattern tp = Pattern.compile("Tests run:\\s*(\\d+).*Failures:\\s*(\\d+).*Errors:\\s*(\\d+).*Skipped:\\s*(\\d+)");
+            Pattern tp =
+                    Pattern.compile("Tests run:\\s*(\\d+).*Failures:\\s*(\\d+).*Errors:\\s*(\\d+).*Skipped:\\s*(\\d+)");
             Matcher m = tp.matcher(output);
             if (m.find()) {
                 counts.put("total", parseInt(m.group(1)));
@@ -360,8 +363,8 @@ public class BuildPerformanceService {
 
     // ─── History persistence ────────────────────────────────────────────
 
-    private List<Map<String, Object>> loadBuildHistory(Path projectDir, String tool,
-                                                        String command) throws IOException {
+    private List<Map<String, Object>> loadBuildHistory(Path projectDir, String tool, String command)
+            throws IOException {
         Path historyDir = projectDir.resolve(".buildtools/history");
         if (!Files.exists(historyDir)) return new ArrayList<>();
 
@@ -374,26 +377,26 @@ public class BuildPerformanceService {
         return parseHistoryJson(content);
     }
 
-    private void loadAllBuildHistory(Path projectDir, String tool,
-                                      Map<String, List<Map<String, Object>>> all) throws IOException {
+    private void loadAllBuildHistory(Path projectDir, String tool, Map<String, List<Map<String, Object>>> all)
+            throws IOException {
         Path historyDir = projectDir.resolve(".buildtools/history");
         if (!Files.exists(historyDir)) return;
 
         try (var stream = Files.list(historyDir)) {
-            stream.filter(f -> f.getFileName().toString().endsWith(".json"))
-                    .forEach(f -> {
-                        try {
-                            String content = Files.readString(f);
-                            String cmd = f.getFileName().toString().replace(".json", "")
-                                    .replace(tool + "_", "");
-                            all.put(cmd, parseHistoryJson(content));
-                        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
-                    });
+            stream.filter(f -> f.getFileName().toString().endsWith(".json")).forEach(f -> {
+                try {
+                    String content = Files.readString(f);
+                    String cmd = f.getFileName().toString().replace(".json", "").replace(tool + "_", "");
+                    all.put(cmd, parseHistoryJson(content));
+                } catch (IOException e) {
+                    System.err.println("[WARN] Build performance: " + e.getMessage());
+                }
+            });
         }
     }
 
-    private void saveBuildHistory(Path projectDir, String tool, String command,
-                                   List<Map<String, Object>> history) throws IOException {
+    private void saveBuildHistory(Path projectDir, String tool, String command, List<Map<String, Object>> history)
+            throws IOException {
         Path historyDir = projectDir.resolve(".buildtools/history");
         Files.createDirectories(historyDir);
 
@@ -420,8 +423,8 @@ public class BuildPerformanceService {
         }
         json.append("]");
 
-        Files.writeString(historyFile, json.toString(),
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.writeString(
+                historyFile, json.toString(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
     @SuppressWarnings("unchecked")
@@ -454,10 +457,12 @@ public class BuildPerformanceService {
 
         double recentAvg = recent.stream()
                 .mapToDouble(e -> ((Number) e.get("durationSeconds")).doubleValue())
-                .average().orElse(0);
+                .average()
+                .orElse(0);
         double earlierAvg = earlier.stream()
                 .mapToDouble(e -> ((Number) e.get("durationSeconds")).doubleValue())
-                .average().orElse(0);
+                .average()
+                .orElse(0);
 
         comparison.put("recentAvgSeconds", Math.round(recentAvg * 1000.0) / 1000.0);
         comparison.put("earlierAvgSeconds", Math.round(earlierAvg * 1000.0) / 1000.0);
@@ -468,8 +473,10 @@ public class BuildPerformanceService {
             comparison.put("changePercent", Math.round(change * 10.0) / 10.0);
             if (change > 10) {
                 comparison.put("trend", "SLOWER — builds are taking longer recently");
-                comparison.put("alert", "Build times increased by " +
-                        Math.round(change * 10.0) / 10.0 + "% — investigate potential causes");
+                comparison.put(
+                        "alert",
+                        "Build times increased by " + Math.round(change * 10.0) / 10.0
+                                + "% — investigate potential causes");
             } else if (change < -10) {
                 comparison.put("trend", "FASTER — builds are improving");
             } else {
@@ -495,8 +502,8 @@ public class BuildPerformanceService {
                 Map<String, Object> trend = analyzeTrend(entry.getValue());
                 String trendVal = (String) trend.get("trend");
                 if ("SLOWER — builds are taking longer recently".equals(trendVal)) {
-                    insights.add("Command '" + entry.getKey() + "' is trending slower (" +
-                            trend.get("changePercent") + "% increase). Review for build cache issues.");
+                    insights.add("Command '" + entry.getKey() + "' is trending slower (" + trend.get("changePercent")
+                            + "% increase). Review for build cache issues.");
                 }
             }
         }
@@ -505,16 +512,18 @@ public class BuildPerformanceService {
 
     // ─── Performance suggestions ────────────────────────────────────────
 
-    private List<String> generateSuggestions(String tool, String command,
-                                              double durationSeconds,
-                                              List<Map<String, Object>> phases,
-                                              Map<String, Integer> testCounts) {
+    private List<String> generateSuggestions(
+            String tool,
+            String command,
+            double durationSeconds,
+            List<Map<String, Object>> phases,
+            Map<String, Integer> testCounts) {
         List<String> suggestions = new ArrayList<>();
 
         // Duration-based suggestions
         if (durationSeconds > 60) {
-            suggestions.add("Build took " + formatDuration(Duration.ofMillis((long)(durationSeconds * 1000))) +
-                    ". Consider enabling parallel execution to reduce build time.");
+            suggestions.add("Build took " + formatDuration(Duration.ofMillis((long) (durationSeconds * 1000)))
+                    + ". Consider enabling parallel execution to reduce build time.");
         }
 
         // Tool-specific
@@ -551,14 +560,14 @@ public class BuildPerformanceService {
 
         // Test-heavy builds
         if (testCounts.containsKey("total") && testCounts.get("total") > 50 && durationSeconds > 30) {
-            suggestions.add("Large test suite (" + testCounts.get("total") + " tests). " +
-                    "Consider parallel test execution to reduce test time.");
+            suggestions.add("Large test suite (" + testCounts.get("total") + " tests). "
+                    + "Consider parallel test execution to reduce test time.");
         }
 
         // Too many phases
         if (phases.size() > 10) {
-            suggestions.add(phases.size() + " build phases detected. " +
-                    "Consider splitting into focused goals to speed up iterative development.");
+            suggestions.add(phases.size() + " build phases detected. "
+                    + "Consider splitting into focused goals to speed up iterative development.");
         }
 
         return suggestions;
@@ -574,19 +583,23 @@ public class BuildPerformanceService {
 
             // Check for parallel build configuration
             if (!content.contains("<fork>true</fork>")) {
-                suggestions.add("Enable Maven surefire fork mode for isolated (and potentially parallel) test execution.");
+                suggestions.add(
+                        "Enable Maven surefire fork mode for isolated (and potentially parallel) test execution.");
             }
 
             // Check for build cache plugins
             if (!content.contains("maven-build-cache") && !content.contains("gradle-enterprise")) {
-                suggestions.add("Consider adding a build cache plugin (maven-build-cache-extension or Gradle Enterprise) to reuse outputs across builds.");
+                suggestions.add(
+                        "Consider adding a build cache plugin (maven-build-cache-extension or Gradle Enterprise) to reuse outputs across builds.");
             }
 
             // Check if skipping tests is configured
             if (content.contains("<skipTests>true</skipTests>")) {
                 suggestions.add("Tests are currently skipped. Enable them periodically to verify correctness.");
             }
-        } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
+        } catch (IOException e) {
+            System.err.println("[WARN] Build performance: " + e.getMessage());
+        }
 
         return suggestions;
     }
@@ -598,14 +611,11 @@ public class BuildPerformanceService {
         if (Files.exists(props)) {
             try {
                 List<String> lines = Files.readAllLines(props);
-                boolean hasParallel = lines.stream().anyMatch(l ->
-                        l.trim().startsWith("org.gradle.parallel="));
-                boolean hasCache = lines.stream().anyMatch(l ->
-                        l.trim().startsWith("org.gradle.caching="));
-                boolean hasDaemon = lines.stream().anyMatch(l ->
-                        l.trim().startsWith("org.gradle.daemon="));
-                boolean hasConfigCache = lines.stream().anyMatch(l ->
-                        l.trim().startsWith("org.gradle.configuration-cache="));
+                boolean hasParallel = lines.stream().anyMatch(l -> l.trim().startsWith("org.gradle.parallel="));
+                boolean hasCache = lines.stream().anyMatch(l -> l.trim().startsWith("org.gradle.caching="));
+                boolean hasDaemon = lines.stream().anyMatch(l -> l.trim().startsWith("org.gradle.daemon="));
+                boolean hasConfigCache =
+                        lines.stream().anyMatch(l -> l.trim().startsWith("org.gradle.configuration-cache="));
 
                 if (!hasParallel) {
                     suggestions.add("Add org.gradle.parallel=true to gradle.properties for parallel project builds.");
@@ -614,11 +624,15 @@ public class BuildPerformanceService {
                     suggestions.add("Add org.gradle.caching=true to enable build cache in gradle.properties.");
                 }
                 if (!hasConfigCache) {
-                    suggestions.add("Enable configuration cache: org.gradle.configuration-cache=true in gradle.properties.");
+                    suggestions.add(
+                            "Enable configuration cache: org.gradle.configuration-cache=true in gradle.properties.");
                 }
-            } catch (IOException e) { System.err.println("[WARN] Build performance: " + e.getMessage()); }
+            } catch (IOException e) {
+                System.err.println("[WARN] Build performance: " + e.getMessage());
+            }
         } else {
-            suggestions.add("No gradle.properties found. Create one with org.gradle.parallel=true and org.gradle.caching=true.");
+            suggestions.add(
+                    "No gradle.properties found. Create one with org.gradle.parallel=true and org.gradle.caching=true.");
         }
 
         return suggestions;
@@ -626,14 +640,16 @@ public class BuildPerformanceService {
 
     private List<String> analyzeSbtPerformance(Path projectDir) {
         List<String> suggestions = new ArrayList<>();
-        suggestions.add("Use Coursier for faster dependency resolution (add to project/plugins.sbt: addSbtPlugin(\"io.get-coursier\" % \"sbt-coursier\" % \"...\"))");
+        suggestions.add(
+                "Use Coursier for faster dependency resolution (add to project/plugins.sbt: addSbtPlugin(\"io.get-coursier\" % \"sbt-coursier\" % \"...\"))");
         return suggestions;
     }
 
     private List<String> generalSuggestions(String tool) {
         List<String> suggestions = new ArrayList<>();
 
-        suggestions.add("Use incremental compilation — most build tools support it by default but verify it's enabled.");
+        suggestions.add(
+                "Use incremental compilation — most build tools support it by default but verify it's enabled.");
         suggestions.add("Review unnecessary plugin executions — each plugin adds overhead.");
         suggestions.add("Consider using build tool daemons (Maven mvnd, Gradle daemon) to avoid JVM warmup time.");
 
@@ -659,8 +675,11 @@ public class BuildPerformanceService {
 
     private int parseInt(String s) {
         if (s == null || s.isBlank()) return 0;
-        try { return Integer.parseInt(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private static String esc(String s) {

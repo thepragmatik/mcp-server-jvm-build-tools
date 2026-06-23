@@ -16,6 +16,11 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.File;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,12 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-
-import java.io.File;
-import java.util.concurrent.TimeUnit;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Regression tests for {@link SyncProcessRunner}.
@@ -64,8 +63,7 @@ class SyncProcessRunnerTest {
     }
 
     private static void assumeShellAvailable() {
-        Assumptions.assumeTrue(new File("/bin/sh").canExecute(),
-                "POSIX /bin/sh required for process-spawning tests");
+        Assumptions.assumeTrue(new File("/bin/sh").canExecute(), "POSIX /bin/sh required for process-spawning tests");
     }
 
     private static Process spawn(String shellScript) throws Exception {
@@ -88,17 +86,14 @@ class SyncProcessRunnerTest {
             // Emit ~200KB to stderr ONLY. Reading stdout to EOF before stderr (the
             // old, broken behaviour) would block the child once the stderr pipe
             // fills, hanging forever. Concurrent draining must complete promptly.
-            Process process = spawn(
-                    "yes 'STDERR_PADDING_0123456789ABCDEF0123456789ABCDEF' | head -n "
-                            + FLOOD_LINES + " 1>&2");
+            Process process =
+                    spawn("yes 'STDERR_PADDING_0123456789ABCDEF0123456789ABCDEF' | head -n " + FLOOD_LINES + " 1>&2");
 
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "test-stderr");
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stdout()).isEmpty();
-            assertThat(result.stderr())
-                    .contains("STDERR_PADDING")
-                    .hasLineCount(FLOOD_LINES);
+            assertThat(result.stderr()).contains("STDERR_PADDING").hasLineCount(FLOOD_LINES);
             assertThat(result.stderr().length()).isGreaterThan(64 * 1024);
         }
 
@@ -107,17 +102,13 @@ class SyncProcessRunnerTest {
         @DisplayName(">64KB of stdout does not deadlock and is fully captured")
         void largeStdoutDoesNotDeadlock() throws Exception {
             assumeShellAvailable();
-            Process process = spawn(
-                    "yes 'STDOUT_PADDING_0123456789ABCDEF0123456789ABCDEF' | head -n "
-                            + FLOOD_LINES);
+            Process process = spawn("yes 'STDOUT_PADDING_0123456789ABCDEF0123456789ABCDEF' | head -n " + FLOOD_LINES);
 
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "test-stdout");
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stderr()).isEmpty();
-            assertThat(result.stdout())
-                    .contains("STDOUT_PADDING")
-                    .hasLineCount(FLOOD_LINES);
+            assertThat(result.stdout()).contains("STDOUT_PADDING").hasLineCount(FLOOD_LINES);
             assertThat(result.stdout().length()).isGreaterThan(64 * 1024);
         }
 
@@ -126,10 +117,9 @@ class SyncProcessRunnerTest {
         @DisplayName("large output on BOTH streams is captured without deadlock")
         void largeBothStreamsDoNotDeadlock() throws Exception {
             assumeShellAvailable();
-            Process process = spawn(
-                    "yes 'BOTH_PADDING_0123456789ABCDEF' | head -n " + FLOOD_LINES + "; "
-                            + "yes 'BOTH_PADDING_0123456789ABCDEF' | head -n " + FLOOD_LINES
-                            + " 1>&2");
+            Process process = spawn("yes 'BOTH_PADDING_0123456789ABCDEF' | head -n " + FLOOD_LINES + "; "
+                    + "yes 'BOTH_PADDING_0123456789ABCDEF' | head -n " + FLOOD_LINES
+                    + " 1>&2");
 
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "test-both");
 
@@ -154,8 +144,7 @@ class SyncProcessRunnerTest {
             assumeShellAvailable();
             Process process = spawn("sleep 60");
 
-            assertThatThrownBy(() ->
-                    SyncProcessRunner.run(process, "test-timeout", 1, TimeUnit.SECONDS))
+            assertThatThrownBy(() -> SyncProcessRunner.run(process, "test-timeout", 1, TimeUnit.SECONDS))
                     .isInstanceOf(SyncProcessRunner.ExecutionTimeoutException.class)
                     .hasMessageContaining("timed out")
                     .hasMessageContaining(SyncProcessRunner.TIMEOUT_PROPERTY);
@@ -170,8 +159,7 @@ class SyncProcessRunnerTest {
             assumeShellAvailable();
             Process process = spawn("echo done");
 
-            SyncProcessRunner.Result result =
-                    SyncProcessRunner.run(process, "test-fast", 30, TimeUnit.SECONDS);
+            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "test-fast", 30, TimeUnit.SECONDS);
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stdout()).contains("done");
@@ -190,8 +178,7 @@ class SyncProcessRunnerTest {
         @DisplayName("returns the default when the property is unset")
         void defaultWhenUnset() {
             System.clearProperty(SyncProcessRunner.TIMEOUT_PROPERTY);
-            assertThat(SyncProcessRunner.resolveTimeoutSeconds())
-                    .isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
+            assertThat(SyncProcessRunner.resolveTimeoutSeconds()).isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
         }
 
         @Test
@@ -205,28 +192,24 @@ class SyncProcessRunnerTest {
         @DisplayName("falls back to default on a blank value")
         void fallsBackOnBlank() {
             System.setProperty(SyncProcessRunner.TIMEOUT_PROPERTY, "   ");
-            assertThat(SyncProcessRunner.resolveTimeoutSeconds())
-                    .isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
+            assertThat(SyncProcessRunner.resolveTimeoutSeconds()).isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
         }
 
         @Test
         @DisplayName("falls back to default on a malformed value")
         void fallsBackOnMalformed() {
             System.setProperty(SyncProcessRunner.TIMEOUT_PROPERTY, "not-a-number");
-            assertThat(SyncProcessRunner.resolveTimeoutSeconds())
-                    .isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
+            assertThat(SyncProcessRunner.resolveTimeoutSeconds()).isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
         }
 
         @Test
         @DisplayName("falls back to default on a non-positive value")
         void fallsBackOnNonPositive() {
             System.setProperty(SyncProcessRunner.TIMEOUT_PROPERTY, "0");
-            assertThat(SyncProcessRunner.resolveTimeoutSeconds())
-                    .isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
+            assertThat(SyncProcessRunner.resolveTimeoutSeconds()).isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
 
             System.setProperty(SyncProcessRunner.TIMEOUT_PROPERTY, "-5");
-            assertThat(SyncProcessRunner.resolveTimeoutSeconds())
-                    .isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
+            assertThat(SyncProcessRunner.resolveTimeoutSeconds()).isEqualTo(SyncProcessRunner.DEFAULT_TIMEOUT_SECONDS);
         }
 
         @Test

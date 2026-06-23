@@ -60,5 +60,9 @@ jobs:
       - name: License headers check
         run: ./mvnw -B license:format --file pom.xml --no-transfer-progress
         continue-on-error: true
+      - name: Spotless formatting check
+        run: ./mvnw -B spotless:check --file pom.xml --no-transfer-progress
+      - name: SpotBugs static analysis
+        run: ./mvnw -B compile spotbugs:check --file pom.xml --no-transfer-progress
       - name: Compile with warnings
         run: ./mvnw -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress

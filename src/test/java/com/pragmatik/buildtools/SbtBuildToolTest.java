@@ -16,18 +16,17 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Comprehensive test suite for {@link SbtBuildTool}.
@@ -67,9 +66,17 @@ class SbtBuildToolTest {
                     .isNotNull()
                     .isNotEmpty()
                     .containsExactlyInAnyOrder(
-                            "compile", "test", "run", "package", "clean", "assembly",
-                            "publishLocal", "publish", "update", "doc", "console"
-                    );
+                            "compile",
+                            "test",
+                            "run",
+                            "package",
+                            "clean",
+                            "assembly",
+                            "publishLocal",
+                            "publish",
+                            "update",
+                            "doc",
+                            "console");
         }
 
         @Test
@@ -152,15 +159,13 @@ class SbtBuildToolTest {
         @Test
         @DisplayName("strips 'sbt ' prefix and splits tokens")
         void stripsSbtPrefix() {
-            assertThat(SbtBuildTool.parseCommandTokens("sbt compile"))
-                    .containsExactly("compile");
+            assertThat(SbtBuildTool.parseCommandTokens("sbt compile")).containsExactly("compile");
         }
 
         @Test
         @DisplayName("handles command without sbt prefix")
         void handlesCommandWithoutPrefix() {
-            assertThat(SbtBuildTool.parseCommandTokens("compile"))
-                    .containsExactly("compile");
+            assertThat(SbtBuildTool.parseCommandTokens("compile")).containsExactly("compile");
         }
 
         @Test
@@ -186,15 +191,13 @@ class SbtBuildToolTest {
         @Test
         @DisplayName("collapses extra whitespace between tokens")
         void collapsesExtraWhitespace() {
-            assertThat(SbtBuildTool.parseCommandTokens("sbt   compile    test"))
-                    .containsExactly("compile", "test");
+            assertThat(SbtBuildTool.parseCommandTokens("sbt   compile    test")).containsExactly("compile", "test");
         }
 
         @Test
         @DisplayName("trims leading and trailing whitespace")
         void trimsLeadingTrailingWhitespace() {
-            assertThat(SbtBuildTool.parseCommandTokens("  sbt compile  "))
-                    .containsExactly("compile");
+            assertThat(SbtBuildTool.parseCommandTokens("  sbt compile  ")).containsExactly("compile");
         }
 
         @Test
@@ -224,22 +227,19 @@ class SbtBuildToolTest {
         @Test
         @DisplayName("allows 'assembly' task (fat JAR packaging)")
         void allowsAssemblyTask() {
-            assertThat(SbtBuildTool.parseCommandTokens("sbt assembly"))
-                    .containsExactly("assembly");
+            assertThat(SbtBuildTool.parseCommandTokens("sbt assembly")).containsExactly("assembly");
         }
 
         @Test
         @DisplayName("allows 'publishLocal' task")
         void allowsPublishLocalTask() {
-            assertThat(SbtBuildTool.parseCommandTokens("sbt publishLocal"))
-                    .containsExactly("publishLocal");
+            assertThat(SbtBuildTool.parseCommandTokens("sbt publishLocal")).containsExactly("publishLocal");
         }
 
         @Test
         @DisplayName("allows 'doc' and 'console' tasks")
         void allowsDocAndConsoleTasks() {
-            assertThat(SbtBuildTool.parseCommandTokens("sbt doc console"))
-                    .containsExactly("doc", "console");
+            assertThat(SbtBuildTool.parseCommandTokens("sbt doc console")).containsExactly("doc", "console");
         }
     }
 
@@ -337,8 +337,7 @@ class SbtBuildToolTest {
             Path sbtBin = Files.createFile(binDir.resolve("sbt"));
             sbtBin.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    sbtHome.toString(), null);
+            String result = SbtBuildTool.resolveSbtExecutable(sbtHome.toString(), null);
             assertThat(result).isEqualTo(sbtBin.toString());
         }
 
@@ -348,8 +347,7 @@ class SbtBuildToolTest {
             Path sbtWrapper = Files.createFile(sbtHome.resolve("sbt"));
             sbtWrapper.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    sbtHome.toString(), null);
+            String result = SbtBuildTool.resolveSbtExecutable(sbtHome.toString(), null);
             assertThat(result).isEqualTo(sbtWrapper.toString());
         }
 
@@ -359,8 +357,7 @@ class SbtBuildToolTest {
             Path sbtExe = Files.createFile(sbtHome.resolve("sbt"));
             sbtExe.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    sbtExe.toString(), null);
+            String result = SbtBuildTool.resolveSbtExecutable(sbtExe.toString(), null);
             assertThat(result).isEqualTo(sbtExe.toString());
         }
 
@@ -370,8 +367,7 @@ class SbtBuildToolTest {
             Path sbtWrapper = Files.createFile(sbtHome.resolve("sbt"));
             sbtWrapper.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    null, sbtHome.toString());
+            String result = SbtBuildTool.resolveSbtExecutable(null, sbtHome.toString());
             assertThat(result).isEqualTo(sbtWrapper.toString());
         }
 
@@ -386,8 +382,7 @@ class SbtBuildToolTest {
         @DisplayName("falls back to 'sbt' when paths have no executables")
         void fallsBackWhenNoExecutablesFound(@TempDir Path emptyDir) {
             Path nonexistent = emptyDir.resolve("does-not-exist");
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    nonexistent.toString(), nonexistent.toString());
+            String result = SbtBuildTool.resolveSbtExecutable(nonexistent.toString(), nonexistent.toString());
             assertThat(result).isEqualTo("sbt");
         }
 
@@ -415,8 +410,7 @@ class SbtBuildToolTest {
             Path sbtWrapper = Files.createFile(sbtHome.resolve("sbt"));
             sbtWrapper.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    sbtHome.toString(), null);
+            String result = SbtBuildTool.resolveSbtExecutable(sbtHome.toString(), null);
             assertThat(result).isEqualTo(sbtBin.toString());
         }
 
@@ -432,8 +426,7 @@ class SbtBuildToolTest {
             Path sbtWrapper = Files.createFile(projectDir.resolve("sbt"));
             sbtWrapper.toFile().setExecutable(true);
 
-            String result = SbtBuildTool.resolveSbtExecutable(
-                    toolDir.toString(), projectDir.toString());
+            String result = SbtBuildTool.resolveSbtExecutable(toolDir.toString(), projectDir.toString());
             assertThat(result).isEqualTo(sbtBin.toString());
         }
     }
@@ -451,8 +444,7 @@ class SbtBuildToolTest {
         void providerRegistersSbtBuildTool() {
             BuildToolProvider provider = new BuildToolProvider();
             assertThat(provider.getTool("sbt")).isPresent();
-            assertThat(provider.getTool("sbt").get())
-                    .isInstanceOf(SbtBuildTool.class);
+            assertThat(provider.getTool("sbt").get()).isInstanceOf(SbtBuildTool.class);
         }
 
         @Test
@@ -482,8 +474,7 @@ class SbtBuildToolTest {
         void providerListsSbtInAllTools() {
             BuildToolProvider provider = new BuildToolProvider();
             assertThat(provider.getAllTools()).containsKey("sbt");
-            assertThat(provider.getAllTools().get("sbt"))
-                    .isInstanceOf(SbtBuildTool.class);
+            assertThat(provider.getAllTools().get("sbt")).isInstanceOf(SbtBuildTool.class);
         }
 
         @Test

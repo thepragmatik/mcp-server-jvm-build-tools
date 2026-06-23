@@ -17,10 +17,6 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +24,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * Unified MCP service exposing build tool operations as MCP tools.
@@ -53,8 +52,7 @@ import java.util.stream.Collectors;
 public class BuildToolsService {
 
     private static final int MAX_COMMAND_LENGTH = 500;
-    private static final Pattern COMMAND_PATTERN =
-            Pattern.compile("^(gradle\\w*\\s+)?[a-zA-Z0-9\\s._=/:@;\\-]+$");
+    private static final Pattern COMMAND_PATTERN = Pattern.compile("^(gradle\\w*\\s+)?[a-zA-Z0-9\\s._=/:@;\\-]+$");
 
     private final BuildToolProvider provider;
     private final Map<String, BuildOutputParser> outputParsers;
@@ -70,16 +68,17 @@ public class BuildToolsService {
     /**
      * Get the version of any registered build tool.
      */
-    @Tool(name = "get_build_tool_version",
-          description = "Get the installed version of a build tool. Supports maven, gradle, sbt, and other registered tools.")
+    @Tool(
+            name = "get_build_tool_version",
+            description =
+                    "Get the installed version of a build tool. Supports maven, gradle, sbt, and other registered tools.")
     public String getBuildToolVersion(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = true, description = "Name of the build tool ('maven', 'gradle', 'sbt')")
-            String buildToolName) {
+                    @ToolParam(required = true, description = "Name of the build tool ('maven', 'gradle', 'sbt')")
+                    String buildToolName) {
         BuildTool tool = provider.getTool(buildToolName)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Unknown build tool: " + buildToolName +
-                        ". Available: " + provider.getAllTools().keySet()));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown build tool: " + buildToolName + ". Available: "
+                        + provider.getAllTools().keySet()));
         return tool.version();
     }
 
@@ -87,29 +86,38 @@ public class BuildToolsService {
      * Execute a build command using any registered build tool.
      * Auto-detects the tool from the project directory if no tool name is specified.
      */
-    @Tool(name = "execute_build_command",
-          description = "Execute a build command using Maven, Gradle, SBT, or any registered build tool. " +
-                        "Auto-detects the build tool from project markers if no tool name is specified. " +
-                        "Maven supports: clean, compile, test, package, install, deploy, validate. " +
-                        "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. " +
-                        "SBT supports: compile, test, run, package, clean, assembly.")
+    @Tool(
+            name = "execute_build_command",
+            description = "Execute a build command using Maven, Gradle, SBT, or any registered build tool. "
+                    + "Auto-detects the build tool from project markers if no tool name is specified. "
+                    + "Maven supports: clean, compile, test, package, install, deploy, validate. "
+                    + "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. "
+                    + "SBT supports: compile, test, run, package, clean, assembly.")
     public String executeBuildCommand(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
-            String buildToolName,
-            @ToolParam(required = false, description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
-            String buildToolHome,
+                    @ToolParam(
+                            required = false,
+                            description =
+                                    "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
+                    String buildToolName,
+            @ToolParam(
+                            required = false,
+                            description =
+                                    "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
+                    String buildToolHome,
             @ToolParam(required = true, description = "Path to the project directory containing build files")
-            String projectDir,
-            @ToolParam(required = true, description = "Build command to execute (e.g., 'clean compile' for Maven, 'build' for Gradle, 'compile;test' for SBT)")
-            String command) {
+                    String projectDir,
+            @ToolParam(
+                            required = true,
+                            description =
+                                    "Build command to execute (e.g., 'clean compile' for Maven, 'build' for Gradle, 'compile;test' for SBT)")
+                    String command) {
         // Validate command length and character content
         if (command == null || command.trim().isEmpty()) {
             throw new IllegalArgumentException("Command cannot be null or empty.");
         }
         if (command.length() > MAX_COMMAND_LENGTH) {
-            throw new IllegalArgumentException(
-                    "Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
+            throw new IllegalArgumentException("Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
         }
         if (!COMMAND_PATTERN.matcher(command).matches()) {
             throw new IllegalArgumentException("Command contains disallowed characters.");
@@ -121,8 +129,7 @@ public class BuildToolsService {
             try {
                 validatedHome = Path.of(buildToolHome).toRealPath().toString();
             } catch (IOException e) {
-                throw new IllegalArgumentException(
-                        "Cannot resolve build tool home: " + buildToolHome, e);
+                throw new IllegalArgumentException("Cannot resolve build tool home: " + buildToolHome, e);
             }
         }
         Path validatedProject;
@@ -142,8 +149,7 @@ public class BuildToolsService {
     /**
      * List all registered build tools with their supported commands.
      */
-    @Tool(name = "list_build_tools",
-          description = "List all registered build tools with their supported commands.")
+    @Tool(name = "list_build_tools", description = "List all registered build tools with their supported commands.")
     public String listBuildTools() {
         return provider.getAllTools().entrySet().stream()
                 .map(entry -> {
@@ -164,16 +170,16 @@ public class BuildToolsService {
      * When multiple markers coexist (hybrid projects), all detected tools
      * are listed rather than silently picking one.
      */
-    @Tool(name = "detect_build_tool",
-          description = "Detect which build tool a project uses by scanning for " +
-                        "marker files (pom.xml, build.gradle, build.sbt, etc.). " +
-                        "Returns a JSON object with detected tools, matched marker files, " +
-                        "wrapper availability, and project structure hints. " +
-                        "Use this to understand a project's build system before executing commands.")
+    @Tool(
+            name = "detect_build_tool",
+            description = "Detect which build tool a project uses by scanning for "
+                    + "marker files (pom.xml, build.gradle, build.sbt, etc.). "
+                    + "Returns a JSON object with detected tools, matched marker files, "
+                    + "wrapper availability, and project structure hints. "
+                    + "Use this to understand a project's build system before executing commands.")
     public String detectBuildTool(
-            @ToolParam(required = true,
-                       description = "Path to the project directory to scan for build tool markers")
-            String projectDir) {
+            @ToolParam(required = true, description = "Path to the project directory to scan for build tool markers")
+                    String projectDir) {
 
         Path dir;
         try {
@@ -270,9 +276,13 @@ public class BuildToolsService {
         result.put("toolCount", detectedTools.size());
 
         if (detectedTools.isEmpty()) {
-            result.put("warning", "No build tool markers found. The project directory may not be a recognized JVM project.");
+            result.put(
+                    "warning",
+                    "No build tool markers found. The project directory may not be a recognized JVM project.");
         } else if (detectedTools.size() > 1) {
-            result.put("warning", "Multiple build tools detected (hybrid project). Maven is prioritized for auto-detection when tool name is not specified.");
+            result.put(
+                    "warning",
+                    "Multiple build tools detected (hybrid project). Maven is prioritized for auto-detection when tool name is not specified.");
         }
 
         return JsonUtils.toJson(result);
@@ -290,26 +300,31 @@ public class BuildToolsService {
      * same command as {@link #executeBuildCommand(String, String, String, String)}
      * and then parses the output.
      */
-    @Tool(name = "analyze_build_output",
-          description = "Execute a build command and return structured JSON output with parsed test " +
-                        "results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT. " +
-                        "Returns: {success, tool, command, duration, testSummary: {total, passed, failed, " +
-                        "errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, " +
-                        "warningCount}. Much easier for agents to process than raw build output.")
+    @Tool(
+            name = "analyze_build_output",
+            description = "Execute a build command and return structured JSON output with parsed test "
+                    + "results, compile errors, and warnings instead of raw text. Supports Maven, Gradle, and SBT. "
+                    + "Returns: {success, tool, command, duration, testSummary: {total, passed, failed, "
+                    + "errors, skipped}, errors: [{file, line, severity, message}], warnings, errorCount, "
+                    + "warningCount}. Much easier for agents to process than raw build output.")
     public String analyzeBuildOutput(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false,
-                       description = "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
-            String buildToolName,
-            @ToolParam(required = false,
-                       description = "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
-            String buildToolHome,
-            @ToolParam(required = true,
-                       description = "Path to the project directory containing build files")
-            String projectDir,
-            @ToolParam(required = true,
-                       description = "Build command to execute (e.g., 'clean test' for Maven, 'test' for Gradle)")
-            String command) {
+                    @ToolParam(
+                            required = false,
+                            description =
+                                    "Name of the build tool ('maven', 'gradle', or 'sbt'). Omit to auto-detect from project directory.")
+                    String buildToolName,
+            @ToolParam(
+                            required = false,
+                            description =
+                                    "Path to the build tool installation directory. Optional for Gradle (uses wrapper or PATH fallback).")
+                    String buildToolHome,
+            @ToolParam(required = true, description = "Path to the project directory containing build files")
+                    String projectDir,
+            @ToolParam(
+                            required = true,
+                            description = "Build command to execute (e.g., 'clean test' for Maven, 'test' for Gradle)")
+                    String command) {
 
         // Canonicalize paths
         String validatedHome = null;
@@ -366,16 +381,16 @@ public class BuildToolsService {
      * This is a static analysis tool — it does NOT execute the build, so it is
      * fast and safe. Use before {@link #executeBuildCommand} to catch issues early.
      */
-    @Tool(name = "validate_build_configuration",
-          description = "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) " +
-                        "for correctness. Checks XML well-formedness, required elements, plugin version " +
-                        "consistency for Maven, and basic syntax for Gradle. Returns structured JSON with " +
-                        "{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}. " +
-                        "Use this before executing builds to catch configuration errors early.")
+    @Tool(
+            name = "validate_build_configuration",
+            description = "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) "
+                    + "for correctness. Checks XML well-formedness, required elements, plugin version "
+                    + "consistency for Maven, and basic syntax for Gradle. Returns structured JSON with "
+                    + "{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}. "
+                    + "Use this before executing builds to catch configuration errors early.")
     public String validateBuildConfiguration(
-            @ToolParam(required = true,
-                       description = "Path to the project directory containing build files")
-            String projectDir) {
+            @ToolParam(required = true, description = "Path to the project directory containing build files")
+                    String projectDir) {
 
         Path dir;
         try {
@@ -477,8 +492,7 @@ public class BuildToolsService {
             if (hasParentBlock) {
                 int parentStart = content.indexOf("<parent>");
                 int parentEnd = content.indexOf("</parent>") + "</parent>".length();
-                contentOutsideParent = content.substring(0, parentStart) +
-                        content.substring(parentEnd);
+                contentOutsideParent = content.substring(0, parentStart) + content.substring(parentEnd);
             }
 
             String[] requiredElements = {"modelVersion", "groupId", "artifactId", "version"};
@@ -492,8 +506,7 @@ public class BuildToolsService {
                 if (!hasOpen && canBeInherited && hasParentBlock) {
                     // Check if it's present in the parent block
                     String parentBlock = content.substring(
-                            content.indexOf("<parent>"),
-                            content.indexOf("</parent>") + "</parent>".length());
+                            content.indexOf("<parent>"), content.indexOf("</parent>") + "</parent>".length());
                     if (parentBlock.contains("<" + element + ">")) {
                         // Inherited from parent — valid
                         continue;
@@ -530,8 +543,10 @@ public class BuildToolsService {
                     Map<String, Object> issue = new LinkedHashMap<>();
                     issue.put("severity", "WARNING");
                     issue.put("path", "pom.xml");
-                    issue.put("message", "Duplicate dependency declaration: " + entry.getKey() +
-                            " (declared " + entry.getValue() + " times)");
+                    issue.put(
+                            "message",
+                            "Duplicate dependency declaration: " + entry.getKey() + " (declared " + entry.getValue()
+                                    + " times)");
                     issue.put("suggestion", "Remove duplicate <dependency> entry for " + entry.getKey());
                     issues.add(issue);
                 }
@@ -555,10 +570,14 @@ public class BuildToolsService {
                     Map<String, Object> issue = new LinkedHashMap<>();
                     issue.put("severity", "WARNING");
                     issue.put("path", "pom.xml");
-                    issue.put("message", "Inconsistent plugin versions for " + entry.getKey() +
-                            ": " + String.join(", ", entry.getValue()));
-                    issue.put("suggestion", "Use <pluginManagement> to centralize plugin version for " +
-                            entry.getKey().split(":")[1]);
+                    issue.put(
+                            "message",
+                            "Inconsistent plugin versions for " + entry.getKey() + ": "
+                                    + String.join(", ", entry.getValue()));
+                    issue.put(
+                            "suggestion",
+                            "Use <pluginManagement> to centralize plugin version for "
+                                    + entry.getKey().split(":")[1]);
                     issues.add(issue);
                 }
             }
@@ -608,7 +627,12 @@ public class BuildToolsService {
                 Map<String, Object> issue = new LinkedHashMap<>();
                 issue.put("severity", "ERROR");
                 issue.put("path", filename);
-                issue.put("message", "Unbalanced braces: " + (braceDepth > 0 ? "missing " + braceDepth + " closing brace(s)" : "extra " + (-braceDepth) + " closing brace(s)"));
+                issue.put(
+                        "message",
+                        "Unbalanced braces: "
+                                + (braceDepth > 0
+                                        ? "missing " + braceDepth + " closing brace(s)"
+                                        : "extra " + (-braceDepth) + " closing brace(s)"));
                 issue.put("suggestion", "Ensure all opening braces '{' have matching closing braces '}'");
                 issues.add(issue);
             }
@@ -651,7 +675,9 @@ public class BuildToolsService {
                     issue.put("severity", "WARNING");
                     issue.put("path", filename);
                     issue.put("message", "Using Groovy-style single quotes in Kotlin DSL");
-                    issue.put("suggestion", "Use double quotes in Kotlin DSL: implementation(\"group:artifact:version\")");
+                    issue.put(
+                            "suggestion",
+                            "Use double quotes in Kotlin DSL: implementation(\"group:artifact:version\")");
                     issues.add(issue);
                 }
             }

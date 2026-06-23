@@ -16,12 +16,12 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for streamable HTTP transport configuration, CORS,
@@ -55,8 +55,7 @@ class TransportConfigTest {
     void buildEventController_broadcastToNone() {
         BuildEventController controller = new BuildEventController();
         // Broadcasting with no subscribers should not throw
-        assertDoesNotThrow(() ->
-            controller.broadcast("build-start", "{\"status\":\"started\"}"));
+        assertDoesNotThrow(() -> controller.broadcast("build-start", "{\"status\":\"started\"}"));
     }
 
     @Test

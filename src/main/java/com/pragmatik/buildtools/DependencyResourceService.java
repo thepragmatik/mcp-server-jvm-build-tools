@@ -16,16 +16,15 @@
  */
 package com.pragmatik.buildtools;
 
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * Multi-build-tool dependency extraction service.
@@ -47,12 +46,12 @@ public class DependencyResourceService {
         this.toolProvider = toolProvider;
     }
 
-    @Tool(name = "list_dependency_resources",
-          description = "List available dependency resources for a project directory. " +
-                        "Returns resource URIs with dependency counts per build tool.")
+    @Tool(
+            name = "list_dependency_resources",
+            description = "List available dependency resources for a project directory. "
+                    + "Returns resource URIs with dependency counts per build tool.")
     public String listDependencyResources(
-            @ToolParam(required = true, description = "Project directory path")
-            String projectDir) {
+            @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
         try {
@@ -79,7 +78,7 @@ public class DependencyResourceService {
             resources.add(r);
         }
 
-        for (String gf : new String[]{"build.gradle", "build.gradle.kts"}) {
+        for (String gf : new String[] {"build.gradle", "build.gradle.kts"}) {
             if (Files.exists(dir.resolve(gf))) {
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("uri", "build://" + projectName + "/dependencies/gradle");
@@ -112,14 +111,14 @@ public class DependencyResourceService {
         return toJson(result);
     }
 
-    @Tool(name = "read_dependency_resource",
-          description = "Read extracted dependencies from a build file. " +
-                        "Use list_dependency_resources first to discover available URIs.")
+    @Tool(
+            name = "read_dependency_resource",
+            description = "Read extracted dependencies from a build file. "
+                    + "Use list_dependency_resources first to discover available URIs.")
     public String readDependencyResource(
             @ToolParam(required = true, description = "Resource URI (e.g., 'build://myproject/dependencies/maven')")
-            String resourceUri,
-            @ToolParam(required = true, description = "Project directory path")
-            String projectDir) {
+                    String resourceUri,
+            @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
         try {
@@ -156,9 +155,9 @@ public class DependencyResourceService {
             List<Map<String, Object>> deps = new ArrayList<>();
 
             Pattern dp = Pattern.compile(
-                "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>" +
-                "\\s*(?:<version>([^<]*)</version>)?(?:\\s*<scope>([^<]*)</scope>)?",
-                Pattern.DOTALL);
+                    "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>"
+                            + "\\s*(?:<version>([^<]*)</version>)?(?:\\s*<scope>([^<]*)</scope>)?",
+                    Pattern.DOTALL);
             Matcher m = dp.matcher(content);
             while (m.find()) {
                 Map<String, Object> d = new LinkedHashMap<>();
@@ -189,7 +188,7 @@ public class DependencyResourceService {
     // ─── Gradle ─────────────────────────────────────────────────────────
 
     private Path findGradleFile(Path dir) {
-        for (String n : new String[]{"build.gradle.kts", "build.gradle"}) {
+        for (String n : new String[] {"build.gradle.kts", "build.gradle"}) {
             Path f = dir.resolve(n);
             if (Files.exists(f)) return f;
         }
@@ -245,8 +244,7 @@ public class DependencyResourceService {
             String content = Files.readString(dir.resolve("build.sbt"));
             List<Map<String, Object>> deps = new ArrayList<>();
 
-            Pattern p = Pattern.compile(
-                "\"([^\"]+)\"\\s*(%{1,2})\\s*\"([^\"]+)\"\\s*%\\s*\"([^\"]+)\"");
+            Pattern p = Pattern.compile("\"([^\"]+)\"\\s*(%{1,2})\\s*\"([^\"]+)\"\\s*%\\s*\"([^\"]+)\"");
             Matcher m = p.matcher(content);
             while (m.find()) {
                 Map<String, Object> d = new LinkedHashMap<>();
@@ -294,25 +292,34 @@ public class DependencyResourceService {
 
     @SuppressWarnings("unchecked")
     private static void appendVal(StringBuilder sb, Object v) {
-        if (v == null) { sb.append("null"); }
-        else if (v instanceof String) { sb.append("\"").append(esc((String) v)).append("\""); }
-        else if (v instanceof Boolean || v instanceof Number) { sb.append(v); }
-        else if (v instanceof List) {
+        if (v == null) {
+            sb.append("null");
+        } else if (v instanceof String) {
+            sb.append("\"").append(esc((String) v)).append("\"");
+        } else if (v instanceof Boolean || v instanceof Number) {
+            sb.append(v);
+        } else if (v instanceof List) {
             sb.append("[");
             List<?> l = (List<?>) v;
-            for (int i = 0; i < l.size(); i++) { if (i > 0) sb.append(","); appendVal(sb, l.get(i)); }
+            for (int i = 0; i < l.size(); i++) {
+                if (i > 0) sb.append(",");
+                appendVal(sb, l.get(i));
+            }
             sb.append("]");
         } else if (v instanceof Map) {
             sb.append("{");
             Map<String, Object> m = (Map<String, Object>) v;
             boolean f = true;
             for (Map.Entry<String, Object> e : m.entrySet()) {
-                if (!f) sb.append(","); f = false;
+                if (!f) sb.append(",");
+                f = false;
                 sb.append("\"").append(esc(e.getKey())).append("\":");
                 appendVal(sb, e.getValue());
             }
             sb.append("}");
-        } else { sb.append("\"").append(esc(String.valueOf(v))).append("\""); }
+        } else {
+            sb.append("\"").append(esc(String.valueOf(v))).append("\"");
+        }
     }
 
     private static String esc(String s) {
@@ -320,12 +327,23 @@ public class DependencyResourceService {
         StringBuilder sb = new StringBuilder();
         for (char c : s.toCharArray()) {
             switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default: sb.append(c);
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    sb.append(c);
             }
         }
         return sb.toString();

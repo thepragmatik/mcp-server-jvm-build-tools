@@ -17,6 +17,14 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -24,15 +32,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.IOException;
-import java.io.StringReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
 
 /**
  * Build tool credential management service.
@@ -54,28 +53,40 @@ public class BuildAuthService {
 
     // Known credential-bearing environment variables
     private static final List<String> CREDENTIAL_ENV_VARS = List.of(
-            "MAVEN_USERNAME", "MAVEN_PASSWORD",
-            "MAVEN_CENTRAL_USERNAME", "MAVEN_CENTRAL_PASSWORD",
-            "GRADLE_USERNAME", "GRADLE_PASSWORD",
-            "NEXUS_USERNAME", "NEXUS_PASSWORD",
-            "ARTIFACTORY_USERNAME", "ARTIFACTORY_PASSWORD",
-            "REPOSILITE_USERNAME", "REPOSILITE_PASSWORD",
-            "JFROG_USERNAME", "JFROG_PASSWORD",
-            "GITHUB_ACTOR", "GITHUB_TOKEN",
-            "GITLAB_USERNAME", "GITLAB_TOKEN",
+            "MAVEN_USERNAME",
+            "MAVEN_PASSWORD",
+            "MAVEN_CENTRAL_USERNAME",
+            "MAVEN_CENTRAL_PASSWORD",
+            "GRADLE_USERNAME",
+            "GRADLE_PASSWORD",
+            "NEXUS_USERNAME",
+            "NEXUS_PASSWORD",
+            "ARTIFACTORY_USERNAME",
+            "ARTIFACTORY_PASSWORD",
+            "REPOSILITE_USERNAME",
+            "REPOSILITE_PASSWORD",
+            "JFROG_USERNAME",
+            "JFROG_PASSWORD",
+            "GITHUB_ACTOR",
+            "GITHUB_TOKEN",
+            "GITLAB_USERNAME",
+            "GITLAB_TOKEN",
             "CODEARTIFACT_AUTH_TOKEN",
-            "PUBLISH_USERNAME", "PUBLISH_PASSWORD"
-    );
+            "PUBLISH_USERNAME",
+            "PUBLISH_PASSWORD");
 
     // Known Gradle properties that carry credentials
     private static final List<String> GRADLE_CREDENTIAL_PROPERTY_PATTERNS = List.of(
             "systemProp.reposilite.",
             "systemProp.maven.central.",
-            "nexusUsername", "nexusPassword",
-            "artifactoryUsername", "artifactoryPassword",
-            "repoUsername", "repoPassword",
-            "publishUsername", "publishPassword"
-    );
+            "nexusUsername",
+            "nexusPassword",
+            "artifactoryUsername",
+            "artifactoryPassword",
+            "repoUsername",
+            "repoPassword",
+            "publishUsername",
+            "publishPassword");
 
     private final DocumentBuilder documentBuilder;
 
@@ -102,25 +113,29 @@ public class BuildAuthService {
      * Returns a structured JSON report showing what is configured, what is missing,
      * with all credential values masked.
      */
-    @Tool(name = "check_credential_status",
-          description = "Scan the project directory and system for configured Maven and Gradle " +
-                        "credentials. Checks ~/.m2/settings.xml (servers, mirrors, proxies), " +
-                        "~/.gradle/gradle.properties (repo credentials), and common environment " +
-                        "variables. Returns a JSON report with WHAT is configured, WHAT is missing, " +
-                        "and masked credential values (only last 3 chars shown as ****abc). " +
-                        "NEVER exposes raw passwords or tokens. Read-only and safe.")
+    @Tool(
+            name = "check_credential_status",
+            description = "Scan the project directory and system for configured Maven and Gradle "
+                    + "credentials. Checks ~/.m2/settings.xml (servers, mirrors, proxies), "
+                    + "~/.gradle/gradle.properties (repo credentials), and common environment "
+                    + "variables. Returns a JSON report with WHAT is configured, WHAT is missing, "
+                    + "and masked credential values (only last 3 chars shown as ****abc). "
+                    + "NEVER exposes raw passwords or tokens. Read-only and safe.")
     public String checkCredentialStatus(
-            @ToolParam(required = false,
-                       description = "Project directory path. When provided, also scans for " +
-                                     "project-local credential configuration files.")
-            String projectDir,
+            @ToolParam(
+                            required = false,
+                            description = "Project directory path. When provided, also scans for "
+                                    + "project-local credential configuration files.")
+                    String projectDir,
             @Schema(allowableValues = {"maven", "gradle", "all"})
-            @ToolParam(required = false,
-                       description = "Build tool scope: 'maven' (Maven only), 'gradle' (Gradle only), " +
-                                     "or 'all' (default, checks everything including env vars).")
-            String scope) {
+                    @ToolParam(
+                            required = false,
+                            description = "Build tool scope: 'maven' (Maven only), 'gradle' (Gradle only), "
+                                    + "or 'all' (default, checks everything including env vars).")
+                    String scope) {
 
-        String effectiveScope = (scope == null || scope.isBlank()) ? "all" : scope.toLowerCase().trim();
+        String effectiveScope =
+                (scope == null || scope.isBlank()) ? "all" : scope.toLowerCase().trim();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", "success");
         result.put("scope", effectiveScope);
@@ -218,8 +233,11 @@ public class BuildAuthService {
             }
 
             envSection.put("configured", anyConfigured);
-            envSection.put("configuredCount", envVars.stream()
-                    .filter(v -> Boolean.TRUE.equals(v.get("configured"))).count());
+            envSection.put(
+                    "configuredCount",
+                    envVars.stream()
+                            .filter(v -> Boolean.TRUE.equals(v.get("configured")))
+                            .count());
             envSection.put("variables", envVars);
 
             result.put("environment", envSection);
@@ -283,9 +301,10 @@ public class BuildAuthService {
 
         summary.put("gaps", gaps);
         summary.put("gapsCount", gaps.size());
-        summary.put("recommendation",
-                "Consider setting up ~/.m2/settings.xml with <servers> entries for Maven " +
-                "and ~/.gradle/gradle.properties with repo credentials for Gradle.");
+        summary.put(
+                "recommendation",
+                "Consider setting up ~/.m2/settings.xml with <servers> entries for Maven "
+                        + "and ~/.gradle/gradle.properties with repo credentials for Gradle.");
 
         result.put("summary", summary);
 
@@ -346,8 +365,11 @@ public class BuildAuthService {
             proxy.put("host", getChildText(proxyEl, "host"));
             String port = getChildText(proxyEl, "port");
             if (port != null && !port.isBlank()) {
-                try { proxy.put("port", Integer.parseInt(port)); }
-                catch (NumberFormatException ignored) { proxy.put("port", port); }
+                try {
+                    proxy.put("port", Integer.parseInt(port));
+                } catch (NumberFormatException ignored) {
+                    proxy.put("port", port);
+                }
             }
             String proxyUsername = getChildText(proxyEl, "username");
             String proxyPassword = getChildText(proxyEl, "password");
@@ -421,11 +443,11 @@ public class BuildAuthService {
         for (String name : props.stringPropertyNames()) {
             String value = props.getProperty(name);
 
-            boolean isCredential = name.toLowerCase().contains("password") ||
-                    name.toLowerCase().contains("token") ||
-                    name.toLowerCase().contains("secret") ||
-                    name.toLowerCase().contains("key") ||
-                    name.toLowerCase().contains("username");
+            boolean isCredential = name.toLowerCase().contains("password")
+                    || name.toLowerCase().contains("token")
+                    || name.toLowerCase().contains("secret")
+                    || name.toLowerCase().contains("key")
+                    || name.toLowerCase().contains("username");
 
             boolean matchesPattern = false;
             for (String pattern : GRADLE_CREDENTIAL_PROPERTY_PATTERNS) {

@@ -16,9 +16,9 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for MCP resource template discovery and resolution.
@@ -57,8 +57,8 @@ class ResourceTemplateServiceTest {
     @Test
     void resolveTemplate_withAllParams() {
         String result = svc.resolveResourceTemplate(
-            "build://{projectName}/dependencies/{buildTool}",
-            "{\"projectName\":\"myapp\",\"buildTool\":\"maven\"}");
+                "build://{projectName}/dependencies/{buildTool}",
+                "{\"projectName\":\"myapp\",\"buildTool\":\"maven\"}");
         assertTrue(result.contains("\"allParamsResolved\":true"));
         assertTrue(result.contains("build://myapp/dependencies/maven"));
     }
@@ -66,8 +66,7 @@ class ResourceTemplateServiceTest {
     @Test
     void resolveTemplate_withMissingParam() {
         String result = svc.resolveResourceTemplate(
-            "build://{projectName}/dependencies/{buildTool}",
-            "{\"projectName\":\"myapp\"}");
+                "build://{projectName}/dependencies/{buildTool}", "{\"projectName\":\"myapp\"}");
         assertTrue(result.contains("\"allParamsResolved\":false"));
         assertTrue(result.contains("\"missingParams\""));
         assertTrue(result.contains("buildTool"));
@@ -75,9 +74,8 @@ class ResourceTemplateServiceTest {
 
     @Test
     void resolveTemplate_singleParam() {
-        String result = svc.resolveResourceTemplate(
-            "build://{projectName}/summary",
-            "{\"projectName\":\"my-service\"}");
+        String result =
+                svc.resolveResourceTemplate("build://{projectName}/summary", "{\"projectName\":\"my-service\"}");
         assertTrue(result.contains("\"allParamsResolved\":true"));
         assertTrue(result.contains("build://my-service/summary"));
     }
@@ -85,25 +83,21 @@ class ResourceTemplateServiceTest {
     @Test
     void resolveTemplate_configFile() {
         String result = svc.resolveResourceTemplate(
-            "build://{projectName}/config/{fileName}",
-            "{\"projectName\":\"lib\",\"fileName\":\"build.gradle.kts\"}");
+                "build://{projectName}/config/{fileName}",
+                "{\"projectName\":\"lib\",\"fileName\":\"build.gradle.kts\"}");
         assertTrue(result.contains("\"allParamsResolved\":true"));
         assertTrue(result.contains("build://lib/config/build.gradle.kts"));
     }
 
     @Test
     void resolveTemplate_invalidJson_returnsError() {
-        String result = svc.resolveResourceTemplate(
-            "build://{projectName}/summary",
-            "not-json");
+        String result = svc.resolveResourceTemplate("build://{projectName}/summary", "not-json");
         assertTrue(result.contains("\"error\""));
     }
 
     @Test
     void resolveTemplate_emptyParams() {
-        String result = svc.resolveResourceTemplate(
-            "build://{projectName}/summary",
-            "{}");
+        String result = svc.resolveResourceTemplate("build://{projectName}/summary", "{}");
         assertTrue(result.contains("\"allParamsResolved\":false"));
         assertTrue(result.contains("projectName"));
     }
@@ -111,8 +105,7 @@ class ResourceTemplateServiceTest {
     @Test
     void resolveTemplate_logsCommand() {
         String result = svc.resolveResourceTemplate(
-            "build://{projectName}/logs/{buildCommand}",
-            "{\"projectName\":\"app\",\"buildCommand\":\"test\"}");
+                "build://{projectName}/logs/{buildCommand}", "{\"projectName\":\"app\",\"buildCommand\":\"test\"}");
         assertTrue(result.contains("\"allParamsResolved\":true"));
         assertTrue(result.contains("build://app/logs/test"));
     }

@@ -1,15 +1,13 @@
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class JavaVersionServiceTest {
 
@@ -22,7 +20,8 @@ class JavaVersionServiceTest {
 
     @Test
     void testDetectMavenJavaVersion(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -44,7 +43,8 @@ class JavaVersionServiceTest {
 
     @Test
     void testMavenSourceTargetDetection(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -67,7 +67,9 @@ class JavaVersionServiceTest {
 
     @Test
     void testGradleJavaVersionDetection(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"), """
+        Files.writeString(
+                tempDir.resolve("build.gradle"),
+                """
                 plugins { id 'java' }
                 java {
                     toolchain {
@@ -85,7 +87,8 @@ class JavaVersionServiceTest {
 
     @Test
     void testBreakingChangesWarning(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -105,7 +108,8 @@ class JavaVersionServiceTest {
 
     @Test
     void testNonLtsWarning(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -126,7 +130,8 @@ class JavaVersionServiceTest {
 
     @Test
     void testFrameworkCompatibility(@TempDir Path tempDir) throws IOException {
-        String pom = """
+        String pom =
+                """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>

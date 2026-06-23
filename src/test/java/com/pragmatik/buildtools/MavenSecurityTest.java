@@ -16,12 +16,12 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
  * Security and adversarial tests for command parsing and input validation.
@@ -165,43 +165,37 @@ class MavenSecurityTest {
         @Test
         @DisplayName("multiple legitimate -D flags pass through verbatim")
         void legitimateFlagsPass() {
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean install -DskipTests -Dmaven.test.failure.ignore=true -B");
-            assertThat(result).containsExactly(
-                    "clean", "install", "-DskipTests",
-                    "-Dmaven.test.failure.ignore=true", "-B");
+            String[] result =
+                    MavenInvoker.getCommands("mvn clean install -DskipTests -Dmaven.test.failure.ignore=true -B");
+            assertThat(result)
+                    .containsExactly("clean", "install", "-DskipTests", "-Dmaven.test.failure.ignore=true", "-B");
         }
 
         @Test
         @DisplayName("-Dmaven.ext.class.path is passed through (no blocklist)")
         void mavenExtClassPathPasses() {
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean -Dmaven.ext.class.path=/tmp/ext.jar");
+            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.ext.class.path=/tmp/ext.jar");
             assertThat(result).containsExactly("clean", "-Dmaven.ext.class.path=/tmp/ext.jar");
         }
 
         @Test
         @DisplayName("-Dmaven.repo.local is passed through (no blocklist)")
         void mavenRepoLocalPasses() {
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean -Dmaven.repo.local=/tmp/repo");
+            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.repo.local=/tmp/repo");
             assertThat(result).containsExactly("clean", "-Dmaven.repo.local=/tmp/repo");
         }
 
         @Test
         @DisplayName("-Dmaven.multiModuleProjectDirectory is passed through (no blocklist)")
         void mavenMultiModuleProjectDirectoryPasses() {
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/root");
-            assertThat(result).containsExactly(
-                    "clean", "-Dmaven.multiModuleProjectDirectory=/tmp/root");
+            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/root");
+            assertThat(result).containsExactly("clean", "-Dmaven.multiModuleProjectDirectory=/tmp/root");
         }
 
         @Test
         @DisplayName("double-dash --D form is passed through (just another property key)")
         void doubleDashFormPasses() {
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean --Dmaven.repo.local=/tmp/repo");
+            String[] result = MavenInvoker.getCommands("mvn clean --Dmaven.repo.local=/tmp/repo");
             assertThat(result).containsExactly("clean", "--Dmaven.repo.local=/tmp/repo");
         }
 

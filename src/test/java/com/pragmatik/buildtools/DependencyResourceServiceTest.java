@@ -16,16 +16,15 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class DependencyResourceServiceTest {
 
@@ -44,7 +43,8 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts dependencies from pom.xml")
         void extractsMavenDeps(@TempDir Path tmp) throws Exception {
-            String pom = """
+            String pom =
+                    """
                 <project>
                   <dependencies>
                     <dependency>
@@ -66,8 +66,7 @@ class DependencyResourceServiceTest {
                 </project>""";
             Files.writeString(tmp.resolve("pom.xml"), pom);
 
-            String result = service.readDependencyResource(
-                "build://test/dependencies/maven", tmp.toString());
+            String result = service.readDependencyResource("build://test/dependencies/maven", tmp.toString());
 
             assertTrue(result.contains("spring-boot-starter"));
             assertTrue(result.contains("guava"));
@@ -85,7 +84,8 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts groovy DSL dependencies")
         void extractsGroovyDeps(@TempDir Path tmp) throws Exception {
-            String gradle = """
+            String gradle =
+                    """
                 dependencies {
                     implementation 'org.springframework.boot:spring-boot-starter:3.2.0'
                     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
@@ -93,8 +93,7 @@ class DependencyResourceServiceTest {
                 }""";
             Files.writeString(tmp.resolve("build.gradle"), gradle);
 
-            String result = service.readDependencyResource(
-                "build://test/dependencies/gradle", tmp.toString());
+            String result = service.readDependencyResource("build://test/dependencies/gradle", tmp.toString());
 
             assertTrue(result.contains("spring-boot-starter"));
             assertTrue(result.contains("3.2.0"));
@@ -109,15 +108,15 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts kotlin DSL dependencies")
         void extractsKotlinDeps(@TempDir Path tmp) throws Exception {
-            String gradle = """
+            String gradle =
+                    """
                 dependencies {
                     implementation("org.springframework.boot:spring-boot-starter:3.2.0")
                     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
                 }""";
             Files.writeString(tmp.resolve("build.gradle.kts"), gradle);
 
-            String result = service.readDependencyResource(
-                "build://test/dependencies/gradle", tmp.toString());
+            String result = service.readDependencyResource("build://test/dependencies/gradle", tmp.toString());
 
             assertTrue(result.contains("spring-boot-starter"));
             assertTrue(result.contains("junit-jupiter"));
@@ -132,15 +131,15 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts SBT dependencies with % and %%")
         void extractsSbtDeps(@TempDir Path tmp) throws Exception {
-            String sbt = """
+            String sbt =
+                    """
                 scalaVersion := "2.13.15"
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.12.0"
                 libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.10.0"
                 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test""";
             Files.writeString(tmp.resolve("build.sbt"), sbt);
 
-            String result = service.readDependencyResource(
-                "build://test/dependencies/sbt", tmp.toString());
+            String result = service.readDependencyResource("build://test/dependencies/sbt", tmp.toString());
 
             assertTrue(result.contains("cats-core"));
             assertTrue(result.contains("os-lib"));
@@ -181,8 +180,7 @@ class DependencyResourceServiceTest {
         void unknownUri(@TempDir Path tmp) throws Exception {
             Files.writeString(tmp.resolve("pom.xml"), "<project></project>");
 
-            String result = service.readDependencyResource(
-                "build://test/dependencies/unknown", tmp.toString());
+            String result = service.readDependencyResource("build://test/dependencies/unknown", tmp.toString());
             assertTrue(result.contains("\"error\":true"));
         }
     }

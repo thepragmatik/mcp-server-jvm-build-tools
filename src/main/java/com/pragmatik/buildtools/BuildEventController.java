@@ -16,13 +16,12 @@
  */
 package com.pragmatik.buildtools;
 
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Server-Sent Events (SSE) controller for streaming build events
@@ -50,8 +49,8 @@ public class BuildEventController {
         // Send initial connected event
         try {
             emitter.send(SseEmitter.event()
-                .name("connected")
-                .data("{\"status\":\"connected\",\"timestamp\":" + System.currentTimeMillis() + "}"));
+                    .name("connected")
+                    .data("{\"status\":\"connected\",\"timestamp\":" + System.currentTimeMillis() + "}"));
         } catch (IOException e) {
             emitters.remove(emitter);
             emitter.completeWithError(e);
@@ -84,9 +83,6 @@ public class BuildEventController {
      */
     @GetMapping("/subscribers")
     public String subscriberCount() {
-        return JsonUtils.toJson(Map.of(
-            "subscribers", emitters.size(),
-            "endpoint", "/mcp/build-events/stream"
-        ));
+        return JsonUtils.toJson(Map.of("subscribers", emitters.size(), "endpoint", "/mcp/build-events/stream"));
     }
 }
