@@ -178,7 +178,7 @@ Full documentation audit performed against staging branch code. All inaccuracies
 |------|--------|-------|
 | Tool count (docs) | 7-24 (inconsistent) | 39 (accurate) |
 | Service count (ARCHITECTURE) | 2 | 16 |
-| Test count (docs) | 262-307 (inconsistent) | 375 (accurate) |
+| Test count (docs) | 262-307 (inconsistent) | 397 (accurate) |
 | Transport (SECURITY/FAQ/CONFIG) | stdio-only | stdio + Streamable HTTP |
 | Package structure (ARCHITECTURE) | Missing 11 classes | Complete with all 31+ classes |
 | CHANGELOG | Initial release only | PRs #42-61 documented |
@@ -200,7 +200,7 @@ Full documentation audit performed against staging branch code. All inaccuracies
 
 6. **Complete documentation suite**: 10 in-repo docs + 1 research doc + 1 mission doc + MCP registry manifest + integration guide + launcher script -- 15 artifacts total, all cross-referenced and consistent with staging code.
 
-7. **Production-ready**: 28 MCP tools, dual transport, 12 services, 375 tests, Apache 2.0 licensed.
+7. **Production-ready**: 28 MCP tools, dual transport, 12 services, 397 tests, Apache 2.0 licensed.
 
 ---
 

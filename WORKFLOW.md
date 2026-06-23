@@ -65,7 +65,7 @@ All changes must go through Pull Requests. Branch protection enforces:
 ### Quality Gates
 
 Every PR must pass:
-1. **JUnit tests** — 375 tests, 0 failures required
+1. **JUnit tests** — 397 tests, 0 failures required
 2. **Coverage** — JaCoCo `check` enforced via `verify`; build fails below 60% line / 50% branch (baseline 67% instruction / 57% branch / 67% line)
 3. **License headers** — mvn license:format runs (non-blocking)
 4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
@@ -107,7 +107,7 @@ Reviews are posted to GitHub for a permanent audit trail.
 | Staging branch     | All 5 features integrated, CI green                       |
 | Current State       | All features integrated and merged to staging. Production integration PR target: main.               |
 | Coverage            | JaCoCo enforced via verify — min 60% line / 50% branch    |
-| Tests               | 375 (GradleServiceTest: 64, SbtBuildToolTest: 51, DependencyServiceTest: 47, ToolAuthorizationServiceTest: 25, BuildAuthServiceTest: 20, MavenInvokerTest: 15, BuildOutputParserTest: 14, SupplyChainServiceTest: 14, MavenIntegrationTest: 13, BuildConfigurationValidationTest: 13, BuildCacheServiceTest: 11, MavenSecurityTest: 11, BuildConfigValidatorTest: 10, ResourceTemplateServiceTest: 10, AsyncBuildServiceTest: 9, TestFlakinessServiceTest: 9, SbtProjectServiceTest: 8, DependencyConflictServiceTest: 7, DependencyResourceServiceTest: 7, BuildPerformanceServiceTest: 6, JavaVersionServiceTest: 6, TransportConfigTest: 5) |
+| Tests               | 397 across 23 test classes (GradleServiceTest: 64, SbtBuildToolTest: 51, DependencyServiceTest: 47, ToolAuthorizationServiceTest: 25, MavenSecurityTest: 20, BuildAuthServiceTest: 20, MavenInvokerTest: 17, SupplyChainServiceTest: 14, BuildOutputParserTest: 14, MavenIntegrationTest: 13, BuildConfigurationValidationTest: 13, SyncProcessRunnerTest: 11, BuildCacheServiceTest: 11, ResourceTemplateServiceTest: 10, BuildConfigValidatorTest: 10, TestFlakinessServiceTest: 9, AsyncBuildServiceTest: 9, SbtProjectServiceTest: 8, DependencyResourceServiceTest: 7, DependencyConflictServiceTest: 7, JavaVersionServiceTest: 6, BuildPerformanceServiceTest: 6, TransportConfigTest: 5) |
 
 ### Recovery
 
