@@ -206,7 +206,6 @@ Full documentation audit performed against staging branch code. All inaccuracies
 
 ## Remaining Work for Future Iterations
 
-- JaCoCo coverage threshold enforcement in POM
 - OAuth 2.1 client credentials for CI/CD integrations
 - Toolset organization / tool grouping for better discoverability
 - Completions / autocomplete support

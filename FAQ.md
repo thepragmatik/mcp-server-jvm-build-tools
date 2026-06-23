@@ -237,7 +237,7 @@ mvn verify
 
 ### What's the coverage?
 
-48% instruction, 33% branch, 46% line coverage (JaCoCo). Enforcement thresholds are not yet configured in the POM. The lower branch coverage is expected — many branches handle edge cases and error paths that are tested indirectly through security and integration tests.
+67% instruction, 57% branch, 67% line coverage (JaCoCo), measured excluding the bootstrap class. Enforcement thresholds are configured in the POM and checked during `verify`: the build fails below 60% line or 50% branch coverage. The lower branch coverage is expected — many branches handle edge cases and error paths that are tested indirectly through security and integration tests.
 
 ### Where do I report bugs or request features?
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Coverage Gate**: JaCoCo `report` and `check` bound to `verify`; the build now fails below 60% line / 50% branch coverage (baseline 67% instruction / 57% branch / 67% line, excluding the bootstrap class). Thresholds are externalized as POM properties (`jacoco.line.coverage.min`, `jacoco.branch.coverage.min`)
 - **Container Probes**: /health/ready (readiness) and /health/live (liveness) endpoints for Kubernetes and Docker orchestration
 - **CLI Launcher Script**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT installations. Supports `--http` flag for Streamable HTTP mode
 - **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability — tools, resources, prompts, transports, runtime requirements

@@ -888,7 +888,7 @@ The server enforces multiple layers of defense:
 
 ## CI/CD
 
-Every PR runs on 3 JDK versions (21, 23, 25) with test coverage reporting (48% instruction, 33% branch, 46% line). CI file: `.github/workflows/ci.yml`.
+Every PR runs on 3 JDK versions (21, 23, 25) with enforced test coverage (67% instruction, 57% branch, 67% line; build fails below 60% line / 50% branch). CI file: `.github/workflows/ci.yml`.
 
 ## Contributing
 
