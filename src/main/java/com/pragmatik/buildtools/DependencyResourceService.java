@@ -107,9 +107,6 @@ public class DependencyResourceService {
         result.put("detectedTool", detected.getName());
         result.put("resourceCount", resources.size());
         result.put("resources", resources);
-        // Cacheability hint for this resources/list-style result: per-project enumeration, so it is
-        // private and short-lived (MCP RC CacheableResult, SEP-2549). See McpCachePolicy.
-        result.put("cache", McpCachePolicy.resourcesList());
 
         return toJson(result);
     }
@@ -134,9 +131,6 @@ public class DependencyResourceService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceUri", resourceUri);
         result.put("project", projectName);
-        // Cacheability hint for this resources/read-style result: per-project content, so it is
-        // private and short-lived (MCP RC CacheableResult, SEP-2549). See McpCachePolicy.
-        result.put("cache", McpCachePolicy.resourcesRead());
 
         if (resourceUri.endsWith("/dependencies/maven") && Files.exists(dir.resolve("pom.xml"))) {
             return extractMavenDependencies(dir, result);

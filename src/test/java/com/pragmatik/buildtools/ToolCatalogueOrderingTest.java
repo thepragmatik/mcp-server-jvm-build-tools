@@ -41,9 +41,7 @@ class ToolCatalogueOrderingTest {
     private ToolCallbackProvider toolCallbackProvider;
 
     private static List<String> names(ToolCallback[] callbacks) {
-        return Arrays.stream(callbacks)
-                .map(c -> c.getToolDefinition().name())
-                .toList();
+        return Arrays.stream(callbacks).map(c -> c.getToolDefinition().name()).toList();
     }
 
     @Test

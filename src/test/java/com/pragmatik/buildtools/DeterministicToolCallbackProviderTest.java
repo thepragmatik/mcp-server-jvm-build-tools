@@ -17,28 +17,98 @@
 package com.pragmatik.buildtools;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.definition.ToolDefinition;
 
 /**
- * Unit tests for {@link DeterministicToolCallbackProvider} — verifies that {@code tools/list}
- * ordering is stabilised by sorting on tool name (MCP RC, SEP-2549).
+ * Unit tests for {@link DeterministicToolCallbackProvider} — proves the decorator returns the
+ * wrapped provider's tools in a stable, name-sorted order (MCP RC, SEP-2549) without mutating the
+ * delegate.
  */
 @DisplayName("DeterministicToolCallbackProvider")
 class DeterministicToolCallbackProviderTest {
 
-    /** A minimal {@link ToolCallback} whose only meaningful property is its tool name. */
-    private static ToolCallback tool(String name) {
+    @Test
+    @DisplayName("returns tools sorted by name regardless of the delegate's order")
+    void sortsByName() {
+        ToolCallback[] unsorted = {fake("zebra"), fake("apple"), fake("mango")};
+        var provider = new DeterministicToolCallbackProvider(() -> unsorted);
+
+        assertThat(names(provider)).containsExactly("apple", "mango", "zebra");
+    }
+
+    @Test
+    @DisplayName("order is stable across repeated calls (deterministic)")
+    void stableAcrossCalls() {
+        ToolCallback[] callbacks = {fake("c"), fake("a"), fake("b")};
+        var provider = new DeterministicToolCallbackProvider(() -> callbacks);
+
+        assertThat(names(provider)).isEqualTo(names(provider)).containsExactly("a", "b", "c");
+    }
+
+    @Test
+    @DisplayName("returns a fresh array each call so callers cannot corrupt later results")
+    void returnsDefensiveCopy() {
+        ToolCallback[] callbacks = {fake("b"), fake("a")};
+        var provider = new DeterministicToolCallbackProvider(() -> callbacks);
+
+        ToolCallback[] first = provider.getToolCallbacks();
+        first[0] = fake("zzz"); // mutate the returned array
+
+        assertThat(names(provider)).containsExactly("a", "b");
+    }
+
+    @Test
+    @DisplayName("does not mutate the delegate's own array")
+    void doesNotMutateDelegate() {
+        ToolCallback[] delegateArray = {fake("b"), fake("a")};
+        var provider = new DeterministicToolCallbackProvider(() -> delegateArray);
+
+        provider.getToolCallbacks();
+
+        // The delegate's array order is untouched.
+        assertThat(delegateArray[0].getToolDefinition().name()).isEqualTo("b");
+        assertThat(delegateArray[1].getToolDefinition().name()).isEqualTo("a");
+    }
+
+    @Test
+    @DisplayName("an empty delegate yields an empty array")
+    void emptyDelegate() {
+        var provider = new DeterministicToolCallbackProvider(() -> new ToolCallback[0]);
+        assertThat(provider.getToolCallbacks()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a delegate returning null yields an empty array (no NPE)")
+    void nullReturningDelegate() {
+        var provider = new DeterministicToolCallbackProvider(() -> null);
+        assertThat(provider.getToolCallbacks()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a null delegate is rejected at construction")
+    void nullDelegateRejected() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new DeterministicToolCallbackProvider(null))
+                .withMessageContaining("delegate");
+    }
+
+    private static java.util.List<String> names(DeterministicToolCallbackProvider provider) {
+        return Arrays.stream(provider.getToolCallbacks())
+                .map(c -> c.getToolDefinition().name())
+                .toList();
+    }
+
+    /** Minimal {@link ToolCallback} whose only meaningful property is its name. */
+    private static ToolCallback fake(String name) {
         ToolDefinition definition = ToolDefinition.builder()
                 .name(name)
-                .description("test tool " + name)
+                .description("fake tool " + name)
                 .inputSchema("{\"type\":\"object\"}")
                 .build();
         return new ToolCallback() {
@@ -51,88 +121,6 @@ class DeterministicToolCallbackProviderTest {
             public String call(String toolInput) {
                 return "";
             }
-
-            @Override
-            public String call(String toolInput, ToolContext toolContext) {
-                return "";
-            }
         };
-    }
-
-    private static ToolCallbackProvider providerOf(ToolCallback... tools) {
-        return () -> tools.clone();
-    }
-
-    private static String[] namesOf(ToolCallback[] callbacks) {
-        return Arrays.stream(callbacks)
-                .map(c -> c.getToolDefinition().name())
-                .toArray(String[]::new);
-    }
-
-    @Test
-    @DisplayName("returns tools sorted by name regardless of delegate order")
-    void sortsByName() {
-        ToolCallbackProvider delegate = providerOf(tool("run_build"), tool("analyze_output"), tool("check_deps"));
-
-        ToolCallback[] result = new DeterministicToolCallbackProvider(delegate).getToolCallbacks();
-
-        assertThat(namesOf(result)).containsExactly("analyze_output", "check_deps", "run_build");
-    }
-
-    @Test
-    @DisplayName("produces a stable order across repeated calls and across different delegate orderings")
-    void stableAcrossCallsAndInputOrderings() {
-        ToolCallback a = tool("alpha");
-        ToolCallback b = tool("bravo");
-        ToolCallback c = tool("charlie");
-
-        String[] order1 = namesOf(new DeterministicToolCallbackProvider(providerOf(c, a, b)).getToolCallbacks());
-        String[] order2 = namesOf(new DeterministicToolCallbackProvider(providerOf(b, c, a)).getToolCallbacks());
-
-        DeterministicToolCallbackProvider provider = new DeterministicToolCallbackProvider(providerOf(b, a, c));
-        String[] firstCall = namesOf(provider.getToolCallbacks());
-        String[] secondCall = namesOf(provider.getToolCallbacks());
-
-        assertThat(order1).containsExactly("alpha", "bravo", "charlie");
-        assertThat(order2).isEqualTo(order1);
-        assertThat(firstCall).isEqualTo(order1);
-        assertThat(secondCall).isEqualTo(firstCall);
-    }
-
-    @Test
-    @DisplayName("returns a fresh array each call so the delegate's array cannot be mutated")
-    void returnsFreshArray() {
-        ToolCallback[] backing = {tool("zeta"), tool("alpha")};
-        ToolCallbackProvider delegate = () -> backing;
-        DeterministicToolCallbackProvider provider = new DeterministicToolCallbackProvider(delegate);
-
-        ToolCallback[] sorted = provider.getToolCallbacks();
-        sorted[0] = null; // mutate the returned array
-
-        // The delegate's backing array is untouched and a later call is still correctly sorted.
-        assertThat(backing[0].getToolDefinition().name()).isEqualTo("zeta");
-        assertThat(namesOf(provider.getToolCallbacks())).containsExactly("alpha", "zeta");
-    }
-
-    @Test
-    @DisplayName("handles an empty catalogue")
-    void handlesEmpty() {
-        assertThat(new DeterministicToolCallbackProvider(providerOf()).getToolCallbacks())
-                .isEmpty();
-    }
-
-    @Test
-    @DisplayName("treats a null delegate array as empty")
-    void handlesNullDelegateArray() {
-        ToolCallbackProvider delegate = () -> null;
-        assertThat(new DeterministicToolCallbackProvider(delegate).getToolCallbacks())
-                .isEmpty();
-    }
-
-    @Test
-    @DisplayName("rejects a null delegate")
-    void rejectsNullDelegate() {
-        assertThatThrownBy(() -> new DeterministicToolCallbackProvider(null))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 }

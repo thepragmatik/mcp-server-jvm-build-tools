@@ -41,9 +41,8 @@ class McpServerIdentityTest {
     void listSurfacesArePublic() {
         Map<String, Object> hints = identity.cacheHints();
 
-        for (String method : new String[] {
-            "tools/list", "prompts/list", "resources/list", "resources/templates/list"
-        }) {
+        for (String method :
+                new String[] {"tools/list", "prompts/list", "resources/list", "resources/templates/list"}) {
             Map<String, Object> hint = hintFor(hints, method);
             assertThat(hint)
                     .as("hint for %s", method)

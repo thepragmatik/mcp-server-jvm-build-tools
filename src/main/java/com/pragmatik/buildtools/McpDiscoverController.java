@@ -118,11 +118,6 @@ public class McpDiscoverController {
         // Transport characteristics (RC: stateless Streamable HTTP, no sessions/SSE-resumability).
         result.put("transport", identity.transportProfile());
 
-        // Per-surface cacheability policy (ttlMs + cacheScope) advertised so clients/gateways can
-        // cache list/read results (MCP RC CacheableResult, SEP-2549). The static catalogue is
-        // publicly cacheable; per-project resource list/read is private. See McpCachePolicy.
-        result.put("cachePolicy", McpCachePolicy.advertisedPolicy());
-
         return result;
     }
 }

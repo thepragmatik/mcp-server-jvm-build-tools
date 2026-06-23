@@ -29,7 +29,8 @@ import org.junit.jupiter.api.Test;
 @DisplayName("ServerCardController")
 class ServerCardControllerTest {
 
-    private final ServerCardController controller = new ServerCardController(new McpServerIdentity("test-server", "9.9.9"));
+    private final ServerCardController controller =
+            new ServerCardController(new McpServerIdentity("test-server", "9.9.9"));
 
     @Test
     @DisplayName("server card advertises per-method cache hints from the shared identity")

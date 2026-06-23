@@ -103,8 +103,7 @@ class McpDiscoverControllerTest {
     @DisplayName("discover advertises per-method cache hints (ttlMs/cacheScope, SEP-2549)")
     @SuppressWarnings("unchecked")
     void discoverAdvertisesCacheHints() {
-        Map<String, Object> hints =
-                (Map<String, Object>) controller.discover().get("cacheHints");
+        Map<String, Object> hints = (Map<String, Object>) controller.discover().get("cacheHints");
 
         assertThat(hints)
                 .containsKeys(
