@@ -1,5 +1,4 @@
 target/
-!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
@@ -41,5 +40,11 @@ site/
 ### Mac OS ###
 .DS_Store
 /.idea/
-/.mvn/
 /dependency-reduced-pom.xml
+
+### Maven Wrapper ###
+# Ignore ad-hoc .mvn contents but keep the committed wrapper configuration.
+/.mvn/*
+!/.mvn/wrapper/
+/.mvn/wrapper/*
+!/.mvn/wrapper/maven-wrapper.properties

@@ -730,12 +730,13 @@ Compatible with the MCP Server Card Working Group proposal and MCP Registry disc
 
 ## Quick Start
 
-1. **Build the JAR:**
+1. **Build the JAR** (uses the bundled [Maven Wrapper](https://maven.apache.org/wrapper/) — no system Maven required):
    ```bash
    git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
    cd mcp-server-jvm-build-tools
-   mvn clean package -DskipTests
+   ./mvnw clean package -DskipTests      # use mvnw.cmd on Windows
    ```
+   The wrapper downloads and pins the exact Maven version used by CI, ensuring reproducible builds across environments. Run `./mvnw -B verify` to build and run the full test suite.
 
 2. **Configure your MCP client** — see [Using with Agentic AI Solutions](#using-with-agentic-ai-solutions) above for client-specific configuration examples, or [Installation](#installation) below.
 
@@ -761,8 +762,8 @@ Compatible with the MCP Server Card Working Group proposal and MCP Registry disc
 ### Prerequisites
 
 - Java 21 or later
-- Apache Maven (to build the JAR)
 - An MCP-compatible client: Claude Desktop, Goose, Continue, Cursor, Cline, Windsurf, etc.
+- Apache Maven is optional — the repository ships a Maven Wrapper (`./mvnw`) that downloads the pinned Maven version automatically
 
 ### Option 1: JAR + Claude Desktop
 
@@ -770,7 +771,7 @@ Build the JAR:
 ```bash
 git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
 cd mcp-server-jvm-build-tools
-mvn clean package -DskipTests
+./mvnw clean package -DskipTests      # use mvnw.cmd on Windows
 # JAR is at target/mcp-server-jvm-build-tools.jar
 ```
 

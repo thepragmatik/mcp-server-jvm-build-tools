@@ -5,15 +5,15 @@ Get the MCP server running in 5 minutes. For detailed docs, see [README.md](READ
 ## Prerequisites
 
 - Java 21 or later ([Adoptium](https://adoptium.net/) recommended)
-- Apache Maven 3.9+ (to build the JAR)
 - An MCP-compatible client (Claude Desktop, Cursor, Cline, Goose, Continue, etc.)
+- Apache Maven is optional — the bundled [Maven Wrapper](https://maven.apache.org/wrapper/) (`./mvnw`) downloads the pinned version automatically.
 
 ## Step 1: Build the JAR
 
 ```bash
 git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
 cd mcp-server-jvm-build-tools
-mvn clean package -DskipTests
+./mvnw clean package -DskipTests      # use mvnw.cmd on Windows
 ```
 
 The JAR is at `target/mcp-server-jvm-build-tools.jar`.

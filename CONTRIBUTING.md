@@ -6,15 +6,17 @@ Thanks for your interest in contributing! This document outlines the process for
 
 ### Prerequisites
 - Java 21 or later
-- Apache Maven 3.9+
 - Git
+- Apache Maven 3.9+ is **optional** — the repository ships a [Maven Wrapper](https://maven.apache.org/wrapper/) (`./mvnw`) that downloads and pins the exact Maven version used by CI, so a system Maven install is not required.
 
 ### Build and Test
 ```bash
 git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
 cd mcp-server-jvm-build-tools
-mvn verify
+./mvnw verify      # use mvnw.cmd on Windows
 ```
+
+Always use the wrapper (`./mvnw`) rather than a system `mvn` so that local builds match CI exactly.
 
 ## Branch Strategy
 
@@ -67,10 +69,10 @@ We follow conventional commits:
 ## Quality Gates
 
 Every PR must pass:
-- **397 tests** with 0 failures (JUnit 5)
+- **Full test suite** green — 0 failures (JUnit 5)
 - **JaCoCo coverage** — reports generated and thresholds enforced by `jacoco:check` (bound to `verify`); the build fails below 60% line / 50% branch coverage. Baseline: 67% instruction / 57% branch / 67% line (excluding the bootstrap class)
-- **License headers** — `mvn license:format` must pass
-- **Compile warnings** — `mvn compile -Dmaven.compiler.showWarnings=true` must be clean
+- **License headers** — `./mvnw license:format` must pass
+- **Compile warnings** — `./mvnw compile -Dmaven.compiler.showWarnings=true` must be clean
 
 ## Reporting Issues
 
