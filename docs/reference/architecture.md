@@ -146,8 +146,8 @@ Low-level Maven execution with two modes plus security parsing:
 
 - `executeCommandUsingMavenInvoker()` — out-of-process via the Maven Shared Invoker API.
 - `executeUsingMavenEmbedder()` — in-process via the Maven Embedder API (used for version queries).
-- `getCommands()` — command parsing that enforces the allowlist, rejects shell metacharacters, and
-  applies the `-D` system-property deny-list.
+- `getCommands()` — command parsing that enforces the allowlist and rejects shell metacharacters.
+  Maven `-D` system properties are passed through verbatim (no key deny-list).
 
 ## REST controllers (Streamable HTTP mode)
 
@@ -166,7 +166,7 @@ tools/call ─▶ Spring AI MCP SDK ─▶ @Tool method on a service bean
                                       │
                                       ├─ validate inputs (length, characters, path canonicalisation)
                                       ├─ resolve build tool (explicit or auto-detect)
-                                      ├─ apply allowlist + flag/deny-list checks
+                                      ├─ apply allowlist + flag checks
                                       ▼
                               spawn isolated build process
                                       │

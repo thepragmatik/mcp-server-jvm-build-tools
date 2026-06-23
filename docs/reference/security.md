@@ -36,23 +36,14 @@ Flags that enable arbitrary code execution or file access are blocked.
 |------------|---------------|
 | **Gradle** | `--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`/`-D` |
 | **SBT** | `-D`, `-J`, `-sbt-dir`, `-sbt-boot`, `-sbt-launch-dir`, `-ivy`, `-maven-launcher` |
-| **Maven** | Behaviour-altering `-D` system properties are denied by key (see below). |
+| **Maven** | None — `-D` system properties are passed through (see below). |
 
-#### Maven `-D` system-property deny-list
+#### Maven `-D` system properties
 
-The safe-argument pattern accepts any well-formed `-Dkey=value`, so a targeted deny-list rejects
-these keys (**case-sensitive, exact match**):
-
-| Denied key | Why it is denied |
-|------------|------------------|
-| `maven.ext.class.path` | Injects extension classes into the Maven core class loader (arbitrary code execution). |
-| `maven.repo.local` | Redirects the local artifact repository (dependency substitution / cache poisoning). |
-| `maven.multiModuleProjectDirectory` | Overrides multi-module project-root detection, changing which configuration applies. |
-
-Keys that merely *contain* a denied name as a prefix or suffix (e.g. `maven.repo.local.backup`)
-are **not** blocked. A rejected token raises `IllegalArgumentException` (`Blocked system property:
-…`) before any process is spawned. Implemented in `MavenInvoker.getCommands(...)`; asserted by
-`MavenSecurityTest`.
+Maven `-D` system properties are passed through verbatim — there is no key allowlist or
+blocklist. The server trusts the client's `-D` choices entirely. Shell metacharacters in any
+token are still rejected by the safe-argument pattern (Layer 3), so injection via `-D` values is
+not possible. Implemented in `MavenInvoker.getCommands(...)`; asserted by `MavenSecurityTest`.
 
 ### Layer 3 — Safe-argument pattern
 

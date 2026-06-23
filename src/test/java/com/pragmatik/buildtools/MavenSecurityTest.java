@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Security and adversarial tests for command parsing and input validation.
@@ -160,86 +159,12 @@ class MavenSecurityTest {
     }
 
     @Nested
-    @DisplayName("-D system-property deny-list (issue #79)")
-    class SystemPropertyDenyList {
+    @DisplayName("-D system properties are passed through (issue #97)")
+    class SystemPropertyPassThrough {
 
         @Test
-        @DisplayName("-Dmaven.ext.class.path is rejected")
-        void mavenExtClassPathBlocked() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean -Dmaven.ext.class.path=/tmp/evil.jar"))
-                    .withMessageContaining("Blocked system property")
-                    .withMessageContaining("maven.ext.class.path");
-        }
-
-        @Test
-        @DisplayName("-Dmaven.repo.local is rejected")
-        void mavenRepoLocalBlocked() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean -Dmaven.repo.local=/tmp/pwned-repo"))
-                    .withMessageContaining("Blocked system property")
-                    .withMessageContaining("maven.repo.local");
-        }
-
-        @Test
-        @DisplayName("-Dmaven.multiModuleProjectDirectory is rejected")
-        void mavenMultiModuleProjectDirectoryBlocked() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/sneaky"))
-                    .withMessageContaining("Blocked system property")
-                    .withMessageContaining("maven.multiModuleProjectDirectory");
-        }
-
-        @Test
-        @DisplayName("blocked -D key is rejected even without a value")
-        void blockedKeyWithoutValue() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean -Dmaven.repo.local"))
-                    .withMessageContaining("Blocked system property");
-        }
-
-        @Test
-        @DisplayName("blocked -D key is rejected among other legitimate flags")
-        void blockedKeyAmongLegitFlags() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean install -DskipTests -Dmaven.repo.local=/x -B"))
-                    .withMessageContaining("Blocked system property");
-        }
-
-        @Test
-        @DisplayName("deny-list matches the exact key only (prefix/suffix variants pass)")
-        void exactKeyMatchOnly() {
-            // A key that merely starts with a blocked name must NOT be rejected.
-            String[] result = MavenInvoker.getCommands(
-                    "mvn clean -Dmaven.repo.local.backup=/tmp/x");
-            assertThat(result).containsExactly("clean", "-Dmaven.repo.local.backup=/tmp/x");
-
-            // A key that merely ends with a blocked name must NOT be rejected.
-            String[] result2 = MavenInvoker.getCommands(
-                    "mvn clean -Dnot.maven.repo.local=/tmp/x");
-            assertThat(result2).containsExactly("clean", "-Dnot.maven.repo.local=/tmp/x");
-        }
-
-        @Test
-        @DisplayName("double-dash --D form of a blocked key is also rejected")
-        void doubleDashFormBlocked() {
-            // Defense-in-depth: SAFE_ARG_PATTERN admits the --Dkey=value form, so
-            // isBlockedSystemProperty also strips a leading '--D'. Pin that branch.
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> MavenInvoker.getCommands(
-                            "mvn clean --Dmaven.repo.local=/x"))
-                    .withMessageContaining("Blocked system property")
-                    .withMessageContaining("maven.repo.local");
-        }
-
-        @Test
-        @DisplayName("legitimate -D flags still pass after hardening")
-        void legitimateFlagsStillPass() {
+        @DisplayName("multiple legitimate -D flags pass through verbatim")
+        void legitimateFlagsPass() {
             String[] result = MavenInvoker.getCommands(
                     "mvn clean install -DskipTests -Dmaven.test.failure.ignore=true -B");
             assertThat(result).containsExactly(
@@ -248,13 +173,36 @@ class MavenSecurityTest {
         }
 
         @Test
-        @DisplayName("error message names the offending token and the denied keys")
-        void errorMessageIsInformative() {
-            assertThatThrownBy(() -> MavenInvoker.getCommands(
-                    "mvn clean -Dmaven.ext.class.path=/tmp/x"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("-Dmaven.ext.class.path=/tmp/x")
-                    .hasMessageContaining("maven.ext.class.path");
+        @DisplayName("-Dmaven.ext.class.path is passed through (no blocklist)")
+        void mavenExtClassPathPasses() {
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean -Dmaven.ext.class.path=/tmp/ext.jar");
+            assertThat(result).containsExactly("clean", "-Dmaven.ext.class.path=/tmp/ext.jar");
+        }
+
+        @Test
+        @DisplayName("-Dmaven.repo.local is passed through (no blocklist)")
+        void mavenRepoLocalPasses() {
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean -Dmaven.repo.local=/tmp/repo");
+            assertThat(result).containsExactly("clean", "-Dmaven.repo.local=/tmp/repo");
+        }
+
+        @Test
+        @DisplayName("-Dmaven.multiModuleProjectDirectory is passed through (no blocklist)")
+        void mavenMultiModuleProjectDirectoryPasses() {
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/root");
+            assertThat(result).containsExactly(
+                    "clean", "-Dmaven.multiModuleProjectDirectory=/tmp/root");
+        }
+
+        @Test
+        @DisplayName("double-dash --D form is passed through (just another property key)")
+        void doubleDashFormPasses() {
+            String[] result = MavenInvoker.getCommands(
+                    "mvn clean --Dmaven.repo.local=/tmp/repo");
+            assertThat(result).containsExactly("clean", "--Dmaven.repo.local=/tmp/repo");
         }
     }
 }
