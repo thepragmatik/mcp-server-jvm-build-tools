@@ -177,20 +177,4 @@ public final class W3CTraceContext {
     public String baggage() {
         return baggage;
     }
-
-    /** @return {@code true} when the {@code sampled} (least-significant) flag bit is set */
-    public boolean sampled() {
-        return (Integer.parseInt(traceFlags, 16) & 0x01) != 0;
-    }
-
-    /**
-     * Renders a {@code traceparent} header for the supplied child span id, keeping
-     * this context's trace id and flags so the new span joins the same trace.
-     *
-     * @param childSpanId a 16-hex-character span id
-     * @return a W3C {@code traceparent} value
-     */
-    public String formatTraceparent(String childSpanId) {
-        return version + "-" + traceId + "-" + childSpanId + "-" + traceFlags;
-    }
 }

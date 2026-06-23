@@ -43,17 +43,16 @@ class W3CTraceContextTest {
         assertThat(ctx.traceId()).isEqualTo(TRACE_ID);
         assertThat(ctx.parentSpanId()).isEqualTo(PARENT_ID);
         assertThat(ctx.traceFlags()).isEqualTo("01");
-        assertThat(ctx.sampled()).isTrue();
         assertThat(ctx.traceState()).isNull();
         assertThat(ctx.baggage()).isNull();
     }
 
     @Test
-    @DisplayName("recognises the not-sampled flag")
-    void recognisesNotSampledFlag() {
+    @DisplayName("parses the not-sampled trace-flags value")
+    void parsesNotSampledFlag() {
         W3CTraceContext ctx = W3CTraceContext.parse("00-" + TRACE_ID + "-" + PARENT_ID + "-00")
                 .orElseThrow();
-        assertThat(ctx.sampled()).isFalse();
+        assertThat(ctx.traceFlags()).isEqualTo("00");
     }
 
     @Test
@@ -92,16 +91,6 @@ class W3CTraceContextTest {
         assertThat(parsed).isPresent();
         assertThat(parsed.get().traceId()).isEqualTo(TRACE_ID);
         assertThat(parsed.get().version()).isEqualTo("cc");
-    }
-
-    @Test
-    @DisplayName("formatTraceparent keeps the trace id and flags for a new child span")
-    void formatTraceparentForChild() {
-        W3CTraceContext ctx = W3CTraceContext.parse("00-" + TRACE_ID + "-" + PARENT_ID + "-01")
-                .orElseThrow();
-        String child = "0123456789abcdef";
-
-        assertThat(ctx.formatTraceparent(child)).isEqualTo("00-" + TRACE_ID + "-" + child + "-01");
     }
 
     @Test
