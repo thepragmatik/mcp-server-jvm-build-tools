@@ -79,8 +79,8 @@ public final class TraceContextHolder {
             return Optional.empty();
         }
         return W3CTraceContext.parse(environment.get(TRACEPARENT_ENV))
-                .map(ctx -> ctx.withTraceState(environment.get(TRACESTATE_ENV))
-                        .withBaggage(environment.get(BAGGAGE_ENV)));
+                .map(ctx ->
+                        ctx.withTraceState(environment.get(TRACESTATE_ENV)).withBaggage(environment.get(BAGGAGE_ENV)));
     }
 
     /**
