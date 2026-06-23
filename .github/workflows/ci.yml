@@ -35,14 +35,14 @@ jobs:
         run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-jdk-${{ matrix.java }}
           path: target/surefire-reports/
           retention-days: 7
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-jdk-${{ matrix.java }}
           path: |
