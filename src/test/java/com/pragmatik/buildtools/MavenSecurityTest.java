@@ -204,5 +204,13 @@ class MavenSecurityTest {
                     "mvn clean --Dmaven.repo.local=/tmp/repo");
             assertThat(result).containsExactly("clean", "--Dmaven.repo.local=/tmp/repo");
         }
+
+        @Test
+        @DisplayName("shell metacharacters in a -D value are still rejected (no injection via values)")
+        void shellMetacharsInPropertyValueRejected() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean -Dfoo=$(id)"))
+                    .withMessageContaining("Invalid flag/argument");
+        }
     }
 }
