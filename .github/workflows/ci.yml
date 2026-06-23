@@ -28,7 +28,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: Build, test, and verify coverage
-        run: mvn -B verify --file pom.xml --no-transfer-progress
+        run: ./mvnw -B verify --file pom.xml --no-transfer-progress
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,7 +58,7 @@ jobs:
           distribution: temurin
           cache: maven
       - name: License headers check
-        run: mvn -B license:format --file pom.xml --no-transfer-progress
+        run: ./mvnw -B license:format --file pom.xml --no-transfer-progress
         continue-on-error: true
       - name: Compile with warnings
-        run: mvn -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
+        run: ./mvnw -B compile -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
