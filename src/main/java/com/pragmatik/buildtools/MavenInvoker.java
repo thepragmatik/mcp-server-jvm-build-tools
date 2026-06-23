@@ -33,6 +33,20 @@ public class MavenInvoker {
         request.setBaseDirectory(new File(currentProjectDirectory));
         request.addArgs(Arrays.asList(commands));
 
+        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess via
+        // the conventional TRACEPARENT/TRACESTATE/BAGGAGE environment variables so any
+        // OpenTelemetry-aware build tooling continues the trace. No-op when untraced.
+        TraceContextHolder.currentSpan().ifPresent(span -> {
+            request.setShellEnvironmentInherited(true);
+            request.addShellEnvironment(TraceContextHolder.TRACEPARENT_ENV, span.toTraceparent());
+            if (span.traceState() != null && !span.traceState().isBlank()) {
+                request.addShellEnvironment(TraceContextHolder.TRACESTATE_ENV, span.traceState());
+            }
+            if (span.baggage() != null && !span.baggage().isBlank()) {
+                request.addShellEnvironment(TraceContextHolder.BAGGAGE_ENV, span.baggage());
+            }
+        });
+
         Invoker invoker = new DefaultInvoker();
         invoker.setWorkingDirectory(new File(currentProjectDirectory));
         invoker.setMavenHome(new File(mavenHome));
@@ -233,6 +247,8 @@ public class MavenInvoker {
 
         ProcessBuilder pb = new ProcessBuilder(cmdList);
         pb.directory(new File(projectDir));
+        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess.
+        TraceContextHolder.applyToEnvironment(pb.environment());
         Process process = pb.start();
 
         StringBuilder output = new StringBuilder();
