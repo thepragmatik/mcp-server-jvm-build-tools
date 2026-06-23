@@ -222,20 +222,20 @@ public class MavenInvoker {
         StringBuilder output = new StringBuilder();
         StringBuilder errors = new StringBuilder();
 
+        // Drain stdout and stderr concurrently to avoid the pipe-buffer deadlock that
+        // occurs when one stream is read to EOF before the other is drained. The
+        // single collector thread coordinates two dedicated reader threads so callers
+        // can still join one handle to know when all output has been captured.
         Thread collector = new Thread(() -> {
-            try (BufferedReader outReader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
-                 BufferedReader errReader = new BufferedReader(
-                         new InputStreamReader(process.getErrorStream()))) {
-                String line;
-                while ((line = outReader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
-                }
-                while ((line = errReader.readLine()) != null) {
-                    errors.append(line).append(System.lineSeparator());
-                }
-            } catch (IOException ignored) {
-                // Process was likely destroyed
+            Thread outThread = SyncProcessRunner.drain(
+                    process.getInputStream(), output, "maven-stdout");
+            Thread errThread = SyncProcessRunner.drain(
+                    process.getErrorStream(), errors, "maven-stderr");
+            try {
+                outThread.join();
+                errThread.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }, "maven-output-collector");
         collector.start();

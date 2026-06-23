@@ -132,28 +132,15 @@ public class SbtBuildTool implements BuildTool {
             pb.directory(new File(projectDir));
             Process process = pb.start();
 
-            StringBuilder output = new StringBuilder();
-            StringBuilder errors = new StringBuilder();
-
-            try (BufferedReader outReader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
-                 BufferedReader errReader = new BufferedReader(
-                         new InputStreamReader(process.getErrorStream()))) {
-                String line;
-                while ((line = outReader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
-                }
-                while ((line = errReader.readLine()) != null) {
-                    errors.append(line).append(System.lineSeparator());
-                }
-            }
-
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
+            // Drain stdout and stderr concurrently with a bounded execution timeout
+            // to avoid the pipe-buffer deadlock that occurs when one stream is read
+            // to EOF before the other is drained.
+            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "sbt");
+            if (result.exitCode() != 0) {
                 throw new RuntimeException(
-                        "sbt exited with code " + exitCode + ": " + errors);
+                        "sbt exited with code " + result.exitCode() + ": " + result.stderr());
             }
-            return output.toString();
+            return result.stdout();
         } catch (IOException e) {
             throw new RuntimeException(
                     "Unable to invoke sbt command: " + e.getMessage(), e);
