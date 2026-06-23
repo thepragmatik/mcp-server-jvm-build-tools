@@ -1,0 +1,104 @@
+site_name: MCP Server — JVM Build Tools
+site_description: >-
+  One Model Context Protocol (MCP) server that gives AI agents secure, unified
+  access to Maven, Gradle, and SBT build tools on the JVM.
+site_url: https://thepragmatik.github.io/mcp-server-jvm-build-tools/
+repo_url: https://github.com/thepragmatik/mcp-server-jvm-build-tools
+repo_name: thepragmatik/mcp-server-jvm-build-tools
+edit_uri: edit/main/docs/
+copyright: Licensed under the Apache License, Version 2.0.
+
+theme:
+  name: material
+  language: en
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    logo: material/hammer-wrench
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+# Legacy stand-alone docs kept in the repo for direct GitHub browsing; they use
+# cross-document relative links that are intentionally excluded from the site build.
+exclude_docs: |
+  INDEX.md
+  AUTHORIZATION.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/thepragmatik/mcp-server-jvm-build-tools
+      name: Source on GitHub
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Overview: user-guide/overview.md
+      - Installation: user-guide/installation.md
+      - Configuration: user-guide/configuration.md
+      - Usage: user-guide/usage.md
+      - Examples: user-guide/examples.md
+  - Reference:
+      - Architecture: reference/architecture.md
+      - Tools / MCP API: reference/tools.md
+      - Configuration Reference: reference/configuration.md
+      - Security: reference/security.md
+  - FAQ: faq.md
