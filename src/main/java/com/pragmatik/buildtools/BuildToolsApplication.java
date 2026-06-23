@@ -35,6 +35,15 @@ public class BuildToolsApplication {
         }
     }
 
+    /**
+     * Exposes every {@code @Tool} method as a single {@link ToolCallbackProvider}.
+     *
+     * <p>The underlying {@link MethodToolCallbackProvider} discovers tools via reflection, which has
+     * no defined ordering across JVMs/restarts. We therefore wrap it in a
+     * {@link DeterministicToolCallbackProvider} so {@code tools/list} returns the static catalogue in
+     * a stable, name-sorted order — enabling client/gateway caching and improving LLM prompt cache
+     * hit rates (MCP RC, SEP-2549).
+     */
     @Bean
     public ToolCallbackProvider buildTools(
             BuildToolsService buildToolsService,
@@ -49,7 +58,7 @@ public class BuildToolsApplication {
             BuildPerformanceService buildPerformanceService,
             JavaVersionService javaVersionService,
             ToolAuthorizationService toolAuthorizationService) {
-        return MethodToolCallbackProvider.builder()
+        ToolCallbackProvider methodProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(
                         buildToolsService,
                         dependencyService,
@@ -64,5 +73,6 @@ public class BuildToolsApplication {
                         javaVersionService,
                         toolAuthorizationService)
                 .build();
+        return new DeterministicToolCallbackProvider(methodProvider);
     }
 }

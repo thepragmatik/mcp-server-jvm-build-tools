@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,8 +52,44 @@ public class McpServerIdentity {
     /** Protocol versions this server can speak (oldest to newest). */
     public static final List<String> SUPPORTED_PROTOCOL_VERSIONS = List.of("2024-11-05", "2025-03-26", "2026-07-28");
 
+    /** MCP {@code cacheScope} value permitting shared intermediaries to cache a response. */
+    public static final String CACHE_SCOPE_PUBLIC = "public";
+
+    /** MCP {@code cacheScope} value restricting caching to the requesting client. */
+    public static final String CACHE_SCOPE_PRIVATE = "private";
+
+    /**
+     * Default freshness hint (24h) for the static catalogue surfaces ({@code tools/list},
+     * {@code prompts/list}, {@code resources/list}, {@code resources/templates/list}). The tool set
+     * does not change for the lifetime of the process, so a generous TTL is safe and maximises cache
+     * hit rates. Overridable via {@code buildtools.cache.catalog-ttl-ms}.
+     */
+    public static final long DEFAULT_CATALOG_TTL_MS = 86_400_000L;
+
+    /**
+     * Default freshness hint (5min) for per-project content reads ({@code resources/read}). Reads
+     * reflect on-disk project state and may change between calls, so the TTL is short and the scope
+     * is private. Overridable via {@code buildtools.cache.read-ttl-ms}.
+     */
+    public static final long DEFAULT_READ_TTL_MS = 300_000L;
+
     private final String name;
     private final String version;
+
+    /**
+     * Freshness hint (ms) advertised for the static catalogue list surfaces. Initialised to
+     * {@link #DEFAULT_CATALOG_TTL_MS} so unit tests (constructed without Spring) and the
+     * property-bound runtime agree on the default.
+     */
+    @Value("${buildtools.cache.catalog-ttl-ms:" + DEFAULT_CATALOG_TTL_MS + "}")
+    private long catalogTtlMs = DEFAULT_CATALOG_TTL_MS;
+
+    /**
+     * Freshness hint (ms) advertised for per-project content reads. Initialised to
+     * {@link #DEFAULT_READ_TTL_MS} so unit tests and the property-bound runtime agree on the default.
+     */
+    @Value("${buildtools.cache.read-ttl-ms:" + DEFAULT_READ_TTL_MS + "}")
+    private long readTtlMs = DEFAULT_READ_TTL_MS;
 
     public McpServerIdentity(
             @Value("${spring.ai.mcp.server.name:${spring.application.name:mcp-server-jvm-build-tools}}") String name,
@@ -119,5 +156,54 @@ public class McpServerIdentity {
         capabilities.put("resources", Map.of("listChanged", false, "subscribe", false));
         capabilities.put("prompts", Map.of("listChanged", false));
         return capabilities;
+    }
+
+    /**
+     * The recommended caching policy for this server's MCP list/read surfaces, keyed by MCP method
+     * name. Each entry carries an {@code ttlMs} freshness hint (in milliseconds) and a
+     * {@code cacheScope} ({@code "public"} or {@code "private"}), mirroring the {@code CacheableResult}
+     * interface of the MCP upcoming spec (SEP-2549).
+     *
+     * <p>Because this server's tool/prompt/resource catalogue is static for the lifetime of the
+     * process, the list surfaces advertise a generous TTL and {@code "public"} scope so clients and
+     * shared gateways may cache them aggressively; per-project content reads advertise a short TTL and
+     * {@code "private"} scope because they reflect mutable on-disk state.
+     *
+     * <p><b>Why this is advertised here rather than emitted per result:</b> the bundled MCP SDK
+     * ({@code io.modelcontextprotocol.sdk} {@code 2.0.0-RC1}, via {@code spring-ai-mcp} {@code
+     * 2.0.0-RC2}) does not yet model {@code ttlMs}/{@code cacheScope} as typed fields on its result
+     * records, so the server cannot emit spec-level {@code CacheableResult} fields on individual
+     * responses today. Advertising the policy on the discovery surfaces (server card and
+     * {@code server/discover}) is an additive, backward-compatible interim: existing clients ignore
+     * the unknown key, while cache-aware clients/gateways can learn the catalogue is cacheable. See
+     * {@code docs/mcp-cacheable-result-gap.md} for the upstream dependency.
+     *
+     * <p>A fresh map is returned on each call so callers may layer in surface-specific entries
+     * without mutating shared state.
+     *
+     * @return an ordered, mutable map of MCP method name to its {@code {ttlMs, cacheScope}} hint
+     */
+    public Map<String, Object> cacheHints() {
+        Map<String, Object> hints = new LinkedHashMap<>();
+        hints.put("tools/list", hint(catalogTtlMs, CACHE_SCOPE_PUBLIC));
+        hints.put("prompts/list", hint(catalogTtlMs, CACHE_SCOPE_PUBLIC));
+        hints.put("resources/list", hint(catalogTtlMs, CACHE_SCOPE_PUBLIC));
+        hints.put("resources/templates/list", hint(catalogTtlMs, CACHE_SCOPE_PUBLIC));
+        hints.put("resources/read", hint(readTtlMs, CACHE_SCOPE_PRIVATE));
+        return hints;
+    }
+
+    /**
+     * Builds a single {@code CacheableResult}-shaped hint.
+     *
+     * @param ttlMs the freshness hint in milliseconds
+     * @param cacheScope {@link #CACHE_SCOPE_PUBLIC} or {@link #CACHE_SCOPE_PRIVATE}
+     * @return an ordered, immutable {@code {ttlMs, cacheScope}} map
+     */
+    private static Map<String, Object> hint(long ttlMs, String cacheScope) {
+        Map<String, Object> hint = new LinkedHashMap<>();
+        hint.put("ttlMs", ttlMs);
+        hint.put("cacheScope", cacheScope);
+        return Collections.unmodifiableMap(hint);
     }
 }
