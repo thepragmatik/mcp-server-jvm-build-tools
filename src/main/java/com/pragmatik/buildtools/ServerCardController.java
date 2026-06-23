@@ -76,6 +76,12 @@ public class ServerCardController {
         capabilities.put("extensions", Map.of("tasks", true, "mcpApps", true));
         card.put("capabilities", capabilities);
 
+        // Per-surface cacheability policy (ttlMs + cacheScope) for list/read results (MCP RC
+        // CacheableResult, SEP-2549). The static catalogue (tools/prompts/resource-templates) is
+        // publicly cacheable for an hour; per-project resource list/read is private. Resolved from
+        // the shared McpCachePolicy so the card and server/discover advertise identical values.
+        card.put("cachePolicy", McpCachePolicy.advertisedPolicy());
+
         // MCP RC (SEP-2549): recommended caching policy for the list/read surfaces, expressed as
         // per-method {ttlMs, cacheScope} hints (the CacheableResult shape). Advertised here as
         // additive, backward-compatible metadata from the single shared source; see

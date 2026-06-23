@@ -137,6 +137,25 @@ public final class McpCachePolicy {
     }
 
     /**
+     * The complete, per-surface cache policy this server advertises on its discovery surfaces (the
+     * server card and {@code server/discover}). Keyed by MCP method name, each value is the
+     * {@code {"ttlMs": ..., "cacheScope": ...}} fragment that the corresponding result carries (or
+     * would carry, once the SDK exposes {@code CacheableResult}). A fresh map is returned on every
+     * call so callers may embed it without mutating shared state.
+     *
+     * @return an ordered, mutable map of MCP method name to its cache fragment
+     */
+    public static Map<String, Object> advertisedPolicy() {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("tools/list", toolsList());
+        policy.put("prompts/list", promptsList());
+        policy.put("resources/list", resourcesList());
+        policy.put("resources/read", resourcesRead());
+        policy.put("resources/templates/list", resourceTemplatesList());
+        return policy;
+    }
+
+    /**
      * Builds a fresh, mutable {@code CacheableResult} fragment ({@code {"ttlMs": ..., "cacheScope":
      * ...}}). A new map is returned on every call so callers may embed or extend it without mutating
      * shared state.
