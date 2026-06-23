@@ -40,13 +40,21 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class TransportConfig {
 
     /**
+     * Single source of truth for the default CORS origin list (local origins only,
+     * no wildcard). Used both as the {@code @Value} fallback (when Spring resolves
+     * the property) and as the field initializer (the no-Spring fallback the unit
+     * tests assert against), so the two cannot drift.
+     */
+    static final String DEFAULT_ALLOWED_ORIGINS = "http://localhost:8080,http://127.0.0.1:8080";
+
+    /**
      * Comma-separated list of CORS origins permitted to call the {@code /mcp/**}
      * endpoints. Defaults to local origins only (no wildcard). Set this property
      * to widen access for development (e.g. a specific dashboard origin, or
      * {@code *} to allow any origin during local testing).
      */
-    @Value("${mcp.transport.cors.allowed-origins:http://localhost:8080,http://127.0.0.1:8080}")
-    private String corsAllowedOrigins = "http://localhost:8080,http://127.0.0.1:8080";
+    @Value("${mcp.transport.cors.allowed-origins:" + DEFAULT_ALLOWED_ORIGINS + "}")
+    private String corsAllowedOrigins = DEFAULT_ALLOWED_ORIGINS;
 
     /**
      * Parses {@link #corsAllowedOrigins} into trimmed, non-empty origin entries.
@@ -69,7 +77,15 @@ public class TransportConfig {
      *     to remain valid alongside {@code allowCredentials(true)}
      */
     boolean usesWildcard() {
-        for (String origin : parsedAllowedOrigins()) {
+        return containsWildcard(parsedAllowedOrigins());
+    }
+
+    /**
+     * @param origins already-parsed origin entries
+     * @return {@code true} when any entry contains a wildcard ({@code *})
+     */
+    private static boolean containsWildcard(String[] origins) {
+        for (String origin : origins) {
             if (origin.contains("*")) {
                 return true;
             }
@@ -88,7 +104,7 @@ public class TransportConfig {
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         final String[] origins = parsedAllowedOrigins();
-        final boolean wildcard = usesWildcard();
+        final boolean wildcard = containsWildcard(origins);
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
