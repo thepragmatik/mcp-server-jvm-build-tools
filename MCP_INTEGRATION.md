@@ -227,12 +227,41 @@ java -jar target/mcp-server-jvm-build-tools.jar -Dspring.profiles.active=http -D
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/mcp/message` | POST | MCP message endpoint (JSON-RPC) |
+| `/mcp/discover` | GET / POST | `server/discover`: protocol versions, capabilities, identity |
 | `/.well-known/mcp-server` | GET | Server card / discoverability metadata |
 | `/health` | GET | Health check |
 | `/health/ready` | GET | Readiness probe |
 | `/health/live` | GET | Liveness probe |
-| `/mcp/build-events/stream` | GET | SSE build event stream |
-| `/mcp/build-events/subscribers` | GET | SSE subscriber count |
+| `/mcp/build-events/stream` | GET | Supplementary build-event telemetry stream (not the MCP transport) |
+| `/mcp/build-events/subscribers` | GET | Build-events subscriber count |
+
+### Stateless Operation (2026-07-28 RC)
+
+The Streamable HTTP transport is **stateless** (MCP 2026-07-28 RC):
+
+- **No protocol-level sessions / no `Mcp-Session-Id`** (SEP-2575). The server holds
+  no per-connection state and pins nothing to a connection.
+- **No sticky sessions required — round-robin / load-balancer friendly.** Any replica
+  behind a load balancer can serve any request; there is no session affinity to
+  configure.
+- **Cross-call state uses explicit, server-minted handles** (SEP-2567). For example,
+  `execute_build_async` returns a `taskId`; the client passes that `taskId` back as an
+  ordinary tool argument to `get_build_task` / `cancel_build_task`. No session is
+  involved.
+- **No SSE-stream resumability** (`Last-Event-ID` / SSE event IDs are gone, SEP-2575).
+  A broken response stream loses the in-flight request; the client re-issues it as a
+  **new** request with a new request id. The `/mcp/build-events/stream` feed is a
+  supplementary, non-resumable telemetry firehose — it is **not** the MCP transport
+  and carries no protocol messages.
+- **Standard request headers** `Mcp-Method` and `Mcp-Name` (SEP-2243) are accepted on
+  `POST /mcp/**`. They are validated **only when present**: a header that contradicts
+  the JSON-RPC body (or the server identity) is rejected with `400` +
+  `HeaderMismatchError`. Older clients that omit these headers are unaffected.
+- **`server/discover`** (SEP-2575) is reachable at `/mcp/discover` for up-front
+  protocol-version selection and as a backward-compatibility probe (the `initialize`
+  handshake is no longer required).
+
+See `docs/mcp-2026-07-28-transport-audit.md` for the full framework audit.
 
 ---
 
@@ -263,6 +292,9 @@ curl http://localhost:8080/health/live
 
 # 4. Server card
 curl http://localhost:8080/.well-known/mcp-server
+
+# 4b. server/discover (stateless RC probe): protocol versions, capabilities, identity
+curl http://localhost:8080/mcp/discover
 
 # 5. MCP stdio compliance (requires JAR)
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | java -jar target/mcp-server-jvm-build-tools.jar | head -1

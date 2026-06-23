@@ -81,6 +81,16 @@ class TransportConfigTest {
     }
 
     @Test
+    void corsConfigurer_advertisesStandardMcpHeadersAndDropsSessionId() {
+        // 2026-07-28 RC: Mcp-Method + Mcp-Name are advertised (SEP-2243);
+        // the removed Mcp-Session-Id header (SEP-2575) must NOT be advertised.
+        CorsConfiguration cors = corsConfigFor("http://localhost:8080");
+        assertThat(cors.getAllowedHeaders())
+                .contains("Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin")
+                .doesNotContain("Mcp-Session-Id");
+    }
+
+    @Test
     void corsConfigurer_customExactOriginsUseAllowedOrigins() {
         CorsConfiguration cors = corsConfigFor("https://dashboard.example.com");
         assertThat(cors.getAllowedOrigins()).containsExactly("https://dashboard.example.com");

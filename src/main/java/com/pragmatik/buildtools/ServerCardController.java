@@ -66,6 +66,16 @@ public class ServerCardController {
         List<String> protocolVersions = List.of("2024-11-05", "2025-03-26", "2026-07-28");
         card.put("mcpVersions", protocolVersions);
 
+        // 2026-07-28 RC: stateless Streamable HTTP transport (no sessions / no SSE
+        // resumability) and the server/discover RPC for up-front version selection.
+        card.put("discover", "/mcp/discover");
+        Map<String, Object> transportInfo = new LinkedHashMap<>();
+        transportInfo.put("type", "streamable-http");
+        transportInfo.put("stateless", true);
+        transportInfo.put("sessions", false);
+        transportInfo.put("sseResumability", false);
+        card.put("transportProfile", transportInfo);
+
         Map<String, Object> capabilities = new LinkedHashMap<>();
         capabilities.put("tools", true);
         capabilities.put("resources", true);
