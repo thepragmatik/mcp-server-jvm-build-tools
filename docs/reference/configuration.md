@@ -134,6 +134,13 @@ Only these commands/tasks are permitted; anything else is rejected before a proc
 | **Gradle** | `clean`, `build`, `test`, `compileJava`, `compileTestJava`, `jar`, `assemble`, `check`, `publishToMavenLocal`, `dependencies`, `projects`, `tasks` |
 | **SBT** | `compile`, `test`, `run`, `package`, `clean`, `assembly`, `publishLocal`, `publish`, `update`, `doc`, `console` |
 
+!!! note "`dependency:tree` and `list_build_tools`"
+    Maven's `dependency:tree` is permitted by the executor (`MavenInvoker.ALLOWED_COMMANDS`,
+    8 entries) but is **not** reported by the `list_build_tools` tool, which surfaces
+    `MavenBuildTool.getSupportedCommands()` (7 entries, without `dependency:tree`). If you
+    cross-check this allowlist via `list_build_tools`, expect 7 Maven commands there even
+    though `dependency:tree` is accepted when invoked.
+
 ## Build-tool flag policy
 
 | Build tool | Safe flags | Blocked flags |
