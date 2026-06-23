@@ -16,9 +16,6 @@
  */
 package com.pragmatik.buildtools;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +25,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Structured audit logger for MCP tool invocations.
@@ -44,8 +43,7 @@ public final class ToolAuditLogger {
     private static final Logger log = LoggerFactory.getLogger(ToolAuditLogger.class);
 
     private static final DateTimeFormatter ISO_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
-                    .withZone(ZoneId.of("UTC"));
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX").withZone(ZoneId.of("UTC"));
 
     private final Path auditLogPath;
     private final boolean enabled;
@@ -60,8 +58,7 @@ public final class ToolAuditLogger {
         }
     }
 
-    public void record(String toolName, String caller, List<String> scopes,
-                       boolean authorized, long durationMs) {
+    public void record(String toolName, String caller, List<String> scopes, boolean authorized, long durationMs) {
         if (!enabled) return;
 
         String scopesStr = "null";
@@ -80,8 +77,7 @@ public final class ToolAuditLogger {
 
         try {
             Files.createDirectories(auditLogPath.getParent());
-            Files.writeString(auditLogPath, event + "\n",
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Files.writeString(auditLogPath, event + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             log.warn("Failed to write audit log entry to {}: {}", auditLogPath, e.getMessage());
         }
@@ -99,6 +95,11 @@ public final class ToolAuditLogger {
         }
     }
 
-    public boolean isEnabled() { return enabled; }
-    public String getAuditLogPath() { return auditLogPath.toString(); }
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public String getAuditLogPath() {
+        return auditLogPath.toString();
+    }
 }

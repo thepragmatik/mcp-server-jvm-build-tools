@@ -16,11 +16,10 @@
  */
 package com.pragmatik.buildtools;
 
+import java.util.*;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
 
 /**
  * MCP resource template service.
@@ -43,76 +42,65 @@ import java.util.*;
 @Service
 public class ResourceTemplateService {
 
-    @Tool(name = "list_resource_templates",
-          description = "List all available MCP resource templates with their URI patterns and " +
-                        "parameter descriptions. Templates allow dynamic resource URI construction " +
-                        "through parameter substitution.")
+    @Tool(
+            name = "list_resource_templates",
+            description = "List all available MCP resource templates with their URI patterns and "
+                    + "parameter descriptions. Templates allow dynamic resource URI construction "
+                    + "through parameter substitution.")
     public String listResourceTemplates() {
         List<Map<String, Object>> templates = new ArrayList<>();
 
         // Template 1: Dependencies per build tool
         templates.add(buildTemplate(
-            "build://{projectName}/dependencies/{buildTool}",
-            "Project Dependencies by Build Tool",
-            "Dependency declarations extracted from a specific build tool's file. " +
-            "Supports: maven, gradle, sbt.",
-            List.of(
-                param("projectName", "string", "The project directory name"),
-                param("buildTool", "string", "Build tool: 'maven', 'gradle', or 'sbt'")
-            ),
-            "application/json"
-        ));
+                "build://{projectName}/dependencies/{buildTool}",
+                "Project Dependencies by Build Tool",
+                "Dependency declarations extracted from a specific build tool's file. "
+                        + "Supports: maven, gradle, sbt.",
+                List.of(
+                        param("projectName", "string", "The project directory name"),
+                        param("buildTool", "string", "Build tool: 'maven', 'gradle', or 'sbt'")),
+                "application/json"));
 
         // Template 2: Specific config file
         templates.add(buildTemplate(
-            "build://{projectName}/config/{fileName}",
-            "Build Configuration File",
-            "Read a specific build configuration file by name. " +
-            "Examples: pom.xml, build.gradle, build.gradle.kts, build.sbt, settings.gradle.",
-            List.of(
-                param("projectName", "string", "The project directory name"),
-                param("fileName", "string", "Build file name (e.g., 'pom.xml', 'build.gradle.kts')")
-            ),
-            "text/plain"
-        ));
+                "build://{projectName}/config/{fileName}",
+                "Build Configuration File",
+                "Read a specific build configuration file by name. "
+                        + "Examples: pom.xml, build.gradle, build.gradle.kts, build.sbt, settings.gradle.",
+                List.of(
+                        param("projectName", "string", "The project directory name"),
+                        param("fileName", "string", "Build file name (e.g., 'pom.xml', 'build.gradle.kts')")),
+                "text/plain"));
 
         // Template 3: Build logs by command
         templates.add(buildTemplate(
-            "build://{projectName}/logs/{buildCommand}",
-            "Build Command Logs",
-            "Output logs from a specific build command. " +
-            "Examples: compile, test, package, install, clean.",
-            List.of(
-                param("projectName", "string", "The project directory name"),
-                param("buildCommand", "string", "Build command (e.g., 'compile', 'test', 'package')")
-            ),
-            "text/plain"
-        ));
+                "build://{projectName}/logs/{buildCommand}",
+                "Build Command Logs",
+                "Output logs from a specific build command. " + "Examples: compile, test, package, install, clean.",
+                List.of(
+                        param("projectName", "string", "The project directory name"),
+                        param("buildCommand", "string", "Build command (e.g., 'compile', 'test', 'package')")),
+                "text/plain"));
 
         // Template 4: Test results by suite
         templates.add(buildTemplate(
-            "build://{projectName}/test-results/{testSuite}",
-            "Test Suite Results",
-            "Structured test results for a specific test suite or class. " +
-            "Use 'all' to get results for all test suites.",
-            List.of(
-                param("projectName", "string", "The project directory name"),
-                param("testSuite", "string", "Test suite name or 'all' for all suites")
-            ),
-            "application/json"
-        ));
+                "build://{projectName}/test-results/{testSuite}",
+                "Test Suite Results",
+                "Structured test results for a specific test suite or class. "
+                        + "Use 'all' to get results for all test suites.",
+                List.of(
+                        param("projectName", "string", "The project directory name"),
+                        param("testSuite", "string", "Test suite name or 'all' for all suites")),
+                "application/json"));
 
         // Template 5: Project summary
         templates.add(buildTemplate(
-            "build://{projectName}/summary",
-            "Project Build Summary",
-            "Aggregated summary of build configuration, dependencies, " +
-            "last build status, and detected build tool.",
-            List.of(
-                param("projectName", "string", "The project directory name")
-            ),
-            "application/json"
-        ));
+                "build://{projectName}/summary",
+                "Project Build Summary",
+                "Aggregated summary of build configuration, dependencies, "
+                        + "last build status, and detected build tool.",
+                List.of(param("projectName", "string", "The project directory name")),
+                "application/json"));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("templateCount", templates.size());
@@ -123,14 +111,21 @@ public class ResourceTemplateService {
         return JsonUtils.toJson(result);
     }
 
-    @Tool(name = "resolve_resource_template",
-          description = "Resolve a resource template URI by substituting parameter values. " +
-                        "Returns the concrete resource URI and validates parameter constraints.")
+    @Tool(
+            name = "resolve_resource_template",
+            description = "Resolve a resource template URI by substituting parameter values. "
+                    + "Returns the concrete resource URI and validates parameter constraints.")
     public String resolveResourceTemplate(
-            @ToolParam(required = true, description = "Template URI pattern (e.g., 'build://{projectName}/dependencies/{buildTool}')")
-            String templateUri,
-            @ToolParam(required = true, description = "Parameter values as JSON object (e.g., '{\"projectName\":\"myapp\",\"buildTool\":\"maven\"}')")
-            String paramsJson) {
+            @ToolParam(
+                            required = true,
+                            description =
+                                    "Template URI pattern (e.g., 'build://{projectName}/dependencies/{buildTool}')")
+                    String templateUri,
+            @ToolParam(
+                            required = true,
+                            description =
+                                    "Parameter values as JSON object (e.g., '{\"projectName\":\"myapp\",\"buildTool\":\"maven\"}')")
+                    String paramsJson) {
 
         Map<String, Object> params;
         try {
@@ -181,10 +176,8 @@ public class ResourceTemplateService {
 
     // ─── Helpers ───────────────────────────────────────────────────────────
 
-    private static Map<String, Object> buildTemplate(String uri, String name,
-                                                      String description,
-                                                      List<Map<String, Object>> params,
-                                                      String mimeType) {
+    private static Map<String, Object> buildTemplate(
+            String uri, String name, String description, List<Map<String, Object>> params, String mimeType) {
         Map<String, Object> t = new LinkedHashMap<>();
         t.put("uriTemplate", uri);
         t.put("name", name);
@@ -236,9 +229,18 @@ public class ResourceTemplateService {
         int start = 0;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (escaped) { escaped = false; continue; }
-            if (c == '\\') { escaped = true; continue; }
-            if (c == '"') { inString = !inString; continue; }
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
             if (inString) continue;
             if (c == '{' || c == '[') depth++;
             if (c == '}' || c == ']') depth--;
@@ -258,9 +260,18 @@ public class ResourceTemplateService {
         boolean escaped = false;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (escaped) { escaped = false; continue; }
-            if (c == '\\') { escaped = true; continue; }
-            if (c == '"') { inString = !inString; continue; }
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
             if (!inString && c == ':') return i;
         }
         return -1;

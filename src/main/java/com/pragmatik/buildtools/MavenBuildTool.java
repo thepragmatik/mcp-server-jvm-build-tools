@@ -30,11 +30,11 @@ import java.util.List;
  */
 public class MavenBuildTool implements BuildTool {
 
-    private static final List<String> SUPPORTED_COMMANDS = List.of(
-            "clean", "compile", "test", "package", "install", "deploy", "validate"
-    );
+    private static final List<String> SUPPORTED_COMMANDS =
+            List.of("clean", "compile", "test", "package", "install", "deploy", "validate");
 
-    private static final String EXECUTION_PROMPT = """
+    private static final String EXECUTION_PROMPT =
+            """
             You are an assistant for executing Maven build commands. Follow these rules:
 
             1. Only execute Maven lifecycle phases: clean, compile, test, package, install, deploy, validate.
@@ -52,20 +52,16 @@ public class MavenBuildTool implements BuildTool {
     @Override
     public String version() {
         System.setProperty("maven.multiModuleProjectDirectory", new java.io.File(".").getAbsolutePath());
-        return MavenInvoker.executeUsingMavenEmbedder(new String[]{"--version"}, ".");
+        return MavenInvoker.executeUsingMavenEmbedder(new String[] {"--version"}, ".");
     }
 
     @Override
     public String executeCommand(String buildToolHome, String projectDir, String command) {
         if (buildToolHome == null || buildToolHome.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Maven requires buildToolHome. Specify a Maven installation directory.");
+            throw new IllegalArgumentException("Maven requires buildToolHome. Specify a Maven installation directory.");
         }
         return MavenInvoker.executeCommandUsingMavenInvoker(
-                buildToolHome,
-                MavenInvoker.getCommands(command),
-                projectDir
-        );
+                buildToolHome, MavenInvoker.getCommands(command), projectDir);
     }
 
     @Override

@@ -16,18 +16,17 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for {@link DependencyService}.
@@ -52,7 +51,8 @@ class DependencyServiceTest {
         @Test
         @DisplayName("extracts latest and release versions from well-formed XML")
         void extractsLatestAndReleaseVersions() {
-            String xml = """
+            String xml =
+                    """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <metadata>
                       <groupId>com.example</groupId>
@@ -73,9 +73,8 @@ class DependencyServiceTest {
                     </metadata>
                     """;
 
-            Map<String, Object> result = service.parseMetadata(
-                    "com.example", "test-lib", xml,
-                    DependencyService.VersionPreference.RELEASE);
+            Map<String, Object> result =
+                    service.parseMetadata("com.example", "test-lib", xml, DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("groupId")).isEqualTo("com.example");
             assertThat(result.get("artifactId")).isEqualTo("test-lib");
@@ -89,7 +88,8 @@ class DependencyServiceTest {
         @Test
         @DisplayName("handles missing releaseVersion gracefully")
         void handlesMissingReleaseVersion() {
-            String xml = """
+            String xml =
+                    """
                     <?xml version="1.0"?>
                     <metadata>
                       <groupId>com.example</groupId>
@@ -105,8 +105,7 @@ class DependencyServiceTest {
                     """;
 
             Map<String, Object> result = service.parseMetadata(
-                    "com.example", "no-release", xml,
-                    DependencyService.VersionPreference.RELEASE);
+                    "com.example", "no-release", xml, DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("latestVersion")).isEqualTo("1.0.0");
             assertThat(result.get("releaseVersion")).isNull();
@@ -115,7 +114,8 @@ class DependencyServiceTest {
         @Test
         @DisplayName("extracts all versions including snapshots")
         void extractsAllVersions() {
-            String xml = """
+            String xml =
+                    """
                     <?xml version="1.0"?>
                     <metadata>
                       <groupId>com.example</groupId>
@@ -134,9 +134,8 @@ class DependencyServiceTest {
                     </metadata>
                     """;
 
-            Map<String, Object> result = service.parseMetadata(
-                    "com.example", "snap-lib", xml,
-                    DependencyService.VersionPreference.ALL);
+            Map<String, Object> result =
+                    service.parseMetadata("com.example", "snap-lib", xml, DependencyService.VersionPreference.ALL);
 
             assertThat(result.get("versionCount")).isEqualTo(5);
             assertThat(result.get("totalVersions")).isEqualTo(5);
@@ -161,8 +160,7 @@ class DependencyServiceTest {
         @Test
         @DisplayName("classifies STABLE version")
         void classifiesStableVersion() {
-            assertThat(DependencyService.Stability.fromVersion("2.0.0"))
-                    .isEqualTo(DependencyService.Stability.STABLE);
+            assertThat(DependencyService.Stability.fromVersion("2.0.0")).isEqualTo(DependencyService.Stability.STABLE);
             assertThat(DependencyService.Stability.fromVersion("1.2.3.RELEASE"))
                     .isEqualTo(DependencyService.Stability.STABLE);
         }
@@ -179,10 +177,8 @@ class DependencyServiceTest {
         @Test
         @DisplayName("classifies RC version")
         void classifiesRcVersion() {
-            assertThat(DependencyService.Stability.fromVersion("2.0.0-RC1"))
-                    .isEqualTo(DependencyService.Stability.RC);
-            assertThat(DependencyService.Stability.fromVersion("1.0.rc2"))
-                    .isEqualTo(DependencyService.Stability.RC);
+            assertThat(DependencyService.Stability.fromVersion("2.0.0-RC1")).isEqualTo(DependencyService.Stability.RC);
+            assertThat(DependencyService.Stability.fromVersion("1.0.rc2")).isEqualTo(DependencyService.Stability.RC);
         }
 
         @Test
@@ -190,8 +186,7 @@ class DependencyServiceTest {
         void classifiesAlphaVersion() {
             assertThat(DependencyService.Stability.fromVersion("2.0.0-alpha-1"))
                     .isEqualTo(DependencyService.Stability.ALPHA);
-            assertThat(DependencyService.Stability.fromVersion("1.0-a1"))
-                    .isEqualTo(DependencyService.Stability.ALPHA);
+            assertThat(DependencyService.Stability.fromVersion("1.0-a1")).isEqualTo(DependencyService.Stability.ALPHA);
         }
 
         @Test
@@ -199,8 +194,7 @@ class DependencyServiceTest {
         void classifiesBetaVersion() {
             assertThat(DependencyService.Stability.fromVersion("2.0.0-beta-2"))
                     .isEqualTo(DependencyService.Stability.BETA);
-            assertThat(DependencyService.Stability.fromVersion("1.0-b3"))
-                    .isEqualTo(DependencyService.Stability.BETA);
+            assertThat(DependencyService.Stability.fromVersion("1.0-b3")).isEqualTo(DependencyService.Stability.BETA);
         }
 
         @Test
@@ -275,29 +269,25 @@ class DependencyServiceTest {
         @Test
         @DisplayName("detects MAJOR upgrade")
         void detectsMajorUpgrade() {
-            assertThat(DependencyService.computeUpgradeType("1.5.0", "2.0.0"))
-                    .isEqualTo("MAJOR");
+            assertThat(DependencyService.computeUpgradeType("1.5.0", "2.0.0")).isEqualTo("MAJOR");
         }
 
         @Test
         @DisplayName("detects MINOR upgrade")
         void detectsMinorUpgrade() {
-            assertThat(DependencyService.computeUpgradeType("1.5.0", "1.6.0"))
-                    .isEqualTo("MINOR");
+            assertThat(DependencyService.computeUpgradeType("1.5.0", "1.6.0")).isEqualTo("MINOR");
         }
 
         @Test
         @DisplayName("detects PATCH upgrade")
         void detectsPatchUpgrade() {
-            assertThat(DependencyService.computeUpgradeType("1.5.0", "1.5.3"))
-                    .isEqualTo("PATCH");
+            assertThat(DependencyService.computeUpgradeType("1.5.0", "1.5.3")).isEqualTo("PATCH");
         }
 
         @Test
         @DisplayName("same version returns PATCH")
         void sameVersionReturnsPatch() {
-            assertThat(DependencyService.computeUpgradeType("1.0.0", "1.0.0"))
-                    .isEqualTo("PATCH");
+            assertThat(DependencyService.computeUpgradeType("1.0.0", "1.0.0")).isEqualTo("PATCH");
         }
 
         @Test
@@ -390,8 +380,7 @@ class DependencyServiceTest {
             result.put("latestVersion", "2.5.0");
             result.put("latestStable", "2.5.0");
 
-            service.enrichWithVersionComparison(result, "2.0.0",
-                    DependencyService.VersionPreference.RELEASE);
+            service.enrichWithVersionComparison(result, "2.0.0", DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("currentVersion")).isEqualTo("2.0.0");
             assertThat(result.get("upgradeAvailable")).isEqualTo(true);
@@ -408,8 +397,7 @@ class DependencyServiceTest {
             result.put("latestVersion", "2.5.0");
             result.put("latestStable", "2.5.0");
 
-            service.enrichWithVersionComparison(result, "2.5.0",
-                    DependencyService.VersionPreference.RELEASE);
+            service.enrichWithVersionComparison(result, "2.5.0", DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }
@@ -421,8 +409,7 @@ class DependencyServiceTest {
             result.put("groupId", "com.example");
             result.put("artifactId", "test-lib");
 
-            service.enrichWithVersionComparison(result, "1.0.0",
-                    DependencyService.VersionPreference.RELEASE);
+            service.enrichWithVersionComparison(result, "1.0.0", DependencyService.VersionPreference.RELEASE);
 
             assertThat(result.get("upgradeAvailable")).isEqualTo(false);
         }
@@ -500,8 +487,8 @@ class DependencyServiceTest {
             result.put("groupId", "com.example");
             result.put("artifactId", "test-lib");
 
-            service.enrichWithProjectContext(result,
-                    projectDir.resolve("does-not-exist").toString());
+            service.enrichWithProjectContext(
+                    result, projectDir.resolve("does-not-exist").toString());
 
             // Should not throw, just skip enrichment
             assertThat(result.get("detectedBuildTool")).isNull();

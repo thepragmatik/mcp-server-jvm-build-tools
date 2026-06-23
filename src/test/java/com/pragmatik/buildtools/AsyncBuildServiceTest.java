@@ -16,15 +16,14 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for {@link AsyncBuildService}.
@@ -63,10 +62,11 @@ class AsyncBuildServiceTest {
     }
 
     @Test
-    void testExecuteBuildAsyncReturnsTaskHandle(@TempDir Path tempDir,
-                                                 @TempDir Path mavenHome) throws IOException {
+    void testExecuteBuildAsyncReturnsTaskHandle(@TempDir Path tempDir, @TempDir Path mavenHome) throws IOException {
         // Create a basic Maven project so auto-detection works
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -76,8 +76,7 @@ class AsyncBuildServiceTest {
                 </project>
                 """);
 
-        String result = service.executeBuildAsync("maven", mavenHome.toString(),
-                tempDir.toString(), "clean");
+        String result = service.executeBuildAsync("maven", mavenHome.toString(), tempDir.toString(), "clean");
 
         assertNotNull(result);
         assertTrue(result.contains("\"taskId\""));
@@ -88,8 +87,7 @@ class AsyncBuildServiceTest {
 
     @Test
     void testExecuteBuildAsyncRejectsUnknownTool(@TempDir Path tempDir) {
-        String result = service.executeBuildAsync("bazel", null,
-                tempDir.toString(), "build");
+        String result = service.executeBuildAsync("bazel", null, tempDir.toString(), "build");
         assertNotNull(result);
         assertTrue(result.contains("\"success\":false"));
         assertTrue(result.contains("Unknown build tool"));
@@ -112,10 +110,11 @@ class AsyncBuildServiceTest {
     }
 
     @Test
-    void testCancelBuildTaskNotRunning(@TempDir Path tempDir,
-                                        @TempDir Path mavenHome) throws IOException {
+    void testCancelBuildTaskNotRunning(@TempDir Path tempDir, @TempDir Path mavenHome) throws IOException {
         // Create a task then manually set it to completed
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -125,8 +124,7 @@ class AsyncBuildServiceTest {
                 </project>
                 """);
 
-        String execResult = service.executeBuildAsync("maven", mavenHome.toString(),
-                tempDir.toString(), "validate");
+        String execResult = service.executeBuildAsync("maven", mavenHome.toString(), tempDir.toString(), "validate");
         assertTrue(execResult.contains("\"taskId\""));
 
         // Extract task ID
@@ -141,7 +139,9 @@ class AsyncBuildServiceTest {
 
     @Test
     void testListBuildTasks(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -153,8 +153,7 @@ class AsyncBuildServiceTest {
 
         // Start a task (maven home doesn't need to be valid for listing test)
         Files.createDirectories(tempDir.resolve("maven-home"));
-        service.executeBuildAsync("maven", tempDir.resolve("maven-home").toString(),
-                tempDir.toString(), "validate");
+        service.executeBuildAsync("maven", tempDir.resolve("maven-home").toString(), tempDir.toString(), "validate");
 
         String result = service.listBuildTasks();
         assertNotNull(result);
@@ -166,14 +165,15 @@ class AsyncBuildServiceTest {
     @Test
     void testExecuteBuildAsyncAutoDetectTool(@TempDir Path tempDir) throws IOException {
         // Create Gradle project markers
-        Files.writeString(tempDir.resolve("build.gradle"), """
+        Files.writeString(
+                tempDir.resolve("build.gradle"),
+                """
                 plugins {
                     id 'java'
                 }
                 """);
 
-        String result = service.executeBuildAsync(null, null,
-                tempDir.toString(), "build");
+        String result = service.executeBuildAsync(null, null, tempDir.toString(), "build");
 
         assertNotNull(result);
         assertTrue(result.contains("\"taskId\""));

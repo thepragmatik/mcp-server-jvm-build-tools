@@ -31,44 +31,35 @@ import java.util.Set;
  * aligned with OAuth 2.1 resource indicator patterns.
  */
 public enum ToolPermission {
+    BUILD_READ(
+            "build:read",
+            Set.of("get_build_tool_version", "list_build_tools", "detect_build_tool", "validate_build_configuration")),
 
-    BUILD_READ("build:read", Set.of(
-            "get_build_tool_version", "list_build_tools", "detect_build_tool",
-            "validate_build_configuration")),
+    BUILD_EXECUTE("build:execute", Set.of("execute_build_command")),
 
-    BUILD_EXECUTE("build:execute", Set.of(
-            "execute_build_command")),
+    BUILD_PROFILE("build:profile", Set.of("profile_build", "analyze_build_performance")),
 
-    BUILD_PROFILE("build:profile", Set.of(
-            "profile_build", "analyze_build_performance")),
+    DEPENDENCY_READ("dependency:read", Set.of("check_dependency_version", "list_dependencies")),
 
-    DEPENDENCY_READ("dependency:read", Set.of(
-            "check_dependency_version", "list_dependencies")),
+    DEPENDENCY_MANAGE("dependency:manage", Set.of("detect_dependency_conflicts")),
 
-    DEPENDENCY_MANAGE("dependency:manage", Set.of(
-            "detect_dependency_conflicts")),
+    CREDENTIAL_READ("credential:read", Set.of("check_credential_status")),
 
-    CREDENTIAL_READ("credential:read", Set.of(
-            "check_credential_status")),
+    JAVA_READ("java:read", Set.of("check_java_compatibility")),
 
-    JAVA_READ("java:read", Set.of(
-            "check_java_compatibility")),
+    SBT_READ("sbt:read", Set.of("check_sbt_project", "list_sbt_modules")),
 
-    SBT_READ("sbt:read", Set.of(
-            "check_sbt_project", "list_sbt_modules")),
+    SBT_EXECUTE("sbt:execute", Set.of("execute_sbt_command")),
 
-    SBT_EXECUTE("sbt:execute", Set.of(
-            "execute_sbt_command")),
+    PROMPT_READ("prompt:read", Set.of("get_build_tool_prompt")),
 
-    PROMPT_READ("prompt:read", Set.of(
-            "get_build_tool_prompt")),
+    RESOURCE_READ(
+            "resource:read",
+            Set.of(
+                    "list_build_resources", "read_build_resource",
+                    "list_dependency_resources", "read_dependency_resource")),
 
-    RESOURCE_READ("resource:read", Set.of(
-            "list_build_resources", "read_build_resource",
-            "list_dependency_resources", "read_dependency_resource")),
-
-    RESOURCE_TEMPLATE("resource:template", Set.of(
-            "list_resource_templates", "get_resource_template"));
+    RESOURCE_TEMPLATE("resource:template", Set.of("list_resource_templates", "get_resource_template"));
 
     private final String scope;
     private final Set<String> toolNames;
@@ -78,8 +69,13 @@ public enum ToolPermission {
         this.toolNames = toolNames;
     }
 
-    public String scope() { return scope; }
-    public Set<String> toolNames() { return toolNames; }
+    public String scope() {
+        return scope;
+    }
+
+    public Set<String> toolNames() {
+        return toolNames;
+    }
 
     public static ToolPermission fromScope(String scope) {
         if (scope == null || scope.isBlank()) return null;

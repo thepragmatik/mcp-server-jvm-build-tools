@@ -28,31 +28,41 @@ public class BuildToolsApplication {
     public static void main(String[] args) {
         SpringApplication.run(BuildToolsApplication.class, args);
         // Block main thread to keep JVM alive for stdio MCP transport
-        try { Thread.currentThread().join(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Bean
-    public ToolCallbackProvider buildTools(BuildToolsService buildToolsService,
-                                           DependencyService dependencyService,
-                                           PromptService promptService,
-                                           BuildResourceService buildResourceService,
-                                           DependencyResourceService dependencyResourceService,
-                                           ResourceTemplateService resourceTemplateService,
-                                           SbtProjectService sbtProjectService,
-                                           BuildAuthService buildAuthService,
-                                           DependencyConflictService dependencyConflictService,
-                                           BuildPerformanceService buildPerformanceService,
-                                           JavaVersionService javaVersionService,
-                                           ToolAuthorizationService toolAuthorizationService) {
+    public ToolCallbackProvider buildTools(
+            BuildToolsService buildToolsService,
+            DependencyService dependencyService,
+            PromptService promptService,
+            BuildResourceService buildResourceService,
+            DependencyResourceService dependencyResourceService,
+            ResourceTemplateService resourceTemplateService,
+            SbtProjectService sbtProjectService,
+            BuildAuthService buildAuthService,
+            DependencyConflictService dependencyConflictService,
+            BuildPerformanceService buildPerformanceService,
+            JavaVersionService javaVersionService,
+            ToolAuthorizationService toolAuthorizationService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(buildToolsService, dependencyService, promptService,
-                             buildResourceService, dependencyResourceService,
-                             resourceTemplateService, sbtProjectService,
-                             buildAuthService,
-                             dependencyConflictService,
-                             buildPerformanceService,
-                             javaVersionService,
-                             toolAuthorizationService)
+                .toolObjects(
+                        buildToolsService,
+                        dependencyService,
+                        promptService,
+                        buildResourceService,
+                        dependencyResourceService,
+                        resourceTemplateService,
+                        sbtProjectService,
+                        buildAuthService,
+                        dependencyConflictService,
+                        buildPerformanceService,
+                        javaVersionService,
+                        toolAuthorizationService)
                 .build();
     }
 }

@@ -17,13 +17,7 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -34,7 +28,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * MCP service for supply chain security: SBOM generation, vulnerability auditing,
@@ -57,25 +53,46 @@ public class SupplyChainService {
 
     private static final String OSV_QUERY_URL = "https://api.osv.dev/v1/query";
     private static final String OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch";
-    private static final String GH_ADVISORY_URL =
-            "https://api.github.com/advisories";
+    private static final String GH_ADVISORY_URL = "https://api.github.com/advisories";
 
     private static final Set<String> COPYLEFT_LICENSES = Set.of(
-            "GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0-only", "GPL-3.0-or-later",
-            "AGPL-3.0-only", "AGPL-3.0-or-later", "LGPL-2.1-only", "LGPL-3.0-only",
-            "EUPL-1.1", "EUPL-1.2", "MPL-2.0", "EPL-1.0", "EPL-2.0",
-            "CDDL-1.0", "CDDL-1.1", "CPL-1.0", "OSL-3.0"
-    );
+            "GPL-2.0-only",
+            "GPL-2.0-or-later",
+            "GPL-3.0-only",
+            "GPL-3.0-or-later",
+            "AGPL-3.0-only",
+            "AGPL-3.0-or-later",
+            "LGPL-2.1-only",
+            "LGPL-3.0-only",
+            "EUPL-1.1",
+            "EUPL-1.2",
+            "MPL-2.0",
+            "EPL-1.0",
+            "EPL-2.0",
+            "CDDL-1.0",
+            "CDDL-1.1",
+            "CPL-1.0",
+            "OSL-3.0");
 
     private static final Set<String> RESTRICTED_LICENSES = Set.of(
-            "GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0-only", "GPL-3.0-or-later",
-            "AGPL-3.0-only", "AGPL-3.0-or-later"
-    );
+            "GPL-2.0-only",
+            "GPL-2.0-or-later",
+            "GPL-3.0-only",
+            "GPL-3.0-or-later",
+            "AGPL-3.0-only",
+            "AGPL-3.0-or-later");
 
     private static final Set<String> PERMISSIVE_LICENSES = Set.of(
-            "Apache-2.0", "MIT", "BSD-2-Clause", "BSD-3-Clause", "ISC",
-            "CC0-1.0", "Unlicense", "0BSD", "BSL-1.0", "PostgreSQL"
-    );
+            "Apache-2.0",
+            "MIT",
+            "BSD-2-Clause",
+            "BSD-3-Clause",
+            "ISC",
+            "CC0-1.0",
+            "Unlicense",
+            "0BSD",
+            "BSL-1.0",
+            "PostgreSQL");
 
     private final BuildToolProvider toolProvider;
     private final HttpClient httpClient;
@@ -95,17 +112,17 @@ public class SupplyChainService {
      * Maven: cyclonedx-maven-plugin, Gradle: org.cyclonedx.bom, SBT: sbt-cyclonedx.
      * If a pre-existing SBOM file is found, parses and returns it directly.
      */
-    @Tool(name = "generate_sbom",
-          description = "Generate a CycloneDX or SPDX Software Bill of Materials (SBOM) for a JVM project. " +
-                        "Auto-detects build tool and uses the appropriate CycloneDX plugin. " +
-                        "Returns structured JSON with component inventory, dependency graph, and metadata. " +
-                        "Formats: cyclonedx (default, JSON) or spdx (JSON).")
+    @Tool(
+            name = "generate_sbom",
+            description = "Generate a CycloneDX or SPDX Software Bill of Materials (SBOM) for a JVM project. "
+                    + "Auto-detects build tool and uses the appropriate CycloneDX plugin. "
+                    + "Returns structured JSON with component inventory, dependency graph, and metadata. "
+                    + "Formats: cyclonedx (default, JSON) or spdx (JSON).")
     public String generateSbom(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
             @Schema(allowableValues = {"cyclonedx", "spdx"})
-            @ToolParam(required = false, description = "SBOM format: 'cyclonedx' (default) or 'spdx'")
-            String format) {
+                    @ToolParam(required = false, description = "SBOM format: 'cyclonedx' (default) or 'spdx'")
+                    String format) {
 
         Path dir;
         try {
@@ -124,8 +141,8 @@ public class SupplyChainService {
         Map<String, Object> existingSbom = findExistingSbom(dir);
         if (existingSbom != null && !existingSbom.isEmpty()) {
             existingSbom.put("source", "existing-file");
-            existingSbom.put("generationNote", "Found pre-existing SBOM. " +
-                    "Use 'cyclonedx' format parameter to regenerate.");
+            existingSbom.put(
+                    "generationNote", "Found pre-existing SBOM. " + "Use 'cyclonedx' format parameter to regenerate.");
             return JsonUtils.toJson(existingSbom);
         }
 
@@ -157,15 +174,15 @@ public class SupplyChainService {
      * <p>
      * Reports CVEs with severity scores, fix versions, and remediation steps.
      */
-    @Tool(name = "audit_supply_chain",
-          description = "Audit a project's dependencies for known vulnerabilities. " +
-                        "Parses SBOM, cross-references against OSV.dev and GitHub Advisory databases. " +
-                        "Returns JSON with {vulnerabilities: [{cve, severity, package, currentVersion, " +
-                        "fixVersion, advisory}], totalCount, severityBreakdown}. " +
-                        "Also checks artifact signing status on Maven Central.")
+    @Tool(
+            name = "audit_supply_chain",
+            description = "Audit a project's dependencies for known vulnerabilities. "
+                    + "Parses SBOM, cross-references against OSV.dev and GitHub Advisory databases. "
+                    + "Returns JSON with {vulnerabilities: [{cve, severity, package, currentVersion, "
+                    + "fixVersion, advisory}], totalCount, severityBreakdown}. "
+                    + "Also checks artifact signing status on Maven Central.")
     public String auditSupplyChain(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir) {
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir) {
 
         Path dir;
         try {
@@ -185,8 +202,10 @@ public class SupplyChainService {
         if (sbom == null || sbom.isEmpty()) {
             // No SBOM found — parse dependency declarations from build files
             result.put("sbomAvailable", false);
-            result.put("note", "No SBOM found. Parsing dependency declarations from build files. " +
-                    "Run generate_sbom first for comprehensive supply chain audit.");
+            result.put(
+                    "note",
+                    "No SBOM found. Parsing dependency declarations from build files. "
+                            + "Run generate_sbom first for comprehensive supply chain audit.");
             List<Map<String, String>> deps = parseDependenciesFromBuildFile(dir);
             result.put("componentCount", deps.size());
             if (deps.isEmpty()) {
@@ -213,8 +232,7 @@ public class SupplyChainService {
         // Severity breakdown
         Map<String, Long> severityBreakdown = new LinkedHashMap<>();
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> vulns =
-                (List<Map<String, Object>>) result.get("vulnerabilities");
+        List<Map<String, Object>> vulns = (List<Map<String, Object>>) result.get("vulnerabilities");
         if (vulns != null) {
             for (Map<String, Object> v : vulns) {
                 String severity = (String) v.getOrDefault("severity", "UNKNOWN");
@@ -233,15 +251,15 @@ public class SupplyChainService {
      * each license as permissive, copyleft, restricted, or unknown, and
      * generates a compliance report by category.
      */
-    @Tool(name = "check_license_compliance",
-          description = "Check all project dependencies for license compliance. " +
-                        "Classifies licenses as permissive, copyleft, restricted, or unknown. " +
-                        "Flags GPL/AGPL dependencies that may impose copyleft obligations. " +
-                        "Returns JSON with {compliant, licenses: [{name, category, count}], " +
-                        "restrictedDeps: [{groupId, artifactId, version, license}], summary}.")
+    @Tool(
+            name = "check_license_compliance",
+            description = "Check all project dependencies for license compliance. "
+                    + "Classifies licenses as permissive, copyleft, restricted, or unknown. "
+                    + "Flags GPL/AGPL dependencies that may impose copyleft obligations. "
+                    + "Returns JSON with {compliant, licenses: [{name, category, count}], "
+                    + "restrictedDeps: [{groupId, artifactId, version, license}], summary}.")
     public String checkLicenseCompliance(
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir) {
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir) {
 
         Path dir;
         try {
@@ -268,8 +286,7 @@ public class SupplyChainService {
         List<Map<String, Object>> restricted = new ArrayList<>();
         for (Map<String, Object> li : licenseInfo) {
             @SuppressWarnings("unchecked")
-            List<Map<String, String>> rds =
-                    (List<Map<String, String>>) li.get("dependencies");
+            List<Map<String, String>> rds = (List<Map<String, String>>) li.get("dependencies");
             if (rds != null) {
                 for (Map<String, String> rd : rds) {
                     String license = rd.get("license");
@@ -279,8 +296,7 @@ public class SupplyChainService {
                                 "artifactId", rd.getOrDefault("artifactId", ""),
                                 "version", rd.getOrDefault("version", ""),
                                 "license", license,
-                                "risk", "RESTRICTED — " + license + " may impose copyleft obligations"
-                        ));
+                                "risk", "RESTRICTED — " + license + " may impose copyleft obligations"));
                     }
                 }
             }
@@ -306,12 +322,12 @@ public class SupplyChainService {
         summary.put("copyleftDependencies", copyleftCount);
         summary.put("restrictedDependencies", restrictedCount);
         if (!compliant) {
-            summary.put("recommendation",
-                    "Review " + restrictedCount + " restricted-license dependencies. " +
-                    "Consider replacing with permissive alternatives (Apache-2.0, MIT, BSD).");
+            summary.put(
+                    "recommendation",
+                    "Review " + restrictedCount + " restricted-license dependencies. "
+                            + "Consider replacing with permissive alternatives (Apache-2.0, MIT, BSD).");
         } else {
-            summary.put("recommendation",
-                    "No restricted licenses detected. All clear.");
+            summary.put("recommendation", "No restricted licenses detected. All clear.");
         }
         result.put("summary", summary);
 
@@ -323,10 +339,15 @@ public class SupplyChainService {
     private Map<String, Object> findExistingSbom(Path projectDir) {
         // Common SBOM file locations
         String[] searchPaths = {
-                "target/bom.json", "target/classes/bom.json",
-                "build/reports/bom.json", "build/bom.json",
-                "target/cyclonedx/bom.json", "target/sbom.json",
-                "bom.json", "sbom.json", "sbom.spdx.json"
+            "target/bom.json",
+            "target/classes/bom.json",
+            "build/reports/bom.json",
+            "build/bom.json",
+            "target/cyclonedx/bom.json",
+            "target/sbom.json",
+            "bom.json",
+            "sbom.json",
+            "sbom.spdx.json"
         };
 
         for (String sp : searchPaths) {
@@ -347,8 +368,11 @@ public class SupplyChainService {
                     }
 
                     // Extract metadata
-                    result.put("bomFormat", content.contains("\"bomFormat\"") ?
-                            extractJsonStringValue(content, "bomFormat") : "CycloneDX");
+                    result.put(
+                            "bomFormat",
+                            content.contains("\"bomFormat\"")
+                                    ? extractJsonStringValue(content, "bomFormat")
+                                    : "CycloneDX");
                     return result;
                 } catch (IOException ignored) {
                     // Corrupt file — skip
@@ -363,8 +387,8 @@ public class SupplyChainService {
         // Simple component extraction from CycloneDX JSON
         // Components appear in "components": [ { "group": "...", "name": "...", "version": "..." } ]
         Pattern compPattern = Pattern.compile(
-                "\\{[^}]*\"group\"\\s*:\\s*\"([^\"]*)\"[^}]*\"name\"\\s*:\\s*\"([^\"]*)\"" +
-                "[^}]*\"version\"\\s*:\\s*\"([^\"]*)\"[^}]*\\}",
+                "\\{[^}]*\"group\"\\s*:\\s*\"([^\"]*)\"[^}]*\"name\"\\s*:\\s*\"([^\"]*)\""
+                        + "[^}]*\"version\"\\s*:\\s*\"([^\"]*)\"[^}]*\\}",
                 Pattern.DOTALL);
         Matcher m = compPattern.matcher(json);
         while (m.find()) {
@@ -380,8 +404,7 @@ public class SupplyChainService {
 
     private List<Map<String, String>> extractComponentsFromSbom(Map<String, Object> sbom) {
         @SuppressWarnings("unchecked")
-        List<Map<String, String>> components =
-                (List<Map<String, String>>) sbom.get("components");
+        List<Map<String, String>> components = (List<Map<String, String>>) sbom.get("components");
         return components != null ? components : List.of();
     }
 
@@ -399,17 +422,17 @@ public class SupplyChainService {
                 }
             }
             case "gradle" -> {
-                for (String f : new String[]{"build.gradle", "build.gradle.kts"}) {
+                for (String f : new String[] {"build.gradle", "build.gradle.kts"}) {
                     try {
                         Path gf = dir.resolve(f);
                         if (Files.exists(gf)) {
                             String content = Files.readString(gf);
-                            if (content.contains("org.cyclonedx.bom") ||
-                                    content.contains("cyclonedx")) {
+                            if (content.contains("org.cyclonedx.bom") || content.contains("cyclonedx")) {
                                 yield true;
                             }
                         }
-                    } catch (IOException ignored) {}
+                    } catch (IOException ignored) {
+                    }
                 }
                 yield false;
             }
@@ -432,16 +455,15 @@ public class SupplyChainService {
     private void buildMavenSbomInstructions(Path dir, String format, Map<String, Object> result) {
         String command;
         if (format.equals("spdx")) {
-            command = "mvn org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom " +
-                      "-DoutputFormat=json -DoutputName=bom.spdx -Dschema=spdx";
+            command = "mvn org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom "
+                    + "-DoutputFormat=json -DoutputName=bom.spdx -Dschema=spdx";
         } else {
-            command = "mvn org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom " +
-                      "-DoutputFormat=json -DoutputName=bom";
+            command = "mvn org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom "
+                    + "-DoutputFormat=json -DoutputName=bom";
         }
 
         result.put("command", command);
-        result.put("outputFile", "target/" + (format.equals("spdx") ?
-                "bom.spdx.json" : "bom.json"));
+        result.put("outputFile", "target/" + (format.equals("spdx") ? "bom.spdx.json" : "bom.json"));
         result.put("pluginGroupId", "org.cyclonedx");
         result.put("pluginArtifactId", "cyclonedx-maven-plugin");
         result.put("pluginVersion", "2.9.1");
@@ -449,8 +471,7 @@ public class SupplyChainService {
         // Check for multi-module
         boolean multiModule = dir.resolve("pom.xml").toFile().length() > 0;
         if (multiModule) {
-            result.put("note", "Multi-module project detected. Using makeAggregateBom " +
-                    "to include all modules.");
+            result.put("note", "Multi-module project detected. Using makeAggregateBom " + "to include all modules.");
         }
     }
 
@@ -462,11 +483,13 @@ public class SupplyChainService {
         result.put("pluginVersion", "2.0.0");
 
         Map<String, Object> setup = new LinkedHashMap<>();
-        setup.put("buildScript", """
+        setup.put(
+                "buildScript",
+                """
                 plugins {
                     id 'org.cyclonedx.bom' version '2.0.0'
                 }
-                
+
                 cyclonedxBom {
                     includeConfigs = ['runtimeClasspath']
                     skipConfigs = ['compileClasspath', 'testCompileClasspath']
@@ -497,9 +520,8 @@ public class SupplyChainService {
             try {
                 String content = Files.readString(pomXml);
                 Pattern depPattern = Pattern.compile(
-                        "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*" +
-                        "<artifactId>([^<]+)</artifactId>\\s*" +
-                        "(?:<version>([^<]*)</version>\\s*)?",
+                        "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*" + "<artifactId>([^<]+)</artifactId>\\s*"
+                                + "(?:<version>([^<]*)</version>\\s*)?",
                         Pattern.DOTALL);
                 Matcher m = depPattern.matcher(content);
                 while (m.find()) {
@@ -507,16 +529,18 @@ public class SupplyChainService {
                     dep.put("groupId", m.group(1).trim());
                     dep.put("artifactId", m.group(2).trim());
                     dep.put("version", m.group(3) != null ? m.group(3).trim() : "[managed]");
-                    dep.put("purl", "pkg:maven/" + m.group(1).trim() + "/" +
-                            m.group(2).trim() + "@" +
-                            (m.group(3) != null ? m.group(3).trim() : ""));
+                    dep.put(
+                            "purl",
+                            "pkg:maven/" + m.group(1).trim() + "/" + m.group(2).trim() + "@"
+                                    + (m.group(3) != null ? m.group(3).trim() : ""));
                     deps.add(dep);
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
 
         // Try build.gradle / build.gradle.kts
-        for (String f : new String[]{"build.gradle", "build.gradle.kts"}) {
+        for (String f : new String[] {"build.gradle", "build.gradle.kts"}) {
             Path gradleFile = dir.resolve(f);
             if (Files.exists(gradleFile)) {
                 try {
@@ -525,8 +549,8 @@ public class SupplyChainService {
                     // implementation 'group:artifact:version'
                     // implementation("group:artifact:version")
                     Pattern depPattern = Pattern.compile(
-                            "(?:implementation|api|compileOnly|runtimeOnly|testImplementation)" +
-                            "\\s*['\"(]\\s*([^:'\"\\s]+):([^:'\"\\s]+):([^'\")\\s]+)",
+                            "(?:implementation|api|compileOnly|runtimeOnly|testImplementation)"
+                                    + "\\s*['\"(]\\s*([^:'\"\\s]+):([^:'\"\\s]+):([^'\")\\s]+)",
                             Pattern.DOTALL);
                     Matcher m = depPattern.matcher(content);
                     while (m.find()) {
@@ -534,11 +558,11 @@ public class SupplyChainService {
                         dep.put("groupId", m.group(1));
                         dep.put("artifactId", m.group(2));
                         dep.put("version", m.group(3));
-                        dep.put("purl", "pkg:maven/" + m.group(1) + "/" +
-                                m.group(2) + "@" + m.group(3));
+                        dep.put("purl", "pkg:maven/" + m.group(1) + "/" + m.group(2) + "@" + m.group(3));
                         deps.add(dep);
                     }
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
             }
         }
 
@@ -563,7 +587,8 @@ public class SupplyChainService {
                 pkg.put("name", dep.get("groupId") + ":" + dep.get("artifactId"));
                 pkg.put("ecosystem", "Maven");
                 query.put("package", pkg);
-                if (!dep.get("version").equals("[managed]") && !dep.get("version").isBlank()) {
+                if (!dep.get("version").equals("[managed]")
+                        && !dep.get("version").isBlank()) {
                     query.put("version", dep.get("version"));
                 }
                 queries.add(query);
@@ -586,17 +611,14 @@ public class SupplyChainService {
                     .timeout(Duration.ofSeconds(15))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
                 // Parse OSV batch response
                 String body = response.body();
                 // Results are a JSON object: {"results": [ { "vulns": [...] }, ... ]}
-                Pattern vulnPattern = Pattern.compile(
-                        "\"id\"\\s*:\\s*\"([^\"]+)\"");
-                Pattern aliasPattern = Pattern.compile(
-                        "\"aliases\"\\s*:\\s*\\[([^\\]]*)\\]");
+                Pattern vulnPattern = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
+                Pattern aliasPattern = Pattern.compile("\"aliases\"\\s*:\\s*\\[([^\\]]*)\\]");
                 Matcher vm = vulnPattern.matcher(body);
                 int vulnCount = 0;
                 while (vm.find() && vulnCount < 50) {
@@ -651,8 +673,7 @@ public class SupplyChainService {
             Map<String, String> entry = new LinkedHashMap<>(dep);
             entry.put("license", inferredLicense);
 
-            if (RESTRICTED_LICENSES.contains(inferredLicense) ||
-                    COPYLEFT_LICENSES.contains(inferredLicense)) {
+            if (RESTRICTED_LICENSES.contains(inferredLicense) || COPYLEFT_LICENSES.contains(inferredLicense)) {
                 byCategory.get("COPYLEFT").add(entry);
             } else if (PERMISSIVE_LICENSES.contains(inferredLicense)) {
                 byCategory.get("PERMISSIVE").add(entry);
@@ -687,12 +708,10 @@ public class SupplyChainService {
         if (groupId.startsWith("org.apache")) return "Apache-2.0";
 
         // Google
-        if (groupId.startsWith("com.google") || groupId.equals("com.google.guava"))
-            return "Apache-2.0";
+        if (groupId.startsWith("com.google") || groupId.equals("com.google.guava")) return "Apache-2.0";
 
         // JUnit
-        if (groupId.equals("org.junit") || groupId.startsWith("org.junit.jupiter"))
-            return "EPL-2.0";
+        if (groupId.equals("org.junit") || groupId.startsWith("org.junit.jupiter")) return "EPL-2.0";
 
         // Jackson
         if (groupId.startsWith("com.fasterxml.jackson")) return "Apache-2.0";
@@ -723,8 +742,8 @@ public class SupplyChainService {
         if (groupId.startsWith("org.scala-lang")) return "Apache-2.0";
 
         // MySQL / PostgreSQL drivers
-        if (groupId.equals("mysql") && artifactId != null &&
-                artifactId.contains("mysql-connector")) return "GPL-2.0-only";
+        if (groupId.equals("mysql") && artifactId != null && artifactId.contains("mysql-connector"))
+            return "GPL-2.0-only";
         if (groupId.equals("org.postgresql")) return "BSD-2-Clause";
 
         // Netty

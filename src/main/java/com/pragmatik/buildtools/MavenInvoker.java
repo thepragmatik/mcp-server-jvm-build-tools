@@ -16,14 +16,14 @@
  */
 package com.pragmatik.buildtools;
 
-import org.apache.maven.cli.MavenCli;
-import org.apache.maven.shared.invoker.*;
-
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
+import org.apache.maven.cli.MavenCli;
+import org.apache.maven.shared.invoker.*;
 
 public class MavenInvoker {
 
@@ -48,7 +48,8 @@ public class MavenInvoker {
             InvocationResult result = invoker.execute(request);
             if (invocationResultedInError(result)) {
                 if (result.getExecutionException() != null) {
-                    System.err.println("[ERROR] Maven execution failed: " + result.getExecutionException().getMessage());
+                    System.err.println("[ERROR] Maven execution failed: "
+                            + result.getExecutionException().getMessage());
                 }
                 finalResult = errors.toString();
                 throw new RuntimeException(finalResult);
@@ -65,52 +66,67 @@ public class MavenInvoker {
 
     static String executeUsingMavenEmbedder(String[] command, String currentProjectDirectory) {
         String finalResult;
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
 
-        OutputStream outputStream = new OutputStream() {
-            @Override
-            public void write(int b) {
-                output.append((char) b);
-            }
-        };
+        // Capture the embedder's stdout/stderr as raw bytes so the UTF-8 encoding
+        // applied by the PrintStreams below is decoded back symmetrically. The
+        // previous sink appended one Java char per byte, which reinterpreted each
+        // byte as Latin-1 and mojibake'd any multi-byte UTF-8 output. Buffering the
+        // bytes and decoding once via toString(UTF_8) keeps the round-trip lossless.
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
 
-        OutputStream errorStream = new OutputStream() {
-
-            @Override
-            public void write(int b) throws IOException {
-                errors.append((char) b);
-            }
-        };
-
-        PrintStream outPrintStream = new PrintStream(outputStream);
-        PrintStream errPrintStream = new PrintStream(errorStream);
+        PrintStream outPrintStream = new PrintStream(outputStream, false, StandardCharsets.UTF_8);
+        PrintStream errPrintStream = new PrintStream(errorStream, false, StandardCharsets.UTF_8);
 
         MavenCli mavenCli = new MavenCli();
 
         int exitCode = mavenCli.doMain(command, currentProjectDirectory, outPrintStream, errPrintStream);
 
+        // Flush so all buffered, encoded bytes reach the backing buffers before decode.
+        outPrintStream.flush();
+        errPrintStream.flush();
+
+        String outText = outputStream.toString(StandardCharsets.UTF_8);
+        String errText = errorStream.toString(StandardCharsets.UTF_8);
+
         if (exitCode != 0) {
-            finalResult = errors.toString();
+            finalResult = errText;
             throw new RuntimeException("Maven embedder exited with code " + exitCode + ": " + finalResult);
         } else {
-            finalResult = output.toString();
+            finalResult = outText;
         }
         return finalResult;
     }
 
     // Allowed Maven lifecycle phases and version flags
     private static final Set<String> ALLOWED_COMMANDS = Set.of(
-            "clean", "compile", "test", "package", "install", "deploy", "validate",
-            "--version", "-v", "-version",
-            "dependency:tree"  // read-only analysis, commonly needed
-    );
+            "clean",
+            "compile",
+            "test",
+            "package",
+            "install",
+            "deploy",
+            "validate",
+            "--version",
+            "-v",
+            "-version",
+            "dependency:tree" // read-only analysis, commonly needed
+            );
 
     // Dangerous plugin goals that can execute arbitrary code
     private static final Set<String> BLOCKED_PLUGIN_PREFIXES = Set.of(
-            "exec:", "ant:", "antrun:", "sql:", "groovy:", "shell:", "help:",
-            "dependency:", "resources:", "plugin:", "archetype:", "release:"
-    );
+            "exec:",
+            "ant:",
+            "antrun:",
+            "sql:",
+            "groovy:",
+            "shell:",
+            "help:",
+            "dependency:",
+            "resources:",
+            "plugin:",
+            "archetype:",
+            "release:");
 
     // Safe Maven flag pattern: -Dkey=value, -f file, -P profile, -q, -X, -T4, -B, -U, etc.
     // Also accepts --long-flags like --batch-mode, --non-recursive
@@ -145,23 +161,19 @@ public class MavenInvoker {
                 for (String prefix : BLOCKED_PLUGIN_PREFIXES) {
                     if (token.toLowerCase().startsWith(prefix)) {
                         throw new IllegalArgumentException(
-                                "Blocked plugin goal: " + token +
-                                        ". Allowed commands: " + ALLOWED_COMMANDS);
+                                "Blocked plugin goal: " + token + ". Allowed commands: " + ALLOWED_COMMANDS);
                     }
                 }
             }
 
             // Non-flag tokens must be in the allowed list
             if (!token.startsWith("-")) {
-                throw new IllegalArgumentException(
-                        "Command not allowed: " + token +
-                                ". Allowed: " + ALLOWED_COMMANDS);
+                throw new IllegalArgumentException("Command not allowed: " + token + ". Allowed: " + ALLOWED_COMMANDS);
             }
 
             // Validate flags against safe pattern
             if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
-                throw new IllegalArgumentException(
-                        "Invalid flag/argument: " + token);
+                throw new IllegalArgumentException("Invalid flag/argument: " + token);
             }
 
             // -D system properties are passed through verbatim: the server trusts the
@@ -181,8 +193,8 @@ public class MavenInvoker {
      * A cancellable Maven execution that exposes the underlying {@link Process}
      * so the async build service can destroy it on task cancellation.
      */
-    public record MavenProcessExecution(Process process, Thread outputCollector,
-                                        StringBuilder output, StringBuilder errors) {}
+    public record MavenProcessExecution(
+            Process process, Thread outputCollector, StringBuilder output, StringBuilder errors) {}
 
     /**
      * Execute a Maven command using {@link ProcessBuilder} so the caller can
@@ -201,8 +213,8 @@ public class MavenInvoker {
      * @return a handle to the running process and output collectors
      * @throws IOException if the process cannot be started
      */
-    static MavenProcessExecution executeWithProcessCapture(String mavenHome, String[] commands,
-                                                            String projectDir) throws IOException {
+    static MavenProcessExecution executeWithProcessCapture(String mavenHome, String[] commands, String projectDir)
+            throws IOException {
         Path homePath = Path.of(mavenHome);
         Path mvnw = homePath.resolve("mvnw");
         Path mvnBin = homePath.resolve("bin/mvn");
@@ -230,18 +242,18 @@ public class MavenInvoker {
         // occurs when one stream is read to EOF before the other is drained. The
         // single collector thread coordinates two dedicated reader threads so callers
         // can still join one handle to know when all output has been captured.
-        Thread collector = new Thread(() -> {
-            Thread outThread = SyncProcessRunner.drain(
-                    process.getInputStream(), output, "maven-stdout");
-            Thread errThread = SyncProcessRunner.drain(
-                    process.getErrorStream(), errors, "maven-stderr");
-            try {
-                outThread.join();
-                errThread.join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "maven-output-collector");
+        Thread collector = new Thread(
+                () -> {
+                    Thread outThread = SyncProcessRunner.drain(process.getInputStream(), output, "maven-stdout");
+                    Thread errThread = SyncProcessRunner.drain(process.getErrorStream(), errors, "maven-stderr");
+                    try {
+                        outThread.join();
+                        errThread.join();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                },
+                "maven-output-collector");
         collector.start();
 
         return new MavenProcessExecution(process, collector, output, errors);

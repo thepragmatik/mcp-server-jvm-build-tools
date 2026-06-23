@@ -17,10 +17,6 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,12 +25,15 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * Dependency intelligence service for Maven Central version lookups.
  * <p>
  * Queries the Maven Central REST API for {@code maven-metadata.xml} to
- * retrieve available versions of a dependency. Supports 
+ * retrieve available versions of a dependency. Supports
  * version filtering and project-aware context when a project directory
  * is provided.
  * <p>
@@ -72,29 +71,32 @@ public class DependencyService {
      * includes project-specific context (e.g., the correct dependency
      * declaration syntax for Maven, Gradle, or SBT).
      */
-    @Tool(name = "check_dependency_version",
-          description = "Check if a newer version exists for a Maven Central dependency. " +
-                        "Use this to determine whether a dependency can be upgraded. " +
-                        "Returns a JSON object with latest version, all versions, " +
-                        "stability classification, and upgrade type (major/minor/patch). " +
-                        "Provide projectDir to get build-tool-specific dependency syntax.")
+    @Tool(
+            name = "check_dependency_version",
+            description = "Check if a newer version exists for a Maven Central dependency. "
+                    + "Use this to determine whether a dependency can be upgraded. "
+                    + "Returns a JSON object with latest version, all versions, "
+                    + "stability classification, and upgrade type (major/minor/patch). "
+                    + "Provide projectDir to get build-tool-specific dependency syntax.")
     public String checkDependencyVersion(
-            @ToolParam(required = true,
-                       description = "Maven group ID (e.g., 'org.springframework.boot')")
-            String groupId,
-            @ToolParam(required = true,
-                       description = "Maven artifact ID (e.g., 'spring-boot-starter-web')")
-            String artifactId,
-            @ToolParam(required = false,
-                       description = "Current version to compare against. Omit to just get the latest version.")
-            String currentVersion,
+            @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
+                    String groupId,
+            @ToolParam(required = true, description = "Maven artifact ID (e.g., 'spring-boot-starter-web')")
+                    String artifactId,
+            @ToolParam(
+                            required = false,
+                            description = "Current version to compare against. Omit to just get the latest version.")
+                    String currentVersion,
             @Schema(allowableValues = {"RELEASE", "LATEST", "SNAPSHOT", "ALL"})
-            @ToolParam(required = false,
-                       description = "Version preference: RELEASE (default), LATEST, SNAPSHOT, or ALL")
-            String versionPreference,
-            @ToolParam(required = false,
-                       description = "Project directory path. When provided, auto-detects build tool and includes project context.")
-            String projectDir) {
+                    @ToolParam(
+                            required = false,
+                            description = "Version preference: RELEASE (default), LATEST, SNAPSHOT, or ALL")
+                    String versionPreference,
+            @ToolParam(
+                            required = false,
+                            description =
+                                    "Project directory path. When provided, auto-detects build tool and includes project context.")
+                    String projectDir) {
 
         VersionPreference filter = parseVersionPreference(versionPreference);
 
@@ -107,23 +109,19 @@ public class DependencyService {
 
         try {
             String groupPath = groupId.replace('.', '/');
-            String metadataUrl = String.format("%s/%s/%s/maven-metadata.xml",
-                    MAVEN_CENTRAL_BASE, groupPath, artifactId);
+            String metadataUrl =
+                    String.format("%s/%s/%s/maven-metadata.xml", MAVEN_CENTRAL_BASE, groupPath, artifactId);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(metadataUrl))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString());
+            HttpRequest request =
+                    HttpRequest.newBuilder().uri(URI.create(metadataUrl)).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 404) {
-                return JsonUtils.errorJson("Dependency not found on Maven Central: "
-                        + groupId + ":" + artifactId);
+                return JsonUtils.errorJson("Dependency not found on Maven Central: " + groupId + ":" + artifactId);
             }
             if (response.statusCode() != 200) {
-                return JsonUtils.errorJson("Maven Central returned HTTP "
-                        + response.statusCode() + " for " + groupId + ":" + artifactId);
+                return JsonUtils.errorJson(
+                        "Maven Central returned HTTP " + response.statusCode() + " for " + groupId + ":" + artifactId);
             }
 
             String xmlBody = response.body();
@@ -156,8 +154,7 @@ public class DependencyService {
     /**
      * Parse the maven-metadata.xml response and extract version information.
      */
-    Map<String, Object> parseMetadata(String groupId, String artifactId,
-                                       String xmlBody, VersionPreference filter) {
+    Map<String, Object> parseMetadata(String groupId, String artifactId, String xmlBody, VersionPreference filter) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("groupId", groupId);
         result.put("artifactId", artifactId);
@@ -242,15 +239,16 @@ public class DependencyService {
     /**
      * Enrich the result with version comparison data.
      */
-    void enrichWithVersionComparison(Map<String, Object> result,
-                                      String currentVersion, VersionPreference filter) {
+    void enrichWithVersionComparison(Map<String, Object> result, String currentVersion, VersionPreference filter) {
         result.put("currentVersion", currentVersion);
 
         Object latestObj = result.get("latestVersion");
         Object stableObj = result.get("latestStable");
 
         String compareTarget = null;
-        if (filter == VersionPreference.RELEASE || filter == VersionPreference.LATEST || filter == VersionPreference.SNAPSHOT) {
+        if (filter == VersionPreference.RELEASE
+                || filter == VersionPreference.LATEST
+                || filter == VersionPreference.SNAPSHOT) {
             compareTarget = stableObj != null ? stableObj.toString() : null;
         }
         if (compareTarget == null) {
@@ -286,26 +284,27 @@ public class DependencyService {
 
             String groupId = (String) result.get("groupId");
             String artifactId = (String) result.get("artifactId");
-            String version = (String) result.getOrDefault("latestVersion",
-                    result.get("latestStable"));
+            String version = (String) result.getOrDefault("latestVersion", result.get("latestStable"));
 
             Map<String, String> syntax = new LinkedHashMap<>();
             switch (tool.getName()) {
                 case "maven":
-                    syntax.put("maven", String.format(
-                            "<dependency>\n  <groupId>%s</groupId>\n" +
-                            "  <artifactId>%s</artifactId>\n  <version>%s</version>\n" +
-                            "</dependency>", groupId, artifactId, version));
+                    syntax.put(
+                            "maven",
+                            String.format(
+                                    "<dependency>\n  <groupId>%s</groupId>\n"
+                                            + "  <artifactId>%s</artifactId>\n  <version>%s</version>\n"
+                                            + "</dependency>",
+                                    groupId, artifactId, version));
                     break;
                 case "gradle":
-                    syntax.put("gradle", String.format(
-                            "implementation('%s:%s:%s')",
-                            groupId, artifactId, version));
+                    syntax.put("gradle", String.format("implementation('%s:%s:%s')", groupId, artifactId, version));
                     break;
                 case "sbt":
-                    syntax.put("sbt", String.format(
-                            "libraryDependencies += \"%s\" %% \"%s\" %% \"%s\"",
-                            groupId, artifactId, version));
+                    syntax.put(
+                            "sbt",
+                            String.format(
+                                    "libraryDependencies += \"%s\" %% \"%s\" %% \"%s\"", groupId, artifactId, version));
                     break;
             }
             if (!syntax.isEmpty()) {
@@ -400,14 +399,16 @@ public class DependencyService {
             int curMajor = Integer.parseInt(cur[0].replaceAll("[^0-9].*$", ""));
             int latMajor = Integer.parseInt(lat[0].replaceAll("[^0-9].*$", ""));
             if (curMajor != latMajor) return "MAJOR";
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         if (cur.length > 1 && lat.length > 1) {
             try {
                 int curMinor = Integer.parseInt(cur[1].replaceAll("[^0-9].*$", ""));
                 int latMinor = Integer.parseInt(lat[1].replaceAll("[^0-9].*$", ""));
                 if (curMinor != latMinor) return "MINOR";
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+            }
         }
 
         return "PATCH";
@@ -427,7 +428,12 @@ public class DependencyService {
     }
 
     public enum Stability {
-        STABLE, RC, MILESTONE, BETA, ALPHA, SNAPSHOT;
+        STABLE,
+        RC,
+        MILESTONE,
+        BETA,
+        ALPHA,
+        SNAPSHOT;
 
         static Stability fromVersion(String version) {
             String lower = version.toLowerCase();

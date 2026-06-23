@@ -38,12 +38,12 @@ import java.util.regex.Pattern;
 public class SbtOutputParser implements BuildOutputParser {
 
     // "[success] Total time: 3 s, completed ..."
-    private static final Pattern SUCCESS_PATTERN = Pattern.compile(
-            "\\[success]\\s+Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
+    private static final Pattern SUCCESS_PATTERN =
+            Pattern.compile("\\[success]\\s+Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
 
     // "[error] Total time: ..." on failure
-    private static final Pattern FAILURE_PATTERN = Pattern.compile(
-            "\\[error]\\s+Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
+    private static final Pattern FAILURE_PATTERN =
+            Pattern.compile("\\[error]\\s+Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
 
     // ScalaTest: "[info] Passed: Total N, Failed N, Errors N, Passed N"
     private static final Pattern SCALATEST_SUMMARY_PATTERN = Pattern.compile(
@@ -54,28 +54,25 @@ public class SbtOutputParser implements BuildOutputParser {
             "\\[info]\\s+Test run finished:\\s*(\\d+)\\s*failed,\\s*(\\d+)\\s*ignored,\\s*(\\d+)\\s*total");
 
     // specs2: "[info] Total for specification X: N examples, M failures, ..."
-    private static final Pattern SPECS2_SUMMARY_PATTERN = Pattern.compile(
-            "\\[info]\\s+Total for specification.*?:?\\s*(\\d+)\\s*examples?.*?(\\d+)\\s*failures?");
+    private static final Pattern SPECS2_SUMMARY_PATTERN =
+            Pattern.compile("\\[info]\\s+Total for specification.*?:?\\s*(\\d+)\\s*examples?.*?(\\d+)\\s*failures?");
 
     // File:line error: "[error] /path/File.scala:42: message"
-    private static final Pattern ERROR_FILE_LINE_PATTERN = Pattern.compile(
-            "\\[error]\\s+(.+?\\.[a-zA-Z]+):(\\d+):\\s*(.*)");
+    private static final Pattern ERROR_FILE_LINE_PATTERN =
+            Pattern.compile("\\[error]\\s+(.+?\\.[a-zA-Z]+):(\\d+):\\s*(.*)");
 
     // Stack trace: "at package.Class.method(File.scala:42)"
-    private static final Pattern STACK_TRACE_PATTERN = Pattern.compile(
-            "at\\s+\\S+\\(([^:]+):(\\d+)\\)");
+    private static final Pattern STACK_TRACE_PATTERN = Pattern.compile("at\\s+\\S+\\(([^:]+):(\\d+)\\)");
 
     // Generic [error] line (catch-all for errors without file:line)
-    private static final Pattern ERROR_LINE_PATTERN = Pattern.compile(
-            "\\[error]\\s+(.*)");
+    private static final Pattern ERROR_LINE_PATTERN = Pattern.compile("\\[error]\\s+(.*)");
 
     // Generic [warn] line
-    private static final Pattern WARNING_LINE_PATTERN = Pattern.compile(
-            "\\[warn]\\s+(.*)");
+    private static final Pattern WARNING_LINE_PATTERN = Pattern.compile("\\[warn]\\s+(.*)");
 
     // Duration fallback
-    private static final Pattern DURATION_PATTERN = Pattern.compile(
-            "Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
+    private static final Pattern DURATION_PATTERN =
+            Pattern.compile("Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(s|ms|min|m)");
 
     @Override
     public String getToolName() {
@@ -174,8 +171,11 @@ public class SbtOutputParser implements BuildOutputParser {
             if (errFileMatcher.find()) {
                 Map<String, Object> err = new LinkedHashMap<>();
                 err.put("file", errFileMatcher.group(1));
-                try { err.put("line", Integer.parseInt(errFileMatcher.group(2))); }
-                catch (NumberFormatException e) { err.put("line", 0); }
+                try {
+                    err.put("line", Integer.parseInt(errFileMatcher.group(2)));
+                } catch (NumberFormatException e) {
+                    err.put("line", 0);
+                }
                 err.put("severity", "ERROR");
                 String msg = errFileMatcher.group(3).trim();
                 if (!msg.isEmpty()) err.put("message", msg);
@@ -189,8 +189,11 @@ public class SbtOutputParser implements BuildOutputParser {
                 Matcher stackMatcher = STACK_TRACE_PATTERN.matcher(line);
                 if (stackMatcher.find() && !lastFileLineError.containsKey("stackFile")) {
                     lastFileLineError.put("stackFile", stackMatcher.group(1));
-                    try { lastFileLineError.put("stackLine", Integer.parseInt(stackMatcher.group(2))); }
-                    catch (NumberFormatException e) { lastFileLineError.put("stackLine", 0); }
+                    try {
+                        lastFileLineError.put("stackLine", Integer.parseInt(stackMatcher.group(2)));
+                    } catch (NumberFormatException e) {
+                        lastFileLineError.put("stackLine", 0);
+                    }
                     lastFileLineError.put("stackOrigin", line.trim());
                 }
                 continue;
@@ -248,9 +251,7 @@ public class SbtOutputParser implements BuildOutputParser {
         return summary;
     }
 
-    private static Map<String, Object> buildTestSummary(int total, int passed,
-                                                         int failed, int error,
-                                                         int skipped) {
+    private static Map<String, Object> buildTestSummary(int total, int passed, int failed, int error, int skipped) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("total", total);
         summary.put("passed", passed);

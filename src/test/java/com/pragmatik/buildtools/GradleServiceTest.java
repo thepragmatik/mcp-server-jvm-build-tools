@@ -16,21 +16,17 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Comprehensive test suite for {@link GradleBuildTool}.
@@ -73,10 +69,18 @@ class GradleServiceTest {
                     .isNotNull()
                     .isNotEmpty()
                     .containsExactlyInAnyOrder(
-                            "clean", "build", "test", "compileJava", "compileTestJava",
-                            "jar", "assemble", "check", "publishToMavenLocal",
-                            "dependencies", "projects", "tasks"
-                    );
+                            "clean",
+                            "build",
+                            "test",
+                            "compileJava",
+                            "compileTestJava",
+                            "jar",
+                            "assemble",
+                            "check",
+                            "publishToMavenLocal",
+                            "dependencies",
+                            "projects",
+                            "tasks");
         }
 
         @Test
@@ -174,22 +178,19 @@ class GradleServiceTest {
         @Test
         @DisplayName("strips 'gradle ' prefix and splits tokens")
         void stripsGradlePrefix() {
-            assertThat(GradleBuildTool.parseCommandTokens("gradle clean"))
-                    .containsExactly("clean");
+            assertThat(GradleBuildTool.parseCommandTokens("gradle clean")).containsExactly("clean");
         }
 
         @Test
         @DisplayName("strips 'gradlew ' prefix and splits tokens")
         void stripsGradlewPrefix() {
-            assertThat(GradleBuildTool.parseCommandTokens("gradlew build"))
-                    .containsExactly("build");
+            assertThat(GradleBuildTool.parseCommandTokens("gradlew build")).containsExactly("build");
         }
 
         @Test
         @DisplayName("handles command without gradle/gradlew prefix")
         void handlesCommandWithoutPrefix() {
-            assertThat(GradleBuildTool.parseCommandTokens("clean"))
-                    .containsExactly("clean");
+            assertThat(GradleBuildTool.parseCommandTokens("clean")).containsExactly("clean");
         }
 
         @Test
@@ -228,8 +229,7 @@ class GradleServiceTest {
         @Test
         @DisplayName("trims leading and trailing whitespace")
         void trimsLeadingTrailingWhitespace() {
-            assertThat(GradleBuildTool.parseCommandTokens("  gradle clean  "))
-                    .containsExactly("clean");
+            assertThat(GradleBuildTool.parseCommandTokens("  gradle clean  ")).containsExactly("clean");
         }
 
         @Test
@@ -371,8 +371,7 @@ class GradleServiceTest {
             Path gradleBin = Files.createFile(binDir.resolve("gradle"));
             gradleBin.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    gradleHome.toString(), null);
+            String result = GradleBuildTool.resolveGradleExecutable(gradleHome.toString(), null);
             assertThat(result).isEqualTo(gradleBin.toString());
         }
 
@@ -383,8 +382,7 @@ class GradleServiceTest {
             Path gradlew = Files.createFile(gradleHome.resolve("gradlew"));
             gradlew.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    gradleHome.toString(), null);
+            String result = GradleBuildTool.resolveGradleExecutable(gradleHome.toString(), null);
             assertThat(result).isEqualTo(gradlew.toString());
         }
 
@@ -395,8 +393,7 @@ class GradleServiceTest {
             Path gradleFile = Files.createFile(gradleHome.resolve("gradle"));
             gradleFile.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    gradleFile.toString(), null);
+            String result = GradleBuildTool.resolveGradleExecutable(gradleFile.toString(), null);
             assertThat(result).isEqualTo(gradleFile.toString());
         }
 
@@ -406,8 +403,7 @@ class GradleServiceTest {
             Path gradlew = Files.createFile(gradleHome.resolve("gradlew"));
             gradlew.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    null, gradleHome.toString());
+            String result = GradleBuildTool.resolveGradleExecutable(null, gradleHome.toString());
             assertThat(result).isEqualTo(gradlew.toString());
         }
 
@@ -421,8 +417,7 @@ class GradleServiceTest {
             Path gradlew = Files.createFile(projectDir.resolve("gradlew"));
             gradlew.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    nonexistentHome, projectDir.toString());
+            String result = GradleBuildTool.resolveGradleExecutable(nonexistentHome, projectDir.toString());
             assertThat(result).isEqualTo(gradlew.toString());
         }
 
@@ -438,8 +433,7 @@ class GradleServiceTest {
         void fallsBackWhenNoExecutablesFound(@TempDir Path emptyDir) {
             // Use nonexistent paths to ensure all Files.isExecutable checks return false
             Path nonexistent = emptyDir.resolve("does-not-exist");
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    nonexistent.toString(), nonexistent.toString());
+            String result = GradleBuildTool.resolveGradleExecutable(nonexistent.toString(), nonexistent.toString());
             assertThat(result).isEqualTo("gradle");
         }
 
@@ -461,8 +455,7 @@ class GradleServiceTest {
         @DisplayName("handles nonexistent buildToolHome path")
         void handlesNonexistentBuildToolHome(@TempDir Path tmp) {
             Path nonexistent = tmp.resolve("does-not-exist");
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    nonexistent.toString(), null);
+            String result = GradleBuildTool.resolveGradleExecutable(nonexistent.toString(), null);
             assertThat(result).isEqualTo("gradle");
         }
 
@@ -470,8 +463,7 @@ class GradleServiceTest {
         @DisplayName("handles nonexistent projectDir path")
         void handlesNonexistentProjectDir(@TempDir Path tmp) {
             Path nonexistent = tmp.resolve("does-not-exist");
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    null, nonexistent.toString());
+            String result = GradleBuildTool.resolveGradleExecutable(null, nonexistent.toString());
             assertThat(result).isEqualTo("gradle");
         }
 
@@ -485,8 +477,7 @@ class GradleServiceTest {
             Path gradlew = Files.createFile(gradleHome.resolve("gradlew"));
             gradlew.toFile().setExecutable(true);
 
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    gradleHome.toString(), null);
+            String result = GradleBuildTool.resolveGradleExecutable(gradleHome.toString(), null);
             assertThat(result).isEqualTo(gradleBin.toString());
         }
 
@@ -503,8 +494,7 @@ class GradleServiceTest {
             gradlew.toFile().setExecutable(true);
 
             // buildToolHome has bin/gradle -> should be used, not projectDir's gradlew
-            String result = GradleBuildTool.resolveGradleExecutable(
-                    buildToolDir.toString(), projectDir.toString());
+            String result = GradleBuildTool.resolveGradleExecutable(buildToolDir.toString(), projectDir.toString());
             assertThat(result).isEqualTo(gradleBin.toString());
         }
     }
@@ -535,8 +525,7 @@ class GradleServiceTest {
             // This will actually try to execute gradle — we expect a RuntimeException
             // because there's no real Gradle installed at this path
             try {
-                tool.executeCommand(projectDir.toString(),
-                        projectDir.toString(), "gradle tasks");
+                tool.executeCommand(projectDir.toString(), projectDir.toString(), "gradle tasks");
                 // If it runs successfully, that's fine too
             } catch (RuntimeException e) {
                 // Expected: gradle executable doesn't really exist
@@ -573,8 +562,7 @@ class GradleServiceTest {
         void providerRegistersGradleBuildTool() {
             BuildToolProvider provider = new BuildToolProvider();
             assertThat(provider.getTool("gradle")).isPresent();
-            assertThat(provider.getTool("gradle").get())
-                    .isInstanceOf(GradleBuildTool.class);
+            assertThat(provider.getTool("gradle").get()).isInstanceOf(GradleBuildTool.class);
         }
 
         @Test
@@ -621,8 +609,7 @@ class GradleServiceTest {
         void providerListsGradleInAllTools() {
             BuildToolProvider provider = new BuildToolProvider();
             assertThat(provider.getAllTools()).containsKey("gradle");
-            assertThat(provider.getAllTools().get("gradle"))
-                    .isInstanceOf(GradleBuildTool.class);
+            assertThat(provider.getAllTools().get("gradle")).isInstanceOf(GradleBuildTool.class);
         }
 
         @Test

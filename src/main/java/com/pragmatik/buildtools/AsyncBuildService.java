@@ -17,14 +17,11 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -32,7 +29,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * MCP service that provides asynchronous build execution via the
@@ -74,22 +73,21 @@ public class AsyncBuildService {
      * The build runs in the background. Use {@link #getBuildTask} to poll for
      * status, progress, and results. Use {@link #cancelBuildTask} to cancel.
      */
-    @Tool(name = "execute_build_async",
-          description = "Start an async build and return a task handle immediately. " +
-                        "Use this for long-running builds (30s+) instead of execute_build_command. " +
-                        "Returns a task JSON with {taskId, status:\"queued\"}. " +
-                        "Poll with get_build_task to track progress, stream output, and get results. " +
-                        "Supports Maven, Gradle, and SBT.")
+    @Tool(
+            name = "execute_build_async",
+            description = "Start an async build and return a task handle immediately. "
+                    + "Use this for long-running builds (30s+) instead of execute_build_command. "
+                    + "Returns a task JSON with {taskId, status:\"queued\"}. "
+                    + "Poll with get_build_task to track progress, stream output, and get results. "
+                    + "Supports Maven, Gradle, and SBT.")
     public String executeBuildAsync(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
-            @ToolParam(required = false, description = "Build tool name. Omit to auto-detect.")
-            String buildToolName,
-            @ToolParam(required = false, description = "Path to build tool installation.")
-            String buildToolHome,
-            @ToolParam(required = true, description = "Path to the project directory")
-            String projectDir,
+                    @ToolParam(required = false, description = "Build tool name. Omit to auto-detect.")
+                    String buildToolName,
+            @ToolParam(required = false, description = "Path to build tool installation.") String buildToolHome,
+            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
             @ToolParam(required = true, description = "Build command to execute (e.g., 'clean compile')")
-            String command) {
+                    String command) {
 
         // --- Input validation (aligned with BuildToolsService) ---
         if (command == null || command.trim().isEmpty()) {
@@ -128,8 +126,7 @@ public class AsyncBuildService {
         // --- Create task ---
         String taskId = UUID.randomUUID().toString().substring(0, 8);
         BuildTask task = new BuildTask(
-                taskId, tool.getName(), command, validatedProject.toString(),
-                validatedHome, Instant.now());
+                taskId, tool.getName(), command, validatedProject.toString(), validatedHome, Instant.now());
 
         tasks.put(taskId, task);
 
@@ -145,8 +142,7 @@ public class AsyncBuildService {
         result.put("command", command);
         result.put("projectDir", validatedProject.toString());
         result.put("createdAt", task.createdAt.toString());
-        result.put("message", "Build queued. Poll with get_build_task(taskId=\"" + taskId +
-                "\") to track progress.");
+        result.put("message", "Build queued. Poll with get_build_task(taskId=\"" + taskId + "\") to track progress.");
 
         return JsonUtils.toJson(result);
     }
@@ -154,19 +150,19 @@ public class AsyncBuildService {
     /**
      * Poll a build task for its current status, progress, and partial output.
      */
-    @Tool(name = "get_build_task",
-          description = "Get the current status, progress, and partial output of an async build task. " +
-                        "Returns JSON with {taskId, status, progress, output (partial), duration, " +
-                        "phaseProgress, result (when completed)}. " +
-                        "Status values: queued, running, completed, failed, cancelled.")
+    @Tool(
+            name = "get_build_task",
+            description = "Get the current status, progress, and partial output of an async build task. "
+                    + "Returns JSON with {taskId, status, progress, output (partial), duration, "
+                    + "phaseProgress, result (when completed)}. "
+                    + "Status values: queued, running, completed, failed, cancelled.")
     public String getBuildTask(
-            @ToolParam(required = true, description = "Task ID returned by execute_build_async")
-            String taskId) {
+            @ToolParam(required = true, description = "Task ID returned by execute_build_async") String taskId) {
 
         BuildTask task = tasks.get(taskId);
         if (task == null) {
-            return JsonUtils.errorJson("Task not found: " + taskId +
-                    ". Tasks may expire after 1 hour. Use list_build_tasks to see active tasks.");
+            return JsonUtils.errorJson("Task not found: " + taskId
+                    + ". Tasks may expire after 1 hour. Use list_build_tasks to see active tasks.");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -203,8 +199,7 @@ public class AsyncBuildService {
             if (task.completedAt != null) {
                 result.put("completedAt", task.completedAt.toString());
                 Duration total = Duration.between(task.createdAt, task.completedAt);
-                result.put("totalDurationSeconds",
-                        Math.round(total.toMillis() / 100.0) / 10.0);
+                result.put("totalDurationSeconds", Math.round(total.toMillis() / 100.0) / 10.0);
                 result.put("totalDurationFormatted", formatDuration(total));
             }
             if (task.exitCode != null) {
@@ -229,13 +224,12 @@ public class AsyncBuildService {
     /**
      * Cancel a running build task by killing the underlying process.
      */
-    @Tool(name = "cancel_build_task",
-          description = "Cancel a running async build task. Kills the underlying build process " +
-                        "and marks the task as cancelled. Has no effect on already-completed tasks. " +
-                        "Returns JSON with {taskId, status, cancelled}.")
-    public String cancelBuildTask(
-            @ToolParam(required = true, description = "Task ID to cancel")
-            String taskId) {
+    @Tool(
+            name = "cancel_build_task",
+            description = "Cancel a running async build task. Kills the underlying build process "
+                    + "and marks the task as cancelled. Has no effect on already-completed tasks. "
+                    + "Returns JSON with {taskId, status, cancelled}.")
+    public String cancelBuildTask(@ToolParam(required = true, description = "Task ID to cancel") String taskId) {
 
         BuildTask task = tasks.get(taskId);
         if (task == null) {
@@ -275,10 +269,11 @@ public class AsyncBuildService {
     /**
      * List all active and recent build tasks.
      */
-    @Tool(name = "list_build_tasks",
-          description = "List all async build tasks. Returns JSON with {activeCount, completedCount, " +
-                        "tasks: [{taskId, status, tool, command, elapsed}]}. " +
-                        "Active tasks include queued and running. Completed tasks are kept for 1 hour.")
+    @Tool(
+            name = "list_build_tasks",
+            description = "List all async build tasks. Returns JSON with {activeCount, completedCount, "
+                    + "tasks: [{taskId, status, tool, command, elapsed}]}. "
+                    + "Active tasks include queued and running. Completed tasks are kept for 1 hour.")
     public String listBuildTasks() {
         List<Map<String, Object>> taskList = new ArrayList<>();
         Instant now = Instant.now();
@@ -339,11 +334,9 @@ public class AsyncBuildService {
             task.buildProcess = null; // Release process reference
 
             // Parse output for completed/failed tasks
-            if (("completed".equals(task.status) || "failed".equals(task.status))
-                    && task.exitCode != null) {
+            if (("completed".equals(task.status) || "failed".equals(task.status)) && task.exitCode != null) {
                 try {
-                    BuildOutputParser parser = outputParsers.getOrDefault(
-                            task.toolName, outputParsers.get("maven"));
+                    BuildOutputParser parser = outputParsers.getOrDefault(task.toolName, outputParsers.get("maven"));
                     String output;
                     synchronized (task.outputLock) {
                         output = task.output.toString();
@@ -369,8 +362,8 @@ public class AsyncBuildService {
             throw new IllegalArgumentException("No valid Maven commands in: " + task.command);
         }
 
-        MavenInvoker.MavenProcessExecution exec = MavenInvoker.executeWithProcessCapture(
-                task.buildToolHome, commands, task.projectDir);
+        MavenInvoker.MavenProcessExecution exec =
+                MavenInvoker.executeWithProcessCapture(task.buildToolHome, commands, task.projectDir);
         task.buildProcess = exec.process();
 
         // Wait for process completion, collecting phase progress
@@ -388,8 +381,8 @@ public class AsyncBuildService {
                     task.output.append(errOutput);
                 }
             }
-            throw new RuntimeException("Maven exited with code " + exitCode +
-                    (errOutput.isEmpty() ? "" : ": " + errOutput));
+            throw new RuntimeException(
+                    "Maven exited with code " + exitCode + (errOutput.isEmpty() ? "" : ": " + errOutput));
         }
 
         // Extract phase progress from output
@@ -400,8 +393,7 @@ public class AsyncBuildService {
         String[] tokens = GradleBuildTool.parseCommandTokens(task.command);
 
         Path projectPath = Path.of(task.projectDir);
-        String executable = GradleBuildTool.resolveGradleExecutable(
-                task.buildToolHome, task.projectDir);
+        String executable = GradleBuildTool.resolveGradleExecutable(task.buildToolHome, task.projectDir);
 
         List<String> cmdList = new ArrayList<>();
         cmdList.add(executable);
@@ -427,8 +419,7 @@ public class AsyncBuildService {
     private void executeSbtAsync(BuildTask task) throws Exception {
         String[] tokens = SbtBuildTool.parseCommandTokens(task.command);
 
-        String executable = SbtBuildTool.resolveSbtExecutable(
-                task.buildToolHome, task.projectDir);
+        String executable = SbtBuildTool.resolveSbtExecutable(task.buildToolHome, task.projectDir);
 
         List<String> cmdList = new ArrayList<>();
         cmdList.add(executable);
@@ -450,41 +441,46 @@ public class AsyncBuildService {
 
     private void executeGenericAsync(BuildTask task, BuildTool tool) throws Exception {
         // Fallback: use synchronous executeCommand in a thread
-        String output = tool.executeCommand(task.buildToolHome,
-                task.projectDir, task.command);
+        String output = tool.executeCommand(task.buildToolHome, task.projectDir, task.command);
         synchronized (task.outputLock) {
             task.output.append(output);
         }
     }
 
     private void readProcessOutput(BuildTask task, Process process) {
-        Thread outThread = new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    synchronized (task.outputLock) {
-                        task.output.append(line).append("\n");
+        Thread outThread = new Thread(
+                () -> {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            synchronized (task.outputLock) {
+                                task.output.append(line).append("\n");
+                            }
+                        }
+                    } catch (IOException e) {
+                        System.err.println("[WARN] Process cleanup: " + e.getMessage());
+                        // Process destroyed
                     }
-                }
-            } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
-                // Process destroyed
-            }
-        }, "async-stdout-" + task.taskId);
+                },
+                "async-stdout-" + task.taskId);
 
-        Thread errThread = new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    synchronized (task.outputLock) {
-                        task.output.append(line).append("\n");
+        Thread errThread = new Thread(
+                () -> {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            synchronized (task.outputLock) {
+                                task.output.append(line).append("\n");
+                            }
+                        }
+                    } catch (IOException e) {
+                        System.err.println("[WARN] Process cleanup: " + e.getMessage());
+                        // Process destroyed
                     }
-                }
-            } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
-                // Process destroyed
-            }
-        }, "async-stderr-" + task.taskId);
+                },
+                "async-stderr-" + task.taskId);
 
         outThread.start();
         errThread.start();
@@ -499,8 +495,8 @@ public class AsyncBuildService {
     private void extractPhaseProgress(BuildTask task, String output, String toolName) {
         List<Map<String, Object>> phases = new ArrayList<>();
         if ("maven".equals(toolName)) {
-            var pattern = java.util.regex.Pattern.compile(
-                    "\\[INFO\\] --- ([a-zA-Z0-9._-]+):([0-9.]+):([a-zA-Z-]+)\\s.*---");
+            var pattern =
+                    java.util.regex.Pattern.compile("\\[INFO\\] --- ([a-zA-Z0-9._-]+):([0-9.]+):([a-zA-Z-]+)\\s.*---");
             var matcher = pattern.matcher(output);
             while (matcher.find()) {
                 Map<String, Object> phase = new LinkedHashMap<>();
@@ -553,9 +549,13 @@ public class AsyncBuildService {
             }
 
             Path taskFile = tasksDir.resolve(task.taskId + ".json");
-            Files.writeString(taskFile, JsonUtils.toJson(summary),
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (IOException e) { System.err.println("[WARN] Process cleanup: " + e.getMessage());
+            Files.writeString(
+                    taskFile,
+                    JsonUtils.toJson(summary),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            System.err.println("[WARN] Process cleanup: " + e.getMessage());
             // Non-critical
         }
     }
@@ -595,8 +595,13 @@ public class AsyncBuildService {
         final StringBuilder output = new StringBuilder();
         final Object outputLock = new Object();
 
-        BuildTask(String taskId, String toolName, String command, String projectDir,
-                  String buildToolHome, Instant createdAt) {
+        BuildTask(
+                String taskId,
+                String toolName,
+                String command,
+                String projectDir,
+                String buildToolHome,
+                Instant createdAt) {
             this.taskId = taskId;
             this.toolName = toolName;
             this.command = command;

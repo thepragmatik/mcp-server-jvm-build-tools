@@ -17,16 +17,12 @@
 package com.pragmatik.buildtools;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.*;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.*;
 
 /**
  * Tool authorization and scoping service.
@@ -61,12 +57,10 @@ public class ToolAuthorizationService {
     private final String authMode;
 
     public ToolAuthorizationService() {
-        boolean enabled = Boolean.parseBoolean(
-                System.getProperty("buildtools.auth.enabled", "false"));
+        boolean enabled = Boolean.parseBoolean(System.getProperty("buildtools.auth.enabled", "false"));
         String mode = System.getProperty("buildtools.auth.mode", "permissive");
         String auditPath = System.getProperty("buildtools.audit.path", "");
-        boolean auditEnabled = Boolean.parseBoolean(
-                System.getProperty("buildtools.audit.enabled", "true"));
+        boolean auditEnabled = Boolean.parseBoolean(System.getProperty("buildtools.audit.enabled", "true"));
 
         this.authEnabled = enabled;
         this.authMode = mode;
@@ -103,8 +97,7 @@ public class ToolAuthorizationService {
                 String suffix = name.substring("buildtools.api.key.".length());
                 String keyValue = prop.getValue().toString();
                 if (!keyValue.isBlank()) {
-                    String scopesProp = System.getProperty(
-                            "buildtools.api.key." + suffix + ".scopes", "");
+                    String scopesProp = System.getProperty("buildtools.api.key." + suffix + ".scopes", "");
                     List<String> scopes = parseScopes(scopesProp);
                     keys.put(suffix, new ToolApiKey(keyValue, scopes));
                 }
@@ -113,8 +106,7 @@ public class ToolAuthorizationService {
 
         // Default development key if none configured
         if (keys.isEmpty()) {
-            keys.put("default", new ToolApiKey("dev-key-unsafe-do-not-use-in-production",
-                    List.of("*")));
+            keys.put("default", new ToolApiKey("dev-key-unsafe-do-not-use-in-production", List.of("*")));
         }
 
         return Collections.unmodifiableMap(keys);
@@ -136,20 +128,23 @@ public class ToolAuthorizationService {
      * Useful for MCP clients to pre-validate whether they have permission
      * before calling a tool, avoiding denied requests.
      */
-    @Tool(name = "check_tool_authorization",
-          description = "Check whether a specific MCP tool is authorized for a given set of " +
-                        "permission scopes. Returns the authorization decision, matching scopes, " +
-                        "and a human-readable explanation. Useful for pre-validation before " +
-                        "calling tools.")
+    @Tool(
+            name = "check_tool_authorization",
+            description = "Check whether a specific MCP tool is authorized for a given set of "
+                    + "permission scopes. Returns the authorization decision, matching scopes, "
+                    + "and a human-readable explanation. Useful for pre-validation before "
+                    + "calling tools.")
     public String checkToolAuthorization(
-            @ToolParam(required = true,
-                       description = "The MCP tool name to check (e.g., 'execute_build_command', " +
-                                     "'check_dependency_version').")
-            String toolName,
-            @ToolParam(required = true,
-                       description = "Comma-separated list of granted scopes " +
-                                     "(e.g., 'build:read,build:execute'). Use '*' for full access.")
-            String grantedScopes) {
+            @ToolParam(
+                            required = true,
+                            description = "The MCP tool name to check (e.g., 'execute_build_command', "
+                                    + "'check_dependency_version').")
+                    String toolName,
+            @ToolParam(
+                            required = true,
+                            description = "Comma-separated list of granted scopes "
+                                    + "(e.g., 'build:read,build:execute'). Use '*' for full access.")
+                    String grantedScopes) {
 
         List<String> scopes;
         if (grantedScopes == null || grantedScopes.isBlank()) {
@@ -180,15 +175,17 @@ public class ToolAuthorizationService {
         if (scopes.contains("*")) {
             result.put("explanation", "Wildcard '*' scope grants access to ALL tools.");
         } else if (authorized) {
-            result.put("explanation", "Tool '" + toolName + "' is authorized via scope(s): " +
-                    String.join(", ", matchingScopes));
+            result.put(
+                    "explanation",
+                    "Tool '" + toolName + "' is authorized via scope(s): " + String.join(", ", matchingScopes));
         } else if (scopes.isEmpty()) {
-            result.put("explanation", "No scopes granted. Tool '" + toolName +
-                    "' requires at least one matching scope.");
+            result.put(
+                    "explanation", "No scopes granted. Tool '" + toolName + "' requires at least one matching scope.");
         } else {
-            result.put("explanation", "Tool '" + toolName +
-                    "' is NOT authorized. None of the granted scopes cover this tool. " +
-                    "Check available scopes with list_available_scopes.");
+            result.put(
+                    "explanation",
+                    "Tool '" + toolName + "' is NOT authorized. None of the granted scopes cover this tool. "
+                            + "Check available scopes with list_available_scopes.");
         }
 
         // List required scopes for this tool
@@ -209,11 +206,12 @@ public class ToolAuthorizationService {
     /**
      * List all available permission scopes with their tool coverage.
      */
-    @Tool(name = "list_available_scopes",
-          description = "List all available permission scopes for tool authorization. " +
-                        "Each scope covers a category of tools (e.g., 'build:read' covers " +
-                        "detection and validation tools, 'build:execute' covers build commands). " +
-                        "Returns scope name, covered tool count, and specific tool names.")
+    @Tool(
+            name = "list_available_scopes",
+            description = "List all available permission scopes for tool authorization. "
+                    + "Each scope covers a category of tools (e.g., 'build:read' covers "
+                    + "detection and validation tools, 'build:execute' covers build commands). "
+                    + "Returns scope name, covered tool count, and specific tool names.")
     public String listAvailableScopes() {
         List<Map<String, Object>> scopes = new ArrayList<>();
 
@@ -233,14 +231,16 @@ public class ToolAuthorizationService {
 
         // Security recommendations
         Map<String, Object> recommendations = new LinkedHashMap<>();
-        recommendations.put("principleOfLeastPrivilege",
-                "Grant only the scopes an AI agent actually needs. " +
-                "Start with build:read + dependency:read and add execute scopes incrementally.");
-        recommendations.put("dangerousScopes",
-                "build:execute and sbt:execute allow arbitrary command execution. " +
-                "Grant these only to trusted agents in controlled environments.");
-        recommendations.put("wildcardWarning",
-                "The '*' wildcard grants unrestricted access. Avoid in production deployments.");
+        recommendations.put(
+                "principleOfLeastPrivilege",
+                "Grant only the scopes an AI agent actually needs. "
+                        + "Start with build:read + dependency:read and add execute scopes incrementally.");
+        recommendations.put(
+                "dangerousScopes",
+                "build:execute and sbt:execute allow arbitrary command execution. "
+                        + "Grant these only to trusted agents in controlled environments.");
+        recommendations.put(
+                "wildcardWarning", "The '*' wildcard grants unrestricted access. Avoid in production deployments.");
         result.put("recommendations", recommendations);
 
         // Known tools without explicit scope coverage (should not happen)
@@ -258,21 +258,24 @@ public class ToolAuthorizationService {
     /**
      * Read the most recent audit log entries.
      */
-    @Tool(name = "audit_tool_access",
-          description = "Read the most recent tool invocation audit log entries. " +
-                        "Returns timestamp, tool name, caller identity, authorization status, " +
-                        "and duration. Requires the audit logging feature to be enabled. " +
-                        "Designed to satisfy OWASP MCP06 logging requirements.")
+    @Tool(
+            name = "audit_tool_access",
+            description = "Read the most recent tool invocation audit log entries. "
+                    + "Returns timestamp, tool name, caller identity, authorization status, "
+                    + "and duration. Requires the audit logging feature to be enabled. "
+                    + "Designed to satisfy OWASP MCP06 logging requirements.")
     public String auditToolAccess(
-            @ToolParam(required = false,
-                       description = "Number of most recent audit entries to return (default: 20, max: 100).")
-            @Schema(description = "Number of most recent audit entries to return")
-            Integer count,
+            @ToolParam(
+                            required = false,
+                            description = "Number of most recent audit entries to return (default: 20, max: 100).")
+                    @Schema(description = "Number of most recent audit entries to return")
+                    Integer count,
             @Schema(allowableValues = {"all", "authorized", "denied"})
-            @ToolParam(required = false,
-                       description = "Filter by authorization status: 'all' (default), " +
-                                     "'authorized', or 'denied'.")
-            String filter) {
+                    @ToolParam(
+                            required = false,
+                            description =
+                                    "Filter by authorization status: 'all' (default), " + "'authorized', or 'denied'.")
+                    String filter) {
 
         int limit = (count != null && count > 0) ? Math.min(count, 100) : 20;
         String filterVal = (filter != null) ? filter.toLowerCase().trim() : "all";
@@ -318,7 +321,8 @@ public class ToolAuthorizationService {
 
         // Summary statistics
         long authorizedCount = entries.stream()
-                .filter(e -> Boolean.TRUE.equals(e.get("authorized"))).count();
+                .filter(e -> Boolean.TRUE.equals(e.get("authorized")))
+                .count();
         long deniedCount = entries.size() - authorizedCount;
 
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -335,24 +339,25 @@ public class ToolAuthorizationService {
     /**
      * Validate an access token and return its granted scopes.
      */
-    @Tool(name = "validate_access_token",
-          description = "Validate an MCP access token (API key) and return the granted " +
-                        "permission scopes. Tokens are configured via BUILDTOOLS_API_KEY_* " +
-                        "environment variables. Returns the token identity, granted scopes, " +
-                        "and expiration status. Token values are never exposed in the response.")
+    @Tool(
+            name = "validate_access_token",
+            description = "Validate an MCP access token (API key) and return the granted "
+                    + "permission scopes. Tokens are configured via BUILDTOOLS_API_KEY_* "
+                    + "environment variables. Returns the token identity, granted scopes, "
+                    + "and expiration status. Token values are never exposed in the response.")
     public String validateAccessToken(
-            @ToolParam(required = true,
-                       description = "The access token (API key) to validate. " +
-                                     "This value is used only for validation and is never logged or stored.")
-            String token) {
+            @ToolParam(
+                            required = true,
+                            description = "The access token (API key) to validate. "
+                                    + "This value is used only for validation and is never logged or stored.")
+                    String token) {
 
         Map<String, Object> result = new LinkedHashMap<>();
 
         if (token == null || token.isBlank()) {
             result.put("valid", false);
             result.put("error", "Token is empty or missing");
-            auditLogger.record("validate_access_token", "anonymous", List.of("*"),
-                    false, -1);
+            auditLogger.record("validate_access_token", "anonymous", List.of("*"), false, -1);
             return JsonUtils.toJson(result);
         }
 
@@ -369,29 +374,31 @@ public class ToolAuthorizationService {
                 result.put("hasWildcard", entry.getValue().scopes.contains("*"));
 
                 Map<String, Object> security = new LinkedHashMap<>();
-                security.put("hasDangerousScopes",
-                        entry.getValue().scopes.contains("build:execute") ||
-                        entry.getValue().scopes.contains("sbt:execute"));
-                security.put("recommendation",
+                security.put(
+                        "hasDangerousScopes",
+                        entry.getValue().scopes.contains("build:execute")
+                                || entry.getValue().scopes.contains("sbt:execute"));
+                security.put(
+                        "recommendation",
                         entry.getValue().scopes.contains("*")
                                 ? "Wildcard scope detected. Consider restricting to specific scopes."
                                 : "Scopes look appropriate.");
                 result.put("security", security);
 
-                auditLogger.record("validate_access_token", entry.getKey(),
-                        entry.getValue().scopes, true, -1);
+                auditLogger.record("validate_access_token", entry.getKey(), entry.getValue().scopes, true, -1);
 
                 return JsonUtils.toJson(result);
             }
         }
 
         result.put("valid", false);
-        result.put("error", "Token not recognized. Configure tokens via BUILDTOOLS_API_KEY_* " +
-                "environment variables or buildtools.api.key.* system properties.");
+        result.put(
+                "error",
+                "Token not recognized. Configure tokens via BUILDTOOLS_API_KEY_* "
+                        + "environment variables or buildtools.api.key.* system properties.");
         result.put("configuredKeyCount", apiKeys.size());
 
-        auditLogger.record("validate_access_token", "anonymous", List.of("*"),
-                false, -1);
+        auditLogger.record("validate_access_token", "anonymous", List.of("*"), false, -1);
 
         return JsonUtils.toJson(result);
     }

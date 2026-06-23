@@ -16,12 +16,11 @@
  */
 package com.pragmatik.buildtools;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * MCP prompt templates for common build and dependency workflows.
@@ -36,17 +35,21 @@ public class PromptService {
     /**
      * Generate a prompt template for building and testing a JVM project.
      */
-    @Tool(name = "prompt_build_and_test",
-          description = "Get a prompt template to help an LLM guide a user through building " +
-                        "and testing a JVM project. Returns a structured prompt with step-by-step " +
-                        "instructions for compile, test, and analyze workflows.")
+    @Tool(
+            name = "prompt_build_and_test",
+            description = "Get a prompt template to help an LLM guide a user through building "
+                    + "and testing a JVM project. Returns a structured prompt with step-by-step "
+                    + "instructions for compile, test, and analyze workflows.")
     public String promptBuildAndTest(
-            @ToolParam(required = false,
-                       description = "Project directory path. If omitted, the prompt will ask the user for it.")
-            String projectDir,
-            @ToolParam(required = false,
-                       description = "Build tool name (maven, gradle, or sbt). If omitted, auto-detection will be used.")
-            String buildTool) {
+            @ToolParam(
+                            required = false,
+                            description = "Project directory path. If omitted, the prompt will ask the user for it.")
+                    String projectDir,
+            @ToolParam(
+                            required = false,
+                            description =
+                                    "Build tool name (maven, gradle, or sbt). If omitted, auto-detection will be used.")
+                    String buildTool) {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("promptName", "build_and_test");
@@ -78,11 +81,8 @@ public class PromptService {
 
         result.put("template", template.toString());
         result.put("estimatedTokens", template.length() / 4);
-        result.put("requiredTools", new String[]{
-            "detect_build_tool",
-            "validate_build_configuration",
-            "execute_build_command",
-            "analyze_build_output"
+        result.put("requiredTools", new String[] {
+            "detect_build_tool", "validate_build_configuration", "execute_build_command", "analyze_build_output"
         });
 
         return JsonUtils.toJson(result);
@@ -91,13 +91,15 @@ public class PromptService {
     /**
      * Generate a prompt template for auditing and upgrading dependencies.
      */
-    @Tool(name = "prompt_dependency_audit",
-          description = "Get a prompt template to help an LLM audit and upgrade project dependencies. " +
-                        "Returns step-by-step instructions for dependency checking and upgrade recommendations.")
+    @Tool(
+            name = "prompt_dependency_audit",
+            description = "Get a prompt template to help an LLM audit and upgrade project dependencies. "
+                    + "Returns step-by-step instructions for dependency checking and upgrade recommendations.")
     public String promptDependencyAudit(
-            @ToolParam(required = false,
-                       description = "Project directory path. If omitted, the prompt will ask the user for it.")
-            String projectDir) {
+            @ToolParam(
+                            required = false,
+                            description = "Project directory path. If omitted, the prompt will ask the user for it.")
+                    String projectDir) {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("promptName", "dependency_audit");
@@ -125,11 +127,9 @@ public class PromptService {
 
         result.put("template", template.toString());
         result.put("estimatedTokens", template.length() / 4);
-        result.put("requiredTools", new String[]{
-            "detect_build_tool",
-            "check_dependency_version",
-            "execute_build_command"
-        });
+        result.put(
+                "requiredTools",
+                new String[] {"detect_build_tool", "check_dependency_version", "execute_build_command"});
 
         return JsonUtils.toJson(result);
     }
@@ -137,17 +137,15 @@ public class PromptService {
     /**
      * Generate a prompt template for diagnosing build failures.
      */
-    @Tool(name = "prompt_build_diagnosis",
-          description = "Get a prompt template to help an LLM diagnose and fix build failures. " +
-                        "Returns a structured diagnostic workflow for investigating compilation errors, " +
-                        "test failures, and build configuration issues.")
+    @Tool(
+            name = "prompt_build_diagnosis",
+            description = "Get a prompt template to help an LLM diagnose and fix build failures. "
+                    + "Returns a structured diagnostic workflow for investigating compilation errors, "
+                    + "test failures, and build configuration issues.")
     public String promptBuildDiagnosis(
-            @ToolParam(required = true,
-                       description = "Project directory path")
-            String projectDir,
-            @ToolParam(required = false,
-                       description = "The failing command that produced the error")
-            String failedCommand) {
+            @ToolParam(required = true, description = "Project directory path") String projectDir,
+            @ToolParam(required = false, description = "The failing command that produced the error")
+                    String failedCommand) {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("promptName", "build_diagnosis");
@@ -155,7 +153,9 @@ public class PromptService {
         result.put("version", "1.0");
 
         StringBuilder template = new StringBuilder();
-        template.append("You are diagnosing a build failure. Project directory: ").append(projectDir).append("\n\n");
+        template.append("You are diagnosing a build failure. Project directory: ")
+                .append(projectDir)
+                .append("\n\n");
         if (failedCommand != null && !failedCommand.isBlank()) {
             template.append("The failing command was: ").append(failedCommand).append("\n\n");
         }
@@ -168,7 +168,8 @@ public class PromptService {
         template.append("the build and get structured error output.\n\n");
         template.append("4. **Categorize errors**: Group errors by type:\n");
         template.append("   - **Compilation errors**: File, line number, message. Fix the syntax.\n");
-        template.append("   - **Dependency errors**: Missing or incompatible versions. Check with check_dependency_version.\n");
+        template.append(
+                "   - **Dependency errors**: Missing or incompatible versions. Check with check_dependency_version.\n");
         template.append("   - **Test failures**: Which tests failed and why. Look at the test output.\n");
         template.append("   - **Configuration errors**: Plugin issues, missing tools on PATH.\n\n");
         template.append("5. **Fix the highest-priority error first**: Address one error and rebuild. ");
@@ -177,7 +178,7 @@ public class PromptService {
 
         result.put("template", template.toString());
         result.put("estimatedTokens", template.length() / 4);
-        result.put("requiredTools", new String[]{
+        result.put("requiredTools", new String[] {
             "validate_build_configuration",
             "detect_build_tool",
             "analyze_build_output",

@@ -19,12 +19,11 @@ package com.pragmatik.buildtools;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * Lightweight HTTP request/response logging filter for MCP transport.
@@ -39,8 +38,8 @@ public class TransportLoggingFilter implements Filter {
     private static final Logger log = LoggerFactory.getLogger(TransportLoggingFilter.class);
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-                         FilterChain chain) throws IOException, ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
 
         HttpServletRequest httpReq = (HttpServletRequest) request;
         long start = System.currentTimeMillis();
@@ -51,12 +50,13 @@ public class TransportLoggingFilter implements Filter {
             HttpServletResponse httpRes = (HttpServletResponse) response;
             long elapsed = System.currentTimeMillis() - start;
             String mcpMethod = httpReq.getHeader("Mcp-Method");
-            log.debug("{} {} -> {} ({}ms) Mcp-Method={}",
-                httpReq.getMethod(),
-                httpReq.getRequestURI(),
-                httpRes.getStatus(),
-                elapsed,
-                mcpMethod != null ? mcpMethod : "none");
+            log.debug(
+                    "{} {} -> {} ({}ms) Mcp-Method={}",
+                    httpReq.getMethod(),
+                    httpReq.getRequestURI(),
+                    httpRes.getStatus(),
+                    elapsed,
+                    mcpMethod != null ? mcpMethod : "none");
         }
     }
 }

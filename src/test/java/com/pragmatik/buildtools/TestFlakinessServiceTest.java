@@ -16,15 +16,14 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for {@link TestFlakinessService}.
@@ -42,7 +41,9 @@ class TestFlakinessServiceTest {
 
     @Test
     void testDetectFlakyTestsNoReports(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -61,7 +62,9 @@ class TestFlakinessServiceTest {
     @Test
     void testDetectFlakyTestsWithSurefireReports(@TempDir Path tempDir) throws IOException {
         // Create project
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -74,7 +77,9 @@ class TestFlakinessServiceTest {
         // Create Surefire XML report
         Path surefireDir = tempDir.resolve("target/surefire-reports");
         Files.createDirectories(surefireDir);
-        Files.writeString(surefireDir.resolve("TEST-com.example.MyTest.xml"), """
+        Files.writeString(
+                surefireDir.resolve("TEST-com.example.MyTest.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <testsuite name="com.example.MyTest" tests="3" failures="1" errors="0" skipped="0" time="1.234">
                   <testcase name="testPasses" classname="com.example.MyTest" time="0.100"/>
@@ -94,13 +99,16 @@ class TestFlakinessServiceTest {
 
     @Test
     void testDetectFlakyTestsWithGradleReports(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"), """
+        Files.writeString(
+                tempDir.resolve("build.gradle"), """
                 plugins { id 'java' }
                 """);
 
         Path testResultsDir = tempDir.resolve("build/test-results/test");
         Files.createDirectories(testResultsDir);
-        Files.writeString(testResultsDir.resolve("TEST-com.example.MyTest.xml"), """
+        Files.writeString(
+                testResultsDir.resolve("TEST-com.example.MyTest.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <testsuite name="com.example.MyTest" tests="2" failures="0" errors="0" skipped="0" time="0.500">
                   <testcase name="testA" classname="com.example.MyTest" time="0.200"/>
@@ -122,7 +130,9 @@ class TestFlakinessServiceTest {
 
     @Test
     void testAnalyzeTestHistoryNoHistory(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -139,7 +149,9 @@ class TestFlakinessServiceTest {
 
     @Test
     void testAnalyzeTestHistoryWithData(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -153,14 +165,16 @@ class TestFlakinessServiceTest {
         Path historyDir = tempDir.resolve(".buildtools/history");
         Files.createDirectories(historyDir);
 
-        String entry1 = """
+        String entry1 =
+                """
                 [
                   {"timestamp":"2026-06-10T10:00:00Z","durationSeconds":12.5,"success":true,"phases":8}
                 ]
                 """;
         Files.writeString(historyDir.resolve("maven_test.json"), entry1);
 
-        String entry2 = """
+        String entry2 =
+                """
                 [
                   {"timestamp":"2026-06-11T10:00:00Z","durationSeconds":15.3,"success":false,"phases":8}
                 ]
@@ -181,7 +195,9 @@ class TestFlakinessServiceTest {
 
     @Test
     void testDetectFlakyTestsWithFilter(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -193,15 +209,16 @@ class TestFlakinessServiceTest {
 
         Path surefireDir = tempDir.resolve("target/surefire-reports");
         Files.createDirectories(surefireDir);
-        Files.writeString(surefireDir.resolve("TEST-com.example.ServiceTest.xml"), """
+        Files.writeString(
+                surefireDir.resolve("TEST-com.example.ServiceTest.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <testsuite name="com.example.ServiceTest" tests="1" failures="0" errors="0" skipped="0" time="0.100">
                   <testcase name="testService" classname="com.example.ServiceTest" time="0.100"/>
                 </testsuite>
                 """);
 
-        String result = service.detectFlakyTests(tempDir.toString(), 10,
-                "com.example.ServiceTest");
+        String result = service.detectFlakyTests(tempDir.toString(), 10, "com.example.ServiceTest");
         assertNotNull(result);
         assertTrue(result.contains("ServiceTest"));
         assertTrue(result.contains("\"suggestedCommand\""));
@@ -209,7 +226,9 @@ class TestFlakinessServiceTest {
 
     @Test
     void testAllTestsStable(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -222,7 +241,9 @@ class TestFlakinessServiceTest {
         Path surefireDir = tempDir.resolve("target/surefire-reports");
         Files.createDirectories(surefireDir);
         // All passing
-        Files.writeString(surefireDir.resolve("TEST-com.example.AllPassTest.xml"), """
+        Files.writeString(
+                surefireDir.resolve("TEST-com.example.AllPassTest.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <testsuite name="com.example.AllPassTest" tests="3" failures="0" errors="0" skipped="0" time="0.300">
                   <testcase name="testOne" classname="com.example.AllPassTest" time="0.100"/>

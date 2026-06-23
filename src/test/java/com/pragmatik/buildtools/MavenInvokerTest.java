@@ -16,17 +16,17 @@
  */
 package com.pragmatik.buildtools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import org.apache.maven.shared.invoker.InvocationResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @DisplayName("MavenInvoker unit tests")
 class MavenInvokerTest {
@@ -50,8 +50,7 @@ class MavenInvokerTest {
         @Test
         @DisplayName("splits multi-word command into arguments")
         void splitsMultiWordCommand() {
-            assertThat(MavenInvoker.getCommands("mvn clean compile test"))
-                    .containsExactly("clean", "compile", "test");
+            assertThat(MavenInvoker.getCommands("mvn clean compile test")).containsExactly("clean", "compile", "test");
         }
 
         @Test
@@ -76,15 +75,13 @@ class MavenInvokerTest {
         @Test
         @DisplayName("collapses extra whitespace between tokens via split regex")
         void handlesExtraWhitespace() {
-            assertThat(MavenInvoker.getCommands("mvn   clean    compile"))
-                    .containsExactly("clean", "compile");
+            assertThat(MavenInvoker.getCommands("mvn   clean    compile")).containsExactly("clean", "compile");
         }
 
         @Test
         @DisplayName("trims leading and trailing whitespace")
         void handlesLeadingTrailingWhitespace() {
-            assertThat(MavenInvoker.getCommands("  mvn clean  "))
-                    .containsExactly("clean");
+            assertThat(MavenInvoker.getCommands("  mvn clean  ")).containsExactly("clean");
         }
 
         @Test
@@ -169,7 +166,7 @@ class MavenInvokerTest {
         @Test
         @DisplayName("returns true for any non-zero exit code")
         void returnsTrueForAnyNonZeroExitCode() {
-            for (int code : new int[]{2, 42, 255, Integer.MAX_VALUE}) {
+            for (int code : new int[] {2, 42, 255, Integer.MAX_VALUE}) {
                 InvocationResult result = mock(InvocationResult.class);
                 when(result.getExitCode()).thenReturn(code);
                 assertThat(MavenInvoker.invocationResultedInError(result))

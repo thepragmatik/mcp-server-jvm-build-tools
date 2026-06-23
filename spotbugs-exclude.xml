@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SpotBugs exclusion / baseline filter.
+
+    Purpose: suppress pre-existing High-priority findings so the build fails
+    only on NEW high-severity defects (see issue #82). Each exclusion below is
+    a deliberately scoped baseline entry; remove an entry once the underlying
+    finding is fixed. Do NOT add broad, untargeted exclusions here.
+
+    Filter file reference:
+    https://spotbugs.readthedocs.io/en/stable/filter.html
+-->
+<FindBugsFilter
+        xmlns="https://github.com/spotbugs/filter/3.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!--
+        Baseline (#82): SupplyChainService#auditDependencies intentionally catches
+        the broad `Exception` so a failing/unavailable OSV vulnerability lookup
+        degrades gracefully (returns an empty result) instead of breaking the
+        whole supply-chain audit. SpotBugs flags this as REC_CATCH_EXCEPTION.
+        Narrowing the catch would change the graceful-degradation behaviour and is
+        out of scope for wiring in the analysis tooling; tracked for follow-up.
+    -->
+    <Match>
+        <Class name="com.pragmatik.buildtools.SupplyChainService" />
+        <Method name="auditDependencies" />
+        <Bug pattern="REC_CATCH_EXCEPTION" />
+    </Match>
+</FindBugsFilter>

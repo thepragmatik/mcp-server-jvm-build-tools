@@ -39,20 +39,18 @@ public class MavenOutputParser implements BuildOutputParser {
             "Tests run:\\s*(\\d+),\\s*Failures:\\s*(\\d+),\\s*Errors:\\s*(\\d+),\\s*Skipped:\\s*(\\d+)");
 
     // Error line with file:line: "[ERROR] /path/to/File.java:[45,12] message"
-    private static final Pattern ERROR_FILE_LINE_PATTERN = Pattern.compile(
-            "\\[ERROR]\\s+(\\S+\\.java):?\\[?(\\d+)(?:,\\d+)?]?\\s*(.*)");
+    private static final Pattern ERROR_FILE_LINE_PATTERN =
+            Pattern.compile("\\[ERROR]\\s+(\\S+\\.java):?\\[?(\\d+)(?:,\\d+)?]?\\s*(.*)");
 
     // Build result: "BUILD SUCCESS" or "BUILD FAILURE"
-    private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile(
-            "BUILD\\s+(SUCCESS|FAILURE)");
+    private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile("BUILD\\s+(SUCCESS|FAILURE)");
 
     // Duration: "Total time:  12.345 s"
-    private static final Pattern DURATION_PATTERN = Pattern.compile(
-            "Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(min|s|ms)");
+    private static final Pattern DURATION_PATTERN =
+            Pattern.compile("Total time:\\s+([0-9]+(?:\\.[0-9]+)?)\\s*(min|s|ms)");
 
     // Simple [WARNING] line
-    private static final Pattern WARNING_SIMPLE_PATTERN = Pattern.compile(
-            "^\\[WARNING]\\s+(.*)");
+    private static final Pattern WARNING_SIMPLE_PATTERN = Pattern.compile("^\\[WARNING]\\s+(.*)");
 
     @Override
     public String getToolName() {

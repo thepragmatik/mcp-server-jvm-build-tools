@@ -16,16 +16,13 @@
  */
 package com.pragmatik.buildtools;
 
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Service;
 
 /**
  * MCP resource service that exposes project build artifacts, dependency trees,
@@ -51,15 +48,14 @@ public class BuildResourceService {
     /**
      * List all available build resources for a project.
      */
-    @Tool(name = "list_build_resources",
-          description = "List all available build resources for a project directory. " +
-                        "Returns a JSON array of resource URIs with descriptions and content types. " +
-                        "Resources include build outputs, dependency information, configuration files, " +
-                        "and test results.")
+    @Tool(
+            name = "list_build_resources",
+            description = "List all available build resources for a project directory. "
+                    + "Returns a JSON array of resource URIs with descriptions and content types. "
+                    + "Resources include build outputs, dependency information, configuration files, "
+                    + "and test results.")
     public String listBuildResources(
-            @ToolParam(required = true,
-                       description = "Project directory path")
-            String projectDir) {
+            @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
         try {
@@ -76,49 +72,43 @@ public class BuildResourceService {
 
         // Resource 1: Build configuration
         Map<String, Object> configRes = resourceEntry(
-            "build://" + projectName + "/config",
-            "Build Configuration",
-            "The build configuration files (pom.xml, build.gradle, etc.) for this project",
-            "text/plain"
-        );
+                "build://" + projectName + "/config",
+                "Build Configuration",
+                "The build configuration files (pom.xml, build.gradle, etc.) for this project",
+                "text/plain");
         resources.add(configRes);
 
         // Resource 2: Dependency information
         Map<String, Object> depRes = resourceEntry(
-            "build://" + projectName + "/dependencies",
-            "Dependency Information",
-            "Dependency tree and version information for this project",
-            "application/json"
-        );
+                "build://" + projectName + "/dependencies",
+                "Dependency Information",
+                "Dependency tree and version information for this project",
+                "application/json");
         resources.add(depRes);
 
         // Resource 3: Build output
         Map<String, Object> outputRes = resourceEntry(
-            "build://" + projectName + "/output",
-            "Recent Build Output",
-            "The most recent build output with parsed test results, errors, and warnings",
-            "application/json"
-        );
+                "build://" + projectName + "/output",
+                "Recent Build Output",
+                "The most recent build output with parsed test results, errors, and warnings",
+                "application/json");
         resources.add(outputRes);
 
         // Resource 4: Test results
         Map<String, Object> testRes = resourceEntry(
-            "build://" + projectName + "/test-results",
-            "Test Results",
-            "Structured test results from the most recent test run",
-            "application/json"
-        );
+                "build://" + projectName + "/test-results",
+                "Test Results",
+                "Structured test results from the most recent test run",
+                "application/json");
         resources.add(testRes);
 
         // Resource 5: Build tool info
         BuildTool detected = provider.resolve(null, dir);
         Map<String, Object> toolRes = resourceEntry(
-            "build://" + projectName + "/tool-info",
-            "Build Tool Information",
-            "Information about the detected build tool: " + detected.getName() +
-            " v" + detected.version(),
-            "application/json"
-        );
+                "build://" + projectName + "/tool-info",
+                "Build Tool Information",
+                "Information about the detected build tool: " + detected.getName() + " v" + detected.version(),
+                "application/json");
         resources.add(toolRes);
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -134,17 +124,17 @@ public class BuildResourceService {
     /**
      * Read a specific build resource by URI.
      */
-    @Tool(name = "read_build_resource",
-          description = "Read the contents of a build resource by its URI. " +
-                        "Use list_build_resources first to discover available resource URIs. " +
-                        "Supports: build config files, dependency info, build outputs, and test results.")
+    @Tool(
+            name = "read_build_resource",
+            description = "Read the contents of a build resource by its URI. "
+                    + "Use list_build_resources first to discover available resource URIs. "
+                    + "Supports: build config files, dependency info, build outputs, and test results.")
     public String readBuildResource(
-            @ToolParam(required = true,
-                       description = "Resource URI from list_build_resources (e.g., 'build://myproject/config')")
-            String resourceUri,
-            @ToolParam(required = true,
-                       description = "Project directory path")
-            String projectDir) {
+            @ToolParam(
+                            required = true,
+                            description = "Resource URI from list_build_resources (e.g., 'build://myproject/config')")
+                    String resourceUri,
+            @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
         try {
@@ -168,8 +158,8 @@ public class BuildResourceService {
         } else if (resourceUri.endsWith("/output") || resourceUri.endsWith("/test-results")) {
             return readBuildOutputNote(dir, result);
         } else {
-            return JsonUtils.errorJson("Unknown resource URI: " + resourceUri +
-                    ". Use list_build_resources to discover available resources.");
+            return JsonUtils.errorJson("Unknown resource URI: " + resourceUri
+                    + ". Use list_build_resources to discover available resources.");
         }
     }
 
@@ -178,8 +168,9 @@ public class BuildResourceService {
     private String readBuildConfig(Path dir, Map<String, Object> result) {
         List<Map<String, Object>> files = new ArrayList<>();
 
-        for (String name : new String[]{"pom.xml", "build.gradle", "build.gradle.kts",
-                                         "build.sbt", "settings.gradle", "settings.gradle.kts"}) {
+        for (String name : new String[] {
+            "pom.xml", "build.gradle", "build.gradle.kts", "build.sbt", "settings.gradle", "settings.gradle.kts"
+        }) {
             Path file = dir.resolve(name);
             if (Files.exists(file)) {
                 try {
@@ -219,8 +210,8 @@ public class BuildResourceService {
                 String content = Files.readString(pomXml);
                 // Extract dependency coordinates
                 java.util.regex.Pattern depPattern = java.util.regex.Pattern.compile(
-                    "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>\\s*(?:<version>([^<]*)</version>)?",
-                    java.util.regex.Pattern.DOTALL);
+                        "<dependency>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>\\s*(?:<version>([^<]*)</version>)?",
+                        java.util.regex.Pattern.DOTALL);
                 java.util.regex.Matcher m = depPattern.matcher(content);
                 while (m.find()) {
                     Map<String, String> dep = new LinkedHashMap<>();
@@ -230,7 +221,8 @@ public class BuildResourceService {
                     dep.put("buildTool", "maven");
                     dependencies.add(dep);
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
 
         result.put("contentType", "application/json");
@@ -239,8 +231,10 @@ public class BuildResourceService {
         result.put("available", !dependencies.isEmpty());
 
         if (dependencies.isEmpty()) {
-            result.put("note", "Dependency extraction is currently supported for Maven (pom.xml). " +
-                    "Gradle and SBT dependency extraction coming soon.");
+            result.put(
+                    "note",
+                    "Dependency extraction is currently supported for Maven (pom.xml). "
+                            + "Gradle and SBT dependency extraction coming soon.");
         }
 
         return JsonUtils.toJson(result);
@@ -261,16 +255,17 @@ public class BuildResourceService {
     private String readBuildOutputNote(Path dir, Map<String, Object> result) {
         result.put("contentType", "application/json");
         result.put("available", false);
-        result.put("note", "Build output is available on-demand. Use analyze_build_output or " +
-                "execute_build_command with the desired build command to get real-time results. " +
-                "Resource URIs are provided for MCP resource discovery compatibility.");
+        result.put(
+                "note",
+                "Build output is available on-demand. Use analyze_build_output or "
+                        + "execute_build_command with the desired build command to get real-time results. "
+                        + "Resource URIs are provided for MCP resource discovery compatibility.");
         return JsonUtils.toJson(result);
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
 
-    private static Map<String, Object> resourceEntry(String uri, String name,
-                                                      String description, String mimeType) {
+    private static Map<String, Object> resourceEntry(String uri, String name, String description, String mimeType) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("uri", uri);
         entry.put("name", name);

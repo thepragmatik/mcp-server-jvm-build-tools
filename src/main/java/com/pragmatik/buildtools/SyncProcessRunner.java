@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -71,8 +72,7 @@ public final class SyncProcessRunner {
      * @param stdout   the fully drained standard output
      * @param stderr   the fully drained standard error
      */
-    public record Result(int exitCode, String stdout, String stderr) {
-    }
+    public record Result(int exitCode, String stdout, String stderr) {}
 
     /**
      * Thrown when a synchronous process exceeds the configured execution timeout.
@@ -120,8 +120,7 @@ public final class SyncProcessRunner {
      * @throws InterruptedException       if the calling thread is interrupted while waiting
      * @throws ExecutionTimeoutException  if the process exceeds the configured timeout
      */
-    public static Result run(Process process, String label)
-            throws IOException, InterruptedException {
+    public static Result run(Process process, String label) throws IOException, InterruptedException {
         return run(process, label, resolveTimeoutSeconds(), TimeUnit.SECONDS);
     }
 
@@ -160,12 +159,11 @@ public final class SyncProcessRunner {
             process.destroyForcibly();
             joinQuietly(outThread);
             joinQuietly(errThread);
-            throw new ExecutionTimeoutException(
-                    "Process '" + label + "' timed out after " + timeout + " " +
-                            unit.toString().toLowerCase() +
-                            " and was forcibly terminated. Increase the timeout via the '" +
-                            TIMEOUT_PROPERTY + "' system property if the build legitimately " +
-                            "needs longer.");
+            throw new ExecutionTimeoutException("Process '" + label + "' timed out after " + timeout + " "
+                    + unit.toString().toLowerCase()
+                    + " and was forcibly terminated. Increase the timeout via the '"
+                    + TIMEOUT_PROPERTY
+                    + "' system property if the build legitimately " + "needs longer.");
         }
 
         // Process exited; let the readers finish draining whatever remains buffered.
@@ -187,20 +185,23 @@ public final class SyncProcessRunner {
      * @return the already-started reader thread
      */
     static Thread drain(InputStream stream, StringBuilder sink, String threadName) {
-        Thread thread = new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    synchronized (sink) {
-                        sink.append(line).append(System.lineSeparator());
+        Thread thread = new Thread(
+                () -> {
+                    try (BufferedReader reader =
+                            new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            synchronized (sink) {
+                                sink.append(line).append(System.lineSeparator());
+                            }
+                        }
+                    } catch (IOException e) {
+                        // Stream closed (e.g. process destroyed) — nothing more to drain.
+                        System.err.println(
+                                "[WARN] Process stream drain stopped (" + threadName + "): " + e.getMessage());
                     }
-                }
-            } catch (IOException e) {
-                // Stream closed (e.g. process destroyed) — nothing more to drain.
-                System.err.println("[WARN] Process stream drain stopped (" + threadName +
-                        "): " + e.getMessage());
-            }
-        }, threadName + "-" + THREAD_SEQ.incrementAndGet());
+                },
+                threadName + "-" + THREAD_SEQ.incrementAndGet());
         thread.setDaemon(true);
         thread.start();
         return thread;

@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -43,18 +44,24 @@ import java.util.regex.Pattern;
 public class SbtBuildTool implements BuildTool {
 
     private static final Set<String> ALLOWED_TASKS = Set.of(
-            "compile", "test", "run", "package", "clean", "assembly",
-            "publishLocal", "publish", "update", "doc", "console"
-    );
+            "compile",
+            "test",
+            "run",
+            "package",
+            "clean",
+            "assembly",
+            "publishLocal",
+            "publish",
+            "update",
+            "doc",
+            "console");
 
     private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
 
     private static final String MARKER_FILE = "build.sbt";
 
-    private static final Set<String> BLOCKED_SBT_FLAGS = Set.of(
-            "-D", "-J", "-sbt-dir", "-sbt-boot", "-sbt-launch-dir",
-            "-ivy", "-maven-launcher"
-    );
+    private static final Set<String> BLOCKED_SBT_FLAGS =
+            Set.of("-D", "-J", "-sbt-dir", "-sbt-boot", "-sbt-launch-dir", "-ivy", "-maven-launcher");
 
     // Safe SBT flag pattern: --flag or -X (single letters for standard options)
     private static final Pattern SAFE_ARG_PATTERN =
@@ -62,7 +69,8 @@ public class SbtBuildTool implements BuildTool {
 
     private static final int MAX_COMMAND_LENGTH = 500;
 
-    private static final String EXECUTION_PROMPT = """
+    private static final String EXECUTION_PROMPT =
+            """
             You are an assistant for executing SBT build commands. Follow these rules:
 
             1. Only execute SBT lifecycle tasks: compile, test, run, package, clean, assembly,
@@ -83,11 +91,10 @@ public class SbtBuildTool implements BuildTool {
     public String version() {
         try {
             String executable = resolveSbtExecutable(null, null);
-            Process process = new ProcessBuilder(executable, "--no-colors", "--version")
-                    .start();
+            Process process = new ProcessBuilder(executable, "--no-colors", "--version").start();
             StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
+            try (BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     output.append(line).append(System.lineSeparator());
@@ -96,24 +103,21 @@ public class SbtBuildTool implements BuildTool {
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 StringBuilder errors = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getErrorStream()))) {
+                try (BufferedReader reader =
+                        new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         errors.append(line).append(System.lineSeparator());
                     }
                 }
-                throw new RuntimeException(
-                        "sbt --version failed with exit code " + exitCode + ": " + errors);
+                throw new RuntimeException("sbt --version failed with exit code " + exitCode + ": " + errors);
             }
             return output.toString().trim();
         } catch (IOException e) {
-            throw new RuntimeException(
-                    "Unable to determine SBT version: " + e.getMessage(), e);
+            throw new RuntimeException("Unable to determine SBT version: " + e.getMessage(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException(
-                    "SBT version check interrupted", e);
+            throw new RuntimeException("SBT version check interrupted", e);
         }
     }
 
@@ -137,17 +141,14 @@ public class SbtBuildTool implements BuildTool {
             // to EOF before the other is drained.
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "sbt");
             if (result.exitCode() != 0) {
-                throw new RuntimeException(
-                        "sbt exited with code " + result.exitCode() + ": " + result.stderr());
+                throw new RuntimeException("sbt exited with code " + result.exitCode() + ": " + result.stderr());
             }
             return result.stdout();
         } catch (IOException e) {
-            throw new RuntimeException(
-                    "Unable to invoke sbt command: " + e.getMessage(), e);
+            throw new RuntimeException("Unable to invoke sbt command: " + e.getMessage(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException(
-                    "sbt command interrupted: " + e.getMessage(), e);
+            throw new RuntimeException("sbt command interrupted: " + e.getMessage(), e);
         }
     }
 
@@ -213,8 +214,7 @@ public class SbtBuildTool implements BuildTool {
             throw new IllegalArgumentException("sbt command cannot be null or empty");
         }
         if (command.length() > MAX_COMMAND_LENGTH) {
-            throw new IllegalArgumentException(
-                    "Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
+            throw new IllegalArgumentException("Command too long (max " + MAX_COMMAND_LENGTH + " characters).");
         }
         var cmd = command.trim();
         if (cmd.startsWith("sbt ")) {
@@ -237,8 +237,7 @@ public class SbtBuildTool implements BuildTool {
             if (!token.startsWith("-")) {
                 if (!ALLOWED_TASKS.contains(token)) {
                     throw new IllegalArgumentException(
-                            "sbt task not allowed: " + token +
-                                    ". Allowed: " + ALLOWED_TASKS);
+                            "sbt task not allowed: " + token + ". Allowed: " + ALLOWED_TASKS);
                 }
                 validated.add(token);
                 continue;
@@ -247,15 +246,13 @@ public class SbtBuildTool implements BuildTool {
             // Block dangerous flags
             for (String blocked : BLOCKED_SBT_FLAGS) {
                 if (token.startsWith(blocked)) {
-                    throw new IllegalArgumentException(
-                            "Blocked sbt flag: " + token);
+                    throw new IllegalArgumentException("Blocked sbt flag: " + token);
                 }
             }
 
             // Validate safe flags against pattern
             if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
-                throw new IllegalArgumentException(
-                        "Invalid flag/argument: " + token);
+                throw new IllegalArgumentException("Invalid flag/argument: " + token);
             }
             validated.add(token);
         }

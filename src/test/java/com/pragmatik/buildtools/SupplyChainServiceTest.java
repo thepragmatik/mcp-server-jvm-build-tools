@@ -16,15 +16,14 @@
  */
 package com.pragmatik.buildtools;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for {@link SupplyChainService}.
@@ -42,7 +41,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomMavenNoPlugin(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -71,7 +72,9 @@ class SupplyChainServiceTest {
     @Test
     void testGenerateSbomWithExistingBom(@TempDir Path tempDir) throws IOException {
         // Create project
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -83,7 +86,9 @@ class SupplyChainServiceTest {
 
         // Create a fake bom.json
         Files.createDirectories(tempDir.resolve("target"));
-        Files.writeString(tempDir.resolve("target/bom.json"), """
+        Files.writeString(
+                tempDir.resolve("target/bom.json"),
+                """
                 {
                   "bomFormat": "CycloneDX",
                   "specVersion": "1.6",
@@ -108,7 +113,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomPluginAlreadyConfigured(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -134,11 +141,13 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"), """
+        Files.writeString(
+                tempDir.resolve("build.gradle"),
+                """
                 plugins {
                     id 'java'
                 }
-                
+
                 dependencies {
                     implementation 'com.google.guava:guava:33.0.0-jre'
                 }
@@ -152,7 +161,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomSbt(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.sbt"), """
+        Files.writeString(
+                tempDir.resolve("build.sbt"),
+                """
                 name := "test"
                 version := "1.0.0"
                 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test
@@ -166,7 +177,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testAuditSupplyChainNoSbom(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -191,7 +204,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testAuditSupplyChainWithSbom(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -202,7 +217,9 @@ class SupplyChainServiceTest {
                 """);
 
         Files.createDirectories(tempDir.resolve("target"));
-        Files.writeString(tempDir.resolve("target/bom.json"), """
+        Files.writeString(
+                tempDir.resolve("target/bom.json"),
+                """
                 {
                   "bomFormat": "CycloneDX",
                   "components": [
@@ -221,7 +238,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testCheckLicenseComplianceMaven(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -252,7 +271,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testCheckLicenseComplianceGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("build.gradle"), """
+        Files.writeString(
+                tempDir.resolve("build.gradle"),
+                """
                 plugins {
                     id 'java'
                 }
@@ -269,22 +290,14 @@ class SupplyChainServiceTest {
 
     @Test
     void testInferLicense() {
-        assertEquals("Apache-2.0", SupplyChainService.inferLicense(
-                "org.springframework.boot", "spring-boot-starter"));
-        assertEquals("Apache-2.0", SupplyChainService.inferLicense(
-                "com.google.guava", "guava"));
-        assertEquals("MIT", SupplyChainService.inferLicense(
-                "org.slf4j", "slf4j-api"));
-        assertEquals("EPL-2.0", SupplyChainService.inferLicense(
-                "org.junit.jupiter", "junit-jupiter"));
-        assertEquals("LGPL-2.1-only", SupplyChainService.inferLicense(
-                "org.hibernate", "hibernate-core"));
-        assertEquals("GPL-2.0-only", SupplyChainService.inferLicense(
-                "mysql", "mysql-connector-java"));
-        assertEquals("BSD-2-Clause", SupplyChainService.inferLicense(
-                "org.postgresql", "postgresql"));
-        assertEquals("UNKNOWN", SupplyChainService.inferLicense(
-                "com.unknown.vendor", "unknown-lib"));
+        assertEquals("Apache-2.0", SupplyChainService.inferLicense("org.springframework.boot", "spring-boot-starter"));
+        assertEquals("Apache-2.0", SupplyChainService.inferLicense("com.google.guava", "guava"));
+        assertEquals("MIT", SupplyChainService.inferLicense("org.slf4j", "slf4j-api"));
+        assertEquals("EPL-2.0", SupplyChainService.inferLicense("org.junit.jupiter", "junit-jupiter"));
+        assertEquals("LGPL-2.1-only", SupplyChainService.inferLicense("org.hibernate", "hibernate-core"));
+        assertEquals("GPL-2.0-only", SupplyChainService.inferLicense("mysql", "mysql-connector-java"));
+        assertEquals("BSD-2-Clause", SupplyChainService.inferLicense("org.postgresql", "postgresql"));
+        assertEquals("UNKNOWN", SupplyChainService.inferLicense("com.unknown.vendor", "unknown-lib"));
     }
 
     @Test
@@ -310,7 +323,9 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomSpdxFormat(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("pom.xml"), """
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
