@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -77,25 +78,45 @@ public class McpServerIdentity {
     private final String version;
 
     /**
-     * Freshness hint (ms) advertised for the static catalogue list surfaces. Initialised to
-     * {@link #DEFAULT_CATALOG_TTL_MS} so unit tests (constructed without Spring) and the
-     * property-bound runtime agree on the default.
+     * Freshness hint (ms) advertised for the static catalogue list surfaces. Bound via the
+     * constructor's {@code @Value} fallback to {@link #DEFAULT_CATALOG_TTL_MS} so unit tests
+     * (constructed without Spring) and the property-bound runtime agree on the default.
      */
-    @Value("${buildtools.cache.catalog-ttl-ms:" + DEFAULT_CATALOG_TTL_MS + "}")
-    private long catalogTtlMs = DEFAULT_CATALOG_TTL_MS;
+    private final long catalogTtlMs;
 
     /**
-     * Freshness hint (ms) advertised for per-project content reads. Initialised to
-     * {@link #DEFAULT_READ_TTL_MS} so unit tests and the property-bound runtime agree on the default.
+     * Freshness hint (ms) advertised for per-project content reads. Bound via the constructor's
+     * {@code @Value} fallback to {@link #DEFAULT_READ_TTL_MS} so unit tests and the property-bound
+     * runtime agree on the default.
      */
-    @Value("${buildtools.cache.read-ttl-ms:" + DEFAULT_READ_TTL_MS + "}")
-    private long readTtlMs = DEFAULT_READ_TTL_MS;
+    private final long readTtlMs;
 
+    /**
+     * Spring injection point. Every value binds from a property with a literal fallback, so a
+     * directly-constructed instance and the property-bound runtime share identical defaults. All
+     * fields are {@code final} and injected through this single constructor, matching the
+     * constructor-injection style used for {@code name}/{@code version}.
+     */
+    @Autowired
     public McpServerIdentity(
             @Value("${spring.ai.mcp.server.name:${spring.application.name:mcp-server-jvm-build-tools}}") String name,
-            @Value("${spring.ai.mcp.server.version:${buildtools.version:0.1.1-SNAPSHOT}}") String version) {
+            @Value("${spring.ai.mcp.server.version:${buildtools.version:0.1.1-SNAPSHOT}}") String version,
+            @Value("${buildtools.cache.catalog-ttl-ms:" + DEFAULT_CATALOG_TTL_MS + "}") long catalogTtlMs,
+            @Value("${buildtools.cache.read-ttl-ms:" + DEFAULT_READ_TTL_MS + "}") long readTtlMs) {
         this.name = name;
         this.version = version;
+        this.catalogTtlMs = catalogTtlMs;
+        this.readTtlMs = readTtlMs;
+    }
+
+    /**
+     * Convenience constructor for unit tests that do not override the cache TTLs: binds
+     * {@code name}/{@code version} explicitly and the cache TTLs to their documented defaults
+     * ({@link #DEFAULT_CATALOG_TTL_MS} / {@link #DEFAULT_READ_TTL_MS}). Not a Spring injection point
+     * — the {@code @Autowired} four-argument constructor is the bean's injection point.
+     */
+    public McpServerIdentity(String name, String version) {
+        this(name, version, DEFAULT_CATALOG_TTL_MS, DEFAULT_READ_TTL_MS);
     }
 
     /** The canonical server name advertised on every surface (and required by {@code Mcp-Name}). */
