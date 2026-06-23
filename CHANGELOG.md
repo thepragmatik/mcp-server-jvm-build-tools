@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Supply-Chain Scanning of the Server's Own Dependencies (#78)**: OWASP dependency-check now runs in CI (dedicated `.github/workflows/dependency-check.yml` — weekly, on-dispatch, and on dependency-surface PRs/pushes), failing the build on any High/Critical (CVSS ≥ 7) vulnerability. Gated behind an opt-in `owasp` Maven profile (`./mvnw -Powasp verify`) so the default build/test matrix is unaffected. Added `.github/dependabot.yml` (weekly `maven` + `github-actions` upgrade PRs, with a dedicated `spring-ai` group) and `owasp-suppressions.xml` for documented, expiring suppressions. Documented decision to track Spring AI 2.0.0 GA when released, plus an upgrade runbook, in `docs/DEPENDENCY_MANAGEMENT.md`
 - **Coverage Gate**: JaCoCo `report` and `check` bound to `verify`; the build now fails below 60% line / 50% branch coverage (baseline 67% instruction / 57% branch / 67% line, excluding the bootstrap class). Thresholds are externalized as POM properties (`jacoco.line.coverage.min`, `jacoco.branch.coverage.min`)
 - **Container Probes**: /health/ready (readiness) and /health/live (liveness) endpoints for Kubernetes and Docker orchestration
 - **CLI Launcher Script**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT installations. Supports `--http` flag for Streamable HTTP mode

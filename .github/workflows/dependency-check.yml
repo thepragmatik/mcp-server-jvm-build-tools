@@ -1,0 +1,123 @@
+name: Dependency Scan (OWASP)
+
+# Scans the server's OWN dependencies for known vulnerabilities using the OWASP
+# dependency-check Maven plugin (issue #78). This complements Dependabot
+# (.github/dependabot.yml): Dependabot proposes upgrades, this job blocks merges
+# that would ship a known-vulnerable dependency on a touched POM, and the weekly
+# schedule catches CVEs published after a dependency was last changed.
+#
+# The scan lives in its own workflow (and behind the `owasp` Maven profile) so it
+# never slows the cross-JDK build/test matrix in ci.yml. See
+# docs/DEPENDENCY_MANAGEMENT.md for the full rationale.
+#
+# IMPORTANT: the OWASP NVD API 2.0 effectively requires an API key for reliable
+# CI runs (anonymous access is heavily rate-limited and cold-cache runs routinely
+# fail). The blocking scan therefore runs only when the `NVD_API_KEY` repository
+# secret is configured. When it is absent the scan is SKIPPED (not failed) with a
+# warning, so CI stays green and Dependabot remains the active mechanism until a
+# key is provisioned. Get a free key at https://nvd.nist.gov/developers/request-an-api-key
+
+on:
+  # Weekly so newly-disclosed CVEs against unchanged dependencies are caught.
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+  # On PRs that change the dependency surface, fail fast before merge.
+  pull_request:
+    branches: [main, staging]
+    paths:
+      - "pom.xml"
+      - "owasp-suppressions.xml"
+      - ".github/workflows/dependency-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pom.xml"
+      - "owasp-suppressions.xml"
+      - ".github/workflows/dependency-check.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Allows uploading the SARIF report to the GitHub code-scanning dashboard.
+  security-events: write
+
+jobs:
+  # Determine whether an NVD API key is available. Secrets cannot be read inside a
+  # job-level `if:`, so we surface the result as a job output and gate the scan
+  # job on it. This keeps CI green (the scan is *skipped*, never *failed*) when no
+  # key is configured, instead of crashing on an empty/invalid key.
+  guard:
+    name: Check NVD API key
+    runs-on: ubuntu-latest
+    outputs:
+      run-scan: ${{ steps.check.outputs.run-scan }}
+    steps:
+      - id: check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -n "$NVD_API_KEY" ]; then
+            echo "run-scan=true" >> "$GITHUB_OUTPUT"
+            echo "NVD_API_KEY is configured; the OWASP dependency-check scan will run."
+          else
+            echo "run-scan=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=OWASP scan skipped::NVD_API_KEY secret is not configured, so the OWASP dependency-check scan is skipped. Configure the secret to enable the blocking supply-chain gate (see docs/DEPENDENCY_MANAGEMENT.md). Dependabot still tracks dependency updates."
+          fi
+
+  owasp:
+    name: OWASP dependency-check
+    needs: guard
+    if: needs.guard.outputs.run-scan == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: maven
+      # Cache the NVD vulnerability database between runs so the scan does not
+      # re-download the full feed every time (much faster, kinder to the NVD API).
+      # The primary `key` embeds github.run_id, so it is unique per run and never
+      # restores — each run writes a fresh cache entry and reuses the prior NVD
+      # feed via the `restore-keys` prefix below (write-new / restore-by-prefix).
+      # This is intentional: it always refreshes the feed from NVD while leaning
+      # on the previous cache to avoid a full re-download on every run.
+      - name: Cache OWASP NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: owasp-nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            owasp-nvd-${{ runner.os }}-
+      # The key is guaranteed non-empty here (the `guard` job gated this job on
+      # it), so passing -Dnvd.api.key is safe and avoids the empty-key error.
+      - name: Run OWASP dependency-check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >-
+          ./mvnw -B -Powasp
+          org.owasp:dependency-check-maven:check
+          -Dnvd.api.key="$NVD_API_KEY"
+          --file pom.xml --no-transfer-progress
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: |
+            target/dependency-check-report.html
+            target/dependency-check-report.json
+            target/dependency-check-report.sarif
+          retention-days: 30
+      - name: Upload SARIF to code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: target/dependency-check-report.sarif

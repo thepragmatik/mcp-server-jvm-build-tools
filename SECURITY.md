@@ -144,9 +144,38 @@ recorded decision and threat model):
 - buildtools.oauth.resource-server.enabled=false (bearer-token enforcement is opt-in; RFC9728 Protected Resource Metadata is served additively)
 - dev-key-unsafe-do-not-use-in-production default key is never created under a `prod`/`production` profile or `buildtools.auth.mode=enforcing`
 
+## Dependency & Supply-Chain Scanning
+
+The server holds its **own** dependencies to the same bar as the SBOM /
+supply-chain tooling it ships to users (issue #78). Two automated, complementary
+mechanisms run in CI; see [docs/DEPENDENCY_MANAGEMENT.md](docs/DEPENDENCY_MANAGEMENT.md)
+for the full design and the recorded decisions.
+
+- **OWASP dependency-check** matches every resolved dependency against the NVD
+  and **fails the build on any High/Critical (CVSS ≥ 7) vulnerability**. It runs
+  in a dedicated workflow (`.github/workflows/dependency-check.yml`) weekly, on
+  manual dispatch, and on PRs/pushes that change the dependency surface. It is
+  gated behind the opt-in `owasp` Maven profile so it never slows the default
+  build; run it locally with `./mvnw -Powasp verify`. Because the NVD API
+  requires a key for reliable CI runs, the CI gate activates only when the
+  `NVD_API_KEY` repository secret is configured (otherwise the scan is skipped,
+  not failed). Documented, expiring suppressions live in `owasp-suppressions.xml`.
+- **Dependabot** (`.github/dependabot.yml`) opens weekly upgrade PRs for the
+  `maven` and `github-actions` ecosystems, which then pass through the same CI
+  gates (including the OWASP scan) and the standard review process.
+
+### Pre-GA dependency tracking (Spring AI)
+
+The MCP integration depends on Spring AI, currently pinned to the pre-GA
+`2.0.0-RC2`. The decision — stay on the latest 2.0.0 RC, upgrade to **GA as a P1
+follow-up when released**, keep the pin centralised in one `spring-ai.version`
+property, and de-risk via the OWASP scan plus the full test suite — is recorded
+in [docs/DEPENDENCY_MANAGEMENT.md](docs/DEPENDENCY_MANAGEMENT.md). Dependabot's
+dedicated `spring-ai` group surfaces the GA upgrade PR automatically.
+
 ## Security Update Process
 
-1. Identify vulnerable dependencies
+1. Identify vulnerable dependencies (automated: OWASP dependency-check + Dependabot — see above)
 2. PR with fix: conventional commit
 3. CI matrix (JDK 21, 23, 25)
 4. Worker-adversarial security review
