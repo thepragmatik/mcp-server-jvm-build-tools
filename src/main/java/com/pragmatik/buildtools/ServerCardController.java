@@ -76,6 +76,12 @@ public class ServerCardController {
         capabilities.put("extensions", Map.of("tasks", true, "mcpApps", true));
         card.put("capabilities", capabilities);
 
+        // MCP RC (SEP-2549): recommended caching policy for the list/read surfaces, expressed as
+        // per-method {ttlMs, cacheScope} hints (the CacheableResult shape). Advertised here as
+        // additive, backward-compatible metadata from the single shared source; see
+        // docs/mcp-cacheable-result-gap.md for why it is advertised rather than emitted per result.
+        card.put("cacheHints", identity.cacheHints());
+
         List<Map<String, String>> buildTools = List.of(
                 Map.of("name", "maven", "minVersion", "3.6+", "detectionFile", "pom.xml"),
                 Map.of("name", "gradle", "minVersion", "7.0+", "detectionFile", "build.gradle(.kts)"),

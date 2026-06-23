@@ -132,10 +132,4 @@ public class TransportConfig {
         };
     }
 
-    @Value("${buildtools.cache.ttl-ms:300000}")
-    private long defaultTtlMs;
-
-    public long getDefaultTtlMs() {
-        return defaultTtlMs;
-    }
 }
