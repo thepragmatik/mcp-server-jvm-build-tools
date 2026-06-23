@@ -145,26 +145,19 @@ Only these commands/tasks are permitted; anything else is rejected before a proc
 
 | Build tool | Safe flags | Blocked flags |
 |------------|------------|---------------|
-| **Maven** | `-D` (non-denied keys), `-f`, `-P`, `-q`, `-X`, `-T`, `-B`, `-U`, `--batch-mode`, `--non-recursive` | `-D` keys on the deny-list (see below) |
+| **Maven** | `-D` (any key — passed through), `-f`, `-P`, `-q`, `-X`, `-T`, `-B`, `-U`, `--batch-mode`, `--non-recursive` | *(none — see below)* |
 | **Gradle** | `-x`, `--exclude-task`, `--parallel`, `--configure-on-demand`, `--build-cache` | `--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`, `--include-build`, `--system-prop`/`-D` |
 | **SBT** | *(standard tasks)* | `-D`, `-J`, `-sbt-dir`, `-sbt-boot`, `-sbt-launch-dir`, `-ivy`, `-maven-launcher` |
 
 **Always-added flags:** Gradle runs with `--no-daemon --console=plain`; SBT runs with
 `--no-colors`. These are appended automatically — do not include them in your command.
 
-### Maven `-D` system-property deny-list
+### Maven `-D` system properties
 
-The safe-argument pattern accepts any well-formed `-Dkey=value`, so a targeted deny-list rejects
-the following behaviour-altering keys (case-sensitive, exact match):
-
-| Denied key | Why |
-|------------|-----|
-| `maven.ext.class.path` | Injects extension classes into the Maven core class loader (arbitrary code execution). |
-| `maven.repo.local` | Redirects the local repository (dependency substitution / cache poisoning). |
-| `maven.multiModuleProjectDirectory` | Overrides project-root detection, changing which config applies. |
-
-A rejected token raises `IllegalArgumentException` (`Blocked system property: …`) before any
-process is spawned.
+Maven `-D` system properties are passed through verbatim — there is no key allowlist or
+blocklist. The server trusts the client's `-D` choices entirely. Shell metacharacters in any
+token are still rejected by the safe-argument pattern, so injection via `-D` values is not
+possible.
 
 ## MCP client configuration
 

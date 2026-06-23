@@ -39,27 +39,14 @@ Only predefined build tasks are permitted. Unknown commands rejected before spaw
 |------------|--------------|
 | Gradle | --init-script/-I, --build-file/-b, --project-dir/-p, --include-build, --system-prop/-D |
 | SBT | -D, -J, -sbt-dir, -sbt-boot, -sbt-launch-dir, -ivy, -maven-launcher |
-| Maven | Behavior-altering `-D` system properties are denied by key (see below). Safe flags: `-D` (non-denied keys), -f, -P, -q, -X, -T, -B, -U, --batch-mode, --non-recursive |
+| Maven | None — `-D` system properties are passed through; the server trusts the client's choices (see below). Safe flags: `-D`, -f, -P, -q, -X, -T, -B, -U, --batch-mode, --non-recursive |
 
-#### Maven `-D` system-property deny-list
+#### Maven `-D` system properties
 
-The safe-argument pattern (Layer 3) accepts any well-formed `-Dkey=value`, so it
-cannot, on its own, prevent an operator from setting behavior-altering Maven
-system properties. A targeted deny-list rejects the following property **keys**
-(the part between `-D` and `=`), with or without a value:
-
-| Denied `-D` key | Why it is denied |
-|-----------------|------------------|
-| `maven.ext.class.path` | Injects extension classes into the Maven core class loader, enabling arbitrary code execution. |
-| `maven.repo.local` | Redirects the local artifact repository, allowing dependency substitution / cache poisoning. |
-| `maven.multiModuleProjectDirectory` | Overrides multi-module project-root detection, changing which configuration is applied. |
-
-Matching is **case-sensitive** and **exact** on the key, consistent with Maven's
-own case-sensitive system-property handling. Keys that merely contain a denied
-name as a prefix or suffix (e.g. `maven.repo.local.backup`) are **not** blocked.
-A rejected token raises `IllegalArgumentException` ("Blocked system property: …")
-before any process is spawned. Implemented in `MavenInvoker.getCommands(...)`;
-see `MavenSecurityTest` for the asserting tests.
+Maven `-D` system properties are passed through verbatim. There is no key
+allowlist or blocklist: the server trusts the client's `-D` choices entirely.
+Shell metacharacters in any token are still rejected by the safe-argument
+pattern (Layer 3), so injection via `-D` values is not possible.
 
 ### Layer 3: Safe-Argument Pattern
 
@@ -86,7 +73,7 @@ Protects against malicious input injection, not intentional misuse by a trusted 
 
 ## Attack Surface Tested
 
-The full suite covers: shell injection, path traversal, blocked plugin goals, behavior-altering Maven `-D` system properties, Unicode/zero-width attacks, null-byte injection, DoS via long inputs, dangerous Gradle/SBT flags, MCP protocol compliance.
+The full suite covers: shell injection, path traversal, blocked plugin goals, Unicode/zero-width attacks, null-byte injection, DoS via long inputs, dangerous Gradle/SBT flags, MCP protocol compliance.
 
 Test files: MavenSecurityTest.java, GradleServiceTest.java, SbtBuildToolTest.java, MavenInvokerTest.java, MavenIntegrationTest.java.
 
