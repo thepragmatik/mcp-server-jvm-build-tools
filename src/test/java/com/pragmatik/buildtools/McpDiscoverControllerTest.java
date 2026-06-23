@@ -98,4 +98,20 @@ class McpDiscoverControllerTest {
     void supportedVersionsConstant() {
         assertThat(McpServerIdentity.SUPPORTED_PROTOCOL_VERSIONS).contains("2026-07-28");
     }
+
+    @Test
+    @DisplayName("discover advertises per-method cache hints (ttlMs/cacheScope, SEP-2549)")
+    @SuppressWarnings("unchecked")
+    void discoverAdvertisesCacheHints() {
+        Map<String, Object> hints =
+                (Map<String, Object>) controller.discover().get("cacheHints");
+
+        assertThat(hints)
+                .containsKeys(
+                        "tools/list", "prompts/list", "resources/list", "resources/templates/list", "resources/read");
+        Map<String, Object> toolsList = (Map<String, Object>) hints.get("tools/list");
+        assertThat(toolsList).containsKey("ttlMs").containsEntry("cacheScope", "public");
+        Map<String, Object> read = (Map<String, Object>) hints.get("resources/read");
+        assertThat(read).containsKey("ttlMs").containsEntry("cacheScope", "private");
+    }
 }
