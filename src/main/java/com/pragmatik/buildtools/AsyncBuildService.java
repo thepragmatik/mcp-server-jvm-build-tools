@@ -127,6 +127,9 @@ public class AsyncBuildService {
         String taskId = UUID.randomUUID().toString().substring(0, 8);
         BuildTask task = new BuildTask(
                 taskId, tool.getName(), command, validatedProject.toString(), validatedHome, Instant.now());
+        // Capture any inbound trace context now (on the request thread) so the background
+        // worker can continue the same distributed trace (SEP-414). Null when absent.
+        task.inboundTrace = TraceContextHolder.inbound().orElse(null);
 
         tasks.put(taskId, task);
 
@@ -310,11 +313,17 @@ public class AsyncBuildService {
         Instant start = Instant.now();
 
         try {
-            switch (tool.getName()) {
-                case "maven" -> executeMavenAsync(task);
-                case "gradle" -> executeGradleAsync(task);
-                case "sbt" -> executeSbtAsync(task);
-                default -> executeGenericAsync(task, tool);
+            // Re-establish the inbound trace context on this background thread and open a
+            // span so the build subprocess (started below) is stamped with the trace and
+            // appears under the originating trace as a single span tree (SEP-414).
+            try (TraceScope inboundScope = McpTraceContext.activate(task.inboundTrace);
+                    TraceScope span = BuildTracer.startSpan("execute_build_async")) {
+                switch (tool.getName()) {
+                    case "maven" -> executeMavenAsync(task);
+                    case "gradle" -> executeGradleAsync(task);
+                    case "sbt" -> executeSbtAsync(task);
+                    default -> executeGenericAsync(task, tool);
+                }
             }
 
             task.exitCode = 0;
@@ -403,6 +412,7 @@ public class AsyncBuildService {
 
         ProcessBuilder pb = new ProcessBuilder(cmdList);
         pb.directory(new File(task.projectDir));
+        TraceContextHolder.applyToEnvironment(pb.environment());
         Process process = pb.start();
         task.buildProcess = process;
 
@@ -428,6 +438,7 @@ public class AsyncBuildService {
 
         ProcessBuilder pb = new ProcessBuilder(cmdList);
         pb.directory(new File(task.projectDir));
+        TraceContextHolder.applyToEnvironment(pb.environment());
         Process process = pb.start();
         task.buildProcess = process;
 
@@ -591,6 +602,7 @@ public class AsyncBuildService {
         volatile Future<?> future;
         volatile List<Map<String, Object>> phaseProgress;
         volatile Map<String, Object> parsedResult;
+        volatile W3CTraceContext inboundTrace;
 
         final StringBuilder output = new StringBuilder();
         final Object outputLock = new Object();

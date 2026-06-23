@@ -134,6 +134,8 @@ public class SbtBuildTool implements BuildTool {
         try {
             ProcessBuilder pb = new ProcessBuilder(cmdList);
             pb.directory(new File(projectDir));
+            // Propagate the active W3C trace context (SEP-414) to the sbt subprocess.
+            TraceContextHolder.applyToEnvironment(pb.environment());
             Process process = pb.start();
 
             // Drain stdout and stderr concurrently with a bounded execution timeout

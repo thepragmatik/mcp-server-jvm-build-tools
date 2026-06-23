@@ -143,7 +143,12 @@ public class BuildToolsService {
         }
 
         BuildTool tool = provider.resolve(buildToolName, validatedProject);
-        return tool.executeCommand(validatedHome, validatedProject.toString(), command);
+        // Open a span around the build so the subprocess (and any downstream tooling it
+        // launches) is correlated under the inbound trace, if one was propagated via
+        // request _meta (SEP-414); otherwise this is a fresh root span (no regression).
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command")) {
+            return tool.executeCommand(validatedHome, validatedProject.toString(), command);
+        }
     }
 
     /**
@@ -353,10 +358,11 @@ public class BuildToolsService {
             return JsonUtils.errorJson(e.getMessage());
         }
 
-        // Execute the build and capture output
+        // Execute the build and capture output within a span so the subprocess is
+        // correlated under the inbound trace (SEP-414) when one is present.
         String rawOutput;
         int exitCode;
-        try {
+        try (TraceScope span = BuildTracer.startSpan("analyze_build_output")) {
             rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
             exitCode = 0;
         } catch (RuntimeException e) {
