@@ -34,6 +34,10 @@ build/
 ### VS Code ###
 .vscode/
 
+### MkDocs ###
+# Generated documentation site (built by `mkdocs build`); never commit it.
+site/
+
 ### Mac OS ###
 .DS_Store
 /.idea/

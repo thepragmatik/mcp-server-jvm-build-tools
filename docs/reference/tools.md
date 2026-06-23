@@ -1,0 +1,372 @@
+# Tools / MCP API
+
+This is the reference for the **28 MCP tools** the server registers with the tool callback
+provider and exposes over `tools/list`. Each tool is grouped by the service that implements it.
+Parameter names, requiredness, and descriptions are taken directly from the `@Tool` / `@ToolParam`
+annotations in the source.
+
+!!! info "Scope of this reference"
+    Only tools wired into `BuildToolsApplication.buildTools(...)` are documented here, because those
+    are the tools an MCP client actually discovers. See the
+    [Architecture reference](architecture.md#the-mcp-tool-surface-28-tools-12-services) for the
+    note about additional services that exist in the source but are not currently registered.
+
+Common conventions:
+
+- **`projectDir`** is canonicalised with `Path.toRealPath()` and must resolve to an existing
+  directory.
+- **`buildToolName`** accepts `maven`, `gradle`, or `sbt`. When optional, omitting it triggers
+  auto-detection from project markers.
+- All `execute`/`analyze` tools enforce the [security model](security.md) before spawning a process.
+
+---
+
+## BuildToolsService
+
+Core build execution, detection, validation, and output analysis. **6 tools.**
+
+### `get_build_tool_version`
+
+Get the installed version of a build tool.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `buildToolName` | yes | Build tool name: `maven`, `gradle`, or `sbt`. |
+
+**Returns:** the version string for the requested tool.
+
+### `execute_build_command`
+
+Execute a build command using Maven, Gradle, SBT, or any registered build tool.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `buildToolName` | no | `maven`, `gradle`, or `sbt`. Omit to auto-detect from `projectDir`. |
+| `buildToolHome` | no | Path to the build tool installation. Required for Maven unless `MAVEN_HOME` is set; optional for Gradle (uses wrapper or `PATH`). |
+| `projectDir` | yes | Path to the project directory containing build files. |
+| `command` | yes | Build command — e.g. `clean compile` (Maven), `build` (Gradle), `compile;test` (SBT). |
+
+**Returns:** the raw build tool output (text).
+
+### `list_build_tools`
+
+List all registered build tools with their supported commands. **No parameters.**
+
+**Returns:** the registered tools and their allowlisted commands.
+
+### `detect_build_tool`
+
+Detect which build tool a project uses by scanning for marker files.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory to scan for build tool markers. |
+
+**Returns:** JSON describing detected tool(s) and the markers found.
+
+### `analyze_build_output`
+
+Execute a build command and return **structured JSON** with parsed test results, errors, and
+warnings.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `buildToolName` | no | `maven`, `gradle`, or `sbt`. Omit to auto-detect. |
+| `buildToolHome` | no | Build tool installation path. Optional for Gradle. |
+| `projectDir` | yes | Project directory containing build files. |
+| `command` | yes | Build command to execute (e.g. `clean test`). |
+
+**Returns:** JSON of the shape
+`{ success, tool, command, testSummary, errors, warnings, errorCount, warningCount, duration }`.
+
+### `validate_build_configuration`
+
+Statically validate build configuration files **without running a build**.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory containing build files. |
+
+**Returns:** JSON validation report. Validates `pom.xml` (XML well-formedness, required elements,
+duplicate dependencies, plugin version consistency), `build.gradle`, and `build.gradle.kts`. SBT
+`build.sbt` validation is not yet implemented.
+
+---
+
+## DependencyService
+
+Maven Central version intelligence. **1 tool.**
+
+### `check_dependency_version`
+
+Check whether a newer version exists for a Maven Central dependency.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `groupId` | yes | Maven group ID (e.g. `org.springframework.boot`). |
+| `artifactId` | yes | Maven artifact ID (e.g. `spring-boot-starter-web`). |
+| `currentVersion` | no | Version to compare against. Omit to just get the latest. |
+| `versionPreference` | no | `RELEASE` (default), `LATEST`, `SNAPSHOT`, or `ALL`. |
+| `projectDir` | no | When provided, auto-detects the build tool and returns the correct dependency declaration syntax. |
+
+**Returns:** JSON with latest/stable version info and stability classification. Queries Maven
+Central over HTTPS with a 5-second timeout.
+
+---
+
+## PromptService
+
+Prompt templates that guide an LLM through multi-step build workflows. **3 tools.**
+
+### `prompt_build_and_test`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | no | Project directory. If omitted, the prompt asks the user for it. |
+| `buildTool` | no | `maven`, `gradle`, or `sbt`. If omitted, auto-detection is used. |
+
+**Returns:** a prompt template for a build-and-test workflow.
+
+### `prompt_dependency_audit`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | no | Project directory. If omitted, the prompt asks the user for it. |
+
+**Returns:** a prompt template for auditing and upgrading dependencies.
+
+### `prompt_build_diagnosis`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory path. |
+| `failedCommand` | no | The failing command that produced the error. |
+
+**Returns:** a prompt template for diagnosing and fixing build failures.
+
+---
+
+## BuildResourceService
+
+Access build configuration as MCP resources. **2 tools.**
+
+### `list_build_resources`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory path. |
+
+**Returns:** the available build resources (e.g. `build://<project>/config`).
+
+### `read_build_resource`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `resourceUri` | yes | Resource URI from `list_build_resources` (e.g. `build://myproject/config`). |
+| `projectDir` | yes | Project directory path. |
+
+**Returns:** the contents of the requested build resource.
+
+---
+
+## DependencyResourceService
+
+Access extracted dependencies as MCP resources. **2 tools.**
+
+### `list_dependency_resources`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory path. |
+
+**Returns:** the available dependency resources for the project.
+
+### `read_dependency_resource`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `resourceUri` | yes | Resource URI (e.g. `build://myproject/dependencies/maven`). |
+| `projectDir` | yes | Project directory path. |
+
+**Returns:** the extracted dependencies from the referenced build file.
+
+---
+
+## ResourceTemplateService
+
+Parameterised URI template resources. **2 tools.**
+
+### `list_resource_templates`
+
+List all available MCP resource templates with their URI patterns and parameters. **No
+parameters.**
+
+**Returns:** the resource templates and their parameter definitions.
+
+### `resolve_resource_template`
+
+Resolve a resource template URI by substituting parameter values.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `templateUri` | yes | Template URI pattern (e.g. `build://{projectName}/dependencies/{buildTool}`). |
+| `paramsJson` | yes | Parameter values as a JSON object (e.g. `{"projectName":"myapp","buildTool":"maven"}`). |
+
+**Returns:** the resolved resource URI / payload.
+
+---
+
+## SbtProjectService
+
+SBT-specific project analysis. **3 tools.**
+
+### `detect_sbt_modules`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory containing `build.sbt`. |
+
+**Returns:** the detected subprojects/modules in a multi-module SBT build.
+
+### `detect_sbt_test_frameworks`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory containing `build.sbt`. |
+
+**Returns:** the test frameworks configured in the SBT build (e.g. ScalaTest, Specs2, MUnit).
+
+### `analyze_sbt_build`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory containing `build.sbt`. |
+
+**Returns:** an analysis of `build.sbt` — plugins, Scala version, and configuration.
+
+---
+
+## BuildAuthService
+
+Read-only credential-configuration scanning. **1 tool.**
+
+### `check_credential_status`
+
+Scan for configured Maven and Gradle credentials. **All passwords are masked** (e.g. `****xyz`)
+and never returned in plaintext.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | no | When provided, also scans the project for credential configuration. |
+| `scope` | no | `maven`, `gradle`, or `all`. |
+
+**Returns:** JSON summarising servers, mirrors, proxies, repositories, environment variables,
+gaps, and recommendations — with sensitive values masked.
+
+---
+
+## DependencyConflictService
+
+Dependency version-conflict detection. **1 tool.**
+
+### `detect_dependency_conflicts`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory. |
+| `scope` | no | `maven`, `gradle`, `sbt`, or `all` (default). |
+
+**Returns:** JSON describing detected version conflicts across the selected build files.
+
+---
+
+## BuildPerformanceService
+
+Build profiling and performance analysis. **2 tools.**
+
+### `profile_build`
+
+Execute a build command with timing instrumentation.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `buildToolName` | no | Build tool name. Omit to auto-detect. |
+| `buildToolHome` | no | Path to the build tool installation. |
+| `projectDir` | yes | Project directory. |
+| `command` | yes | Build command to profile. |
+
+**Returns:** JSON with timing data for the profiled build.
+
+### `analyze_build_performance`
+
+Analyze build performance from historical data and configuration (read-only).
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory. |
+| `buildToolName` | no | Build tool to analyze. Omit to auto-detect. |
+
+**Returns:** JSON with performance findings and optimisation suggestions.
+
+---
+
+## JavaVersionService
+
+Java/JDK compatibility checking. **1 tool.**
+
+### `check_java_compatibility`
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `projectDir` | yes | Project directory. |
+| `targetJavaVersion` | no | Target Java version (`8`, `11`, `17`, `21`, `22`, `23`, `24`, `25`). If omitted, checks against the project's configured version. |
+
+**Returns:** JSON describing compatibility of the project and its dependencies with the target
+Java version.
+
+---
+
+## ToolAuthorizationService
+
+Scope-based authorization, audit log reads, and token validation. **4 tools.** These tools are
+useful regardless of whether enforcement is enabled; see the
+[Security reference](security.md#authorization-optional) for the full model.
+
+### `check_tool_authorization`
+
+Pre-validate whether a tool is authorized for a set of permission scopes.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `toolName` | yes | The MCP tool name to check (e.g. `execute_build_command`). |
+| `grantedScopes` | yes | Comma-separated granted scopes (e.g. `build:read,build:execute`). Use `*` for full access. |
+
+**Returns:** JSON with the authorization decision, the scopes checked, and the matching scopes.
+
+### `list_available_scopes`
+
+List all permission scopes with their tool coverage. **No parameters.**
+
+**Returns:** JSON enumerating the 12 scopes and the tools each grants.
+
+### `audit_tool_access`
+
+Read recent entries from the OWASP-MCP06 audit log.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `count` | no | Number of most recent entries to return (default 20, max 100). |
+| `filter` | no | `all` (default), `authorized`, or `denied`. |
+
+**Returns:** JSON with the requested audit entries.
+
+### `validate_access_token`
+
+Validate an API key and report its granted scopes. The token value is used only for validation and
+is never logged or stored.
+
+| Parameter | Required | Description |
+|-----------|:--------:|-------------|
+| `token` | yes | The access token (API key) to validate. |
+
+**Returns:** JSON indicating validity and the scopes granted to the key.
