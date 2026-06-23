@@ -22,6 +22,8 @@ import java.security.MessageDigest;
 import java.util.*;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -56,7 +58,25 @@ public class ToolAuthorizationService {
     private final boolean authEnabled;
     private final String authMode;
 
+    /**
+     * Convenience constructor used by unit tests (and any direct instantiation). The active Spring
+     * profiles are read from the {@code spring.profiles.active} system property so the production-key
+     * guard can be exercised without a Spring context.
+     */
     public ToolAuthorizationService() {
+        this(System.getProperty("spring.profiles.active", ""));
+    }
+
+    /**
+     * Spring injection point. The active profiles drive the production-key guard: the built-in
+     * {@code dev-key-unsafe-do-not-use-in-production} fallback is <b>never</b> created under a
+     * production profile ({@code prod}/{@code production}) or when authorization is {@code enforcing},
+     * so it cannot be live in a hardened deployment (complements #83).
+     *
+     * @param activeProfiles the comma-separated active Spring profiles ({@code spring.profiles.active})
+     */
+    @Autowired
+    public ToolAuthorizationService(@Value("${spring.profiles.active:}") String activeProfiles) {
         boolean enabled = Boolean.parseBoolean(System.getProperty("buildtools.auth.enabled", "false"));
         String mode = System.getProperty("buildtools.auth.mode", "permissive");
         String auditPath = System.getProperty("buildtools.audit.path", "");
@@ -65,7 +85,26 @@ public class ToolAuthorizationService {
         this.authEnabled = enabled;
         this.authMode = mode;
         this.auditLogger = new ToolAuditLogger(auditPath, auditEnabled);
-        this.apiKeys = loadApiKeys();
+        boolean suppressDevKey = isProductionProfile(activeProfiles) || "enforcing".equalsIgnoreCase(mode);
+        this.apiKeys = loadApiKeys(suppressDevKey);
+    }
+
+    /**
+     * @param activeProfiles the comma-separated active Spring profiles
+     * @return {@code true} when any active profile is a production profile ({@code prod} or
+     *     {@code production}, case-insensitive)
+     */
+    static boolean isProductionProfile(String activeProfiles) {
+        if (activeProfiles == null || activeProfiles.isBlank()) {
+            return false;
+        }
+        for (String profile : activeProfiles.split(",")) {
+            String normalized = profile.trim().toLowerCase(Locale.ROOT);
+            if (normalized.equals("prod") || normalized.equals("production")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -73,7 +112,7 @@ public class ToolAuthorizationService {
      * Format: BUILDTOOLS_API_KEY_SCOPE_SCOPENAME=keyvalue
      * Multiple scopes: BUILDTOOLS_API_KEY_0=keyvalue;BUILDTOOLS_API_KEY_0_SCOPES=build:read,build:execute
      */
-    private Map<String, ToolApiKey> loadApiKeys() {
+    private Map<String, ToolApiKey> loadApiKeys(boolean suppressDevKey) {
         Map<String, ToolApiKey> keys = new LinkedHashMap<>();
 
         // Env-var based keys: BUILDTOOLS_API_KEY_<name>=<value>
@@ -104,8 +143,11 @@ public class ToolAuthorizationService {
             }
         }
 
-        // Default development key if none configured
-        if (keys.isEmpty()) {
+        // Default development key if none configured. NEVER created under a production profile or
+        // when authorization is enforcing, so the unsafe default cannot be live in a hardened
+        // deployment (issue #89, complements #83). In that case the store is left empty: no token
+        // validates until the operator configures real BUILDTOOLS_API_KEY_* credentials.
+        if (keys.isEmpty() && !suppressDevKey) {
             keys.put("default", new ToolApiKey("dev-key-unsafe-do-not-use-in-production", List.of("*")));
         }
 
@@ -401,6 +443,29 @@ public class ToolAuthorizationService {
         auditLogger.record("validate_access_token", "anonymous", List.of("*"), false, -1);
 
         return JsonUtils.toJson(result);
+    }
+
+    /**
+     * Validates a raw access token against the configured credential store, comparing SHA-256
+     * digests so the configured key material is never compared in plaintext. Used by the OAuth 2.1
+     * resource-server enforcement filter ({@link OAuthResourceServerFilter}) to decide whether a
+     * presented bearer token is recognised.
+     *
+     * @param token the raw bearer token / API key presented by the client
+     * @return {@code true} when the token matches a configured credential; {@code false} for a
+     *     {@code null}/blank or unrecognised token
+     */
+    public boolean isAccessTokenValid(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        String tokenHash = sha256(token);
+        for (ToolApiKey key : apiKeys.values()) {
+            if (tokenHash.equals(sha256(key.key))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

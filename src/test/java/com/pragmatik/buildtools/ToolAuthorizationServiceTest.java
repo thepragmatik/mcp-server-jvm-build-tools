@@ -37,6 +37,7 @@ class ToolAuthorizationServiceTest {
         System.clearProperty("buildtools.auth.enabled");
         System.clearProperty("buildtools.auth.mode");
         System.clearProperty("buildtools.audit.enabled");
+        System.clearProperty("spring.profiles.active");
         service = new ToolAuthorizationService();
     }
 
@@ -176,6 +177,55 @@ class ToolAuthorizationServiceTest {
         assertTrue(result.contains("\"valid\":true"));
         assertTrue(result.contains("\"identity\":\"default\""));
         assertTrue(result.contains("\"hasWildcard\":true"));
+    }
+
+    @Test
+    void testIsAccessTokenValidForConfiguredKey() {
+        // Default dev key present (permissive, no production profile)
+        assertTrue(service.isAccessTokenValid("dev-key-unsafe-do-not-use-in-production"));
+    }
+
+    @Test
+    void testIsAccessTokenValidRejectsUnknownAndBlank() {
+        assertFalse(service.isAccessTokenValid("nope-12345"));
+        assertFalse(service.isAccessTokenValid(""));
+        assertFalse(service.isAccessTokenValid(null));
+    }
+
+    @Test
+    void testProductionProfileDetection() {
+        assertTrue(ToolAuthorizationService.isProductionProfile("prod"));
+        assertTrue(ToolAuthorizationService.isProductionProfile("http,prod"));
+        assertTrue(ToolAuthorizationService.isProductionProfile("PRODUCTION"));
+        assertFalse(ToolAuthorizationService.isProductionProfile("http"));
+        assertFalse(ToolAuthorizationService.isProductionProfile(""));
+        assertFalse(ToolAuthorizationService.isProductionProfile(null));
+    }
+
+    @Test
+    void testDevKeySuppressedUnderProductionProfile() {
+        try {
+            System.setProperty("spring.profiles.active", "prod");
+            ToolAuthorizationService prodService = new ToolAuthorizationService();
+            // The unsafe dev default must NOT be active in a production profile.
+            assertFalse(prodService.isAccessTokenValid("dev-key-unsafe-do-not-use-in-production"));
+            String result = prodService.validateAccessToken("dev-key-unsafe-do-not-use-in-production");
+            assertTrue(result.contains("\"valid\":false"));
+            assertTrue(result.contains("\"configuredKeyCount\":0"));
+        } finally {
+            System.clearProperty("spring.profiles.active");
+        }
+    }
+
+    @Test
+    void testDevKeySuppressedUnderEnforcingMode() {
+        try {
+            System.setProperty("buildtools.auth.mode", "enforcing");
+            ToolAuthorizationService enforcing = new ToolAuthorizationService();
+            assertFalse(enforcing.isAccessTokenValid("dev-key-unsafe-do-not-use-in-production"));
+        } finally {
+            System.clearProperty("buildtools.auth.mode");
+        }
     }
 
     @Test
