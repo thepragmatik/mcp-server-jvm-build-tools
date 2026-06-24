@@ -89,7 +89,7 @@ jobs:
       # This is intentional: it always refreshes the feed from NVD while leaning
       # on the previous cache to avoid a full re-download on every run.
       - name: Cache OWASP NVD database
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: owasp-nvd-${{ runner.os }}-${{ github.run_id }}
