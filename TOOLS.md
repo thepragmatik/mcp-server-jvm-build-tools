@@ -59,7 +59,7 @@ Get the installed version of any registered build tool.
 **Example:**
 ```
 Request:  get_build_tool_version(buildToolName="maven")
-Response: "Apache Maven 3.9.9 (8e8579a9e76f...)
+Response: "Apache Maven 3.9.16 (2bdd9fddda4b...)
 Maven home: /opt/maven
 Java version: 21.0.6..."
 ```
