@@ -32,7 +32,7 @@ jobs:
       # cross-JDK runtime/test matrix never breaks on formatter/analyzer JDK
       # compatibility (they still run in a plain local `mvn verify`).
       - name: Build, test, and verify coverage
-        run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true
+        run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true -Dspring-boot.repackage.skip=true
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
