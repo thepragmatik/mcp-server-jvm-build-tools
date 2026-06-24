@@ -339,8 +339,8 @@ public class ToolAuthorizationService {
         for (String raw : rawEntries) {
             try {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> entry = (Map<String, Object>)
-                        new com.fasterxml.jackson.databind.ObjectMapper().readValue(raw, Map.class);
+                Map<String, Object> entry =
+                        (Map<String, Object>) new tools.jackson.databind.ObjectMapper().readValue(raw, Map.class);
 
                 boolean isAuthorized = Boolean.TRUE.equals(entry.get("authorized"));
 

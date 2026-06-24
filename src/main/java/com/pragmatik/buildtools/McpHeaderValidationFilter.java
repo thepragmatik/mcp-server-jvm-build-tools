@@ -16,9 +16,6 @@
  */
 package com.pragmatik.buildtools;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
@@ -41,6 +38,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Validates the standard MCP request headers ({@code Mcp-Method}, {@code Mcp-Name})
@@ -103,8 +105,11 @@ public class McpHeaderValidationFilter implements Filter {
     /** Default body-buffer cap for validation: 1 MiB. */
     static final int DEFAULT_MAX_VALIDATION_BODY_BYTES = 1_048_576;
 
-    private final ObjectMapper objectMapper =
-            new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    // Jackson 3 (Spring Boot 4) makes ObjectMapper immutable: configuration must be
+    // supplied through the builder rather than post-construction setters.
+    private final ObjectMapper objectMapper = JsonMapper.builder()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .build();
 
     /**
      * The shared server identity. {@code Mcp-Name}, when present, must equal
@@ -178,8 +183,10 @@ public class McpHeaderValidationFilter implements Filter {
                     }
                 }
             }
-        } catch (IOException parseFailure) {
+        } catch (JacksonException parseFailure) {
             // Malformed / non-JSON body: not our concern. Let the transport handle it.
+            // Jackson 3 surfaces parse failures as the unchecked JacksonException
+            // (it no longer extends IOException), so this catch must name it explicitly.
             log.debug("Skipping MCP header validation for unparseable body: {}", parseFailure.getMessage());
             chain.doFilter(cached, response);
             return;
