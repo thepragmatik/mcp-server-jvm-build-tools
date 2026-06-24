@@ -314,7 +314,7 @@ Extended to 5-layer defense:
 | Spring Boot | 3.5.14 | Application framework |
 | Spring AI | 2.0.0-RC2 | MCP server framework |
 | MCP SDK | 2.0.0-RC1 | Bundled protocol implementation |
-| Maven Embedder | 3.9.9 | In-process Maven |
+| Maven Embedder | 3.9.16 | In-process Maven |
 | Maven Shared Invoker | 3.3.0 | Out-of-process Maven |
 | JUnit 5 | (test) | Test framework |
 | JaCoCo | (test) | Code coverage |

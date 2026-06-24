@@ -68,7 +68,7 @@ New build tools (Bazel, Ant, Mill, …) are added by implementing this interface
 === "MavenBuildTool"
 
     - Executes out-of-process via the **Maven Shared Invoker** (3.3.0).
-    - Version queries use the **Maven Embedder** (3.9.9), in-process — no external process.
+    - Version queries use the **Maven Embedder** (3.9.16), in-process — no external process.
     - Requires a `buildToolHome` pointing at a Maven installation.
     - Detects projects via `pom.xml`.
     - Commands: `clean, compile, test, package, install, deploy, validate`.
@@ -256,7 +256,7 @@ tools/call ─▶ Spring AI MCP SDK ─▶ @Tool method on a service bean
 | Java | 21+ | Runtime |
 | Spring Boot | 3.5.14 | Application framework |
 | Spring AI | 2.0.0-RC2 | MCP server framework |
-| Maven Embedder | 3.9.9 | In-process Maven (version queries) |
+| Maven Embedder | 3.9.16 | In-process Maven (version queries) |
 | Maven Shared Invoker | 3.3.0 | Out-of-process Maven (builds) |
 
 ## Extending the server

@@ -212,7 +212,7 @@ Here's a realistic multi-step workflow showing how an AI agent uses the server t
 User:   "Build my Maven project and fix any compilation errors"
 
 Agent:  get_build_tool_version(buildToolName="maven")
-        → "Apache Maven 3.9.9"
+        → "Apache Maven 3.9.16"
 
 Agent:  detect_build_tool(projectDir="/home/dev/my-app")
         → Detected: maven (found pom.xml)
@@ -803,7 +803,7 @@ Any MCP client that supports stdio transport. See [MCP Client Configuration](#mc
 ```
 User:   "Build my project and run the tests"
 LLM:    get_build_tool_version(buildToolName="maven")
-        → "Apache Maven 3.9.9 ..."
+        → "Apache Maven 3.9.16 ..."
 
 LLM:    execute_build_command(
           buildToolHome="/opt/maven",
@@ -902,4 +902,4 @@ Apache License 2.0. See [LICENSE](LICENSE).
 ---
 
 **Repository:** [github.com/thepragmatik/mcp-server-jvm-build-tools](https://github.com/thepragmatik/mcp-server-jvm-build-tools)
-**Built with:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.9
+**Built with:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.16
