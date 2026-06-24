@@ -119,4 +119,5 @@ nav:
       - Tools / MCP API: reference/tools.md
       - Configuration Reference: reference/configuration.md
       - Security: reference/security.md
+      - Protocol Evidence: EVIDENCE.md
   - FAQ: faq.md
