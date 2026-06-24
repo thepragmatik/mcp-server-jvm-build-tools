@@ -28,7 +28,7 @@
 
     <groupId>com.thepragmatik.ai</groupId>
     <artifactId>mcp-server-jvm-build-tools</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <name>MCP Server - Build Tools for the JVM</name>
     <description>MCP Server - Build tools for the JVM.</description>
 
