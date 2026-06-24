@@ -10,10 +10,16 @@ unified interface with automatic project-type detection.
 
 ---
 
+!!! success "Now available — v1.0.0 :material-rocket-launch:"
+    The first stable release is here: full **MCP 2026-07-28 RC alignment**, **28 MCP tools**, and
+    first-class support for **Maven, Gradle, and sbt**.
+
+    [Read the v1.0.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0){ .md-button .md-button--primary }
+
 ## What is it?
 
 This project is a [Model Context Protocol](https://spec.modelcontextprotocol.io)
-(MCP) server, built with **Spring Boot 3.5.14** and **Spring AI 2.0.0-RC2**, that
+(MCP) server, built with **Spring Boot 4.1.0** and **Spring AI 2.0.0**, that
 exposes JVM build operations as MCP tools. Any MCP client — Claude Desktop, Cursor,
 Cline, Windsurf, Goose, Continue, GitHub Copilot — can discover and call these tools
 to drive real builds on your machine.
@@ -27,6 +33,26 @@ transport.
     formats. This server hides those differences behind a consistent set of tools and
     **auto-detects** the build tool from your project's marker files (`pom.xml`,
     `build.gradle`, `build.sbt`), so you rarely need to specify it by hand.
+
+## What's New in v1.0.0
+
+Version **1.0.0** is the first stable release. Highlights:
+
+-   **MCP-RC alignment (2026-07-28 spec).** Streamable HTTP transport, JSON Schema 2020-12
+    validation, deterministic `tools/list` ordering with `ttlMs`/`cacheScope` cache hints, W3C
+    Trace Context propagation, and an OAuth 2.1 resource-server model — all additive and
+    backward-compatible with existing MCP clients.
+-   **28 MCP tools across 12 services.** Build execution, detection, validation, structured output
+    analysis, dependency intelligence, performance profiling, prompts, resources, and optional
+    scope-based authorization. See the [Tools / MCP API](reference/tools.md) reference.
+-   **First-class Maven, Gradle, and sbt support.** A unified `BuildTool` interface with
+    auto-detection from project marker files, verified end-to-end over the MCP protocol — see the
+    [Protocol Evidence](EVIDENCE.md).
+-   **Hardened by default.** HTTPS transport defaults, local-only CORS, SpotBugs + Spotless in
+    `verify`, OWASP Dependency-Check, and license-header enforcement in CI.
+
+For the complete list, read the
+[v1.0.0 release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0).
 
 ## Key features
 
@@ -155,8 +181,9 @@ The full walkthrough — including client-specific configuration and Docker — 
 ---
 
 !!! info "Project facts"
+    - **Version:** v1.0.0
     - **License:** Apache License 2.0
     - **Language / runtime:** Java 21+
-    - **Frameworks:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2
+    - **Frameworks:** Spring Boot 4.1.0, Spring AI 2.0.0
     - **Transports:** stdio (default), Streamable HTTP (opt-in)
     - **MCP tools exposed:** 28 across 12 service beans
