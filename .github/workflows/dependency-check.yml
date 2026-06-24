@@ -74,7 +74,7 @@ jobs:
     if: needs.guard.outputs.run-scan == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
