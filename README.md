@@ -13,27 +13,25 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
-## What's New in v0.2.0 (June 2026)
+## What's New in v1.0.0 (June 2026)
 
-- **Async Build Execution (MCP Tasks)**: execute_build_async, get_build_task, cancel_build_task, list_build_tasks — fire-and-forget builds with task handles, progress polling, partial output streaming, cancellation support. Virtual threads for concurrency
-- **Tool Authorization & Audit**: check_tool_authorization, list_available_scopes, audit_tool_access, validate_access_token — scope-based MCP tool permissions (OWASP MCP06), API key management, audit logging
-- **SBOM Generation & Supply Chain Audit**: generate_sbom, audit_supply_chain, check_license_compliance tools — CycloneDX/SPDX SBOMs for Maven/Gradle/SBT, CVE cross-referencing via OSV.dev, license compliance
-- **Test Flakiness Detection & History**: detect_flaky_tests and analyze_test_history tools — multi-run flakiness scoring, Surefire XML parsing, trend analysis, quarantine candidates
-- **Build Cache Health Analysis**: analyze_cache_health and optimize_build_cache tools — caching audit for Maven/Gradle/SBT, hit-rate scoring, optimization snippets
-- **Build Performance Profiling**: profile_build and analyze_build_performance tools — timing instrumentation, trend analysis, optimization suggestions for 30-60% faster builds
-- **Dependency Conflict Detection**: Scan Maven/Gradle/SBT builds for version conflicts with severity classification and resolution plans
-- **MCP Server Card**: /.well-known/mcp-server endpoint for discoverability — metadata, capabilities, transports, security posture
-- **Streamable HTTP Transport**: Deploy as a web service with health checks alongside stdio
-- **SBT Output Parser**: Full structured output parsing for Scala/SBT builds
-- **Prompt Templates**: Built-in templates for build and test, dependency audit, and failure diagnosis
-- **Resource Exposure**: Navigate build configs, dependencies, and outputs as MCP resources
-- **Dependency Intelligence**: Version checking, upgrade classification, build-tool-specific syntax
-- **Credential Scanning**: Read-only Maven/Gradle credential status checks (masked, safe)
-- **Tool Schema Enhancements**: Enum constraints, shared JSON utilities, improved error handling
-- **Container Probes**: /health/ready and /health/live endpoints for Kubernetes and Docker orchestration
-- **CLI Launcher**: `scripts/launcher.sh` with auto-discovery of Java, Maven, Gradle, SBT
-- **MCP Registry Manifest**: `mcp-registry.json` for ecosystem discoverability
-- **MCP Client Integration Guide**: `MCP_INTEGRATION.md` with configs for 9+ clients
+**MCP-RC Alignment (2026-07-28 Spec)** — fully backward-compatible with existing MCP clients.
+
+- **Streamable HTTP Transport**: Stateless HTTP transport with  Mcp-Method / Mcp-Name  header validation, server/discover endpoint
+- **JSON Schema 2020-12 Validation**: All tool inputSchema validated as full JSON Schema 2020-12 documents
+- **Deterministic Tool Order + ttlMs/cacheScope**: Tools listed deterministically; results carry expiry hints for caching
+- **W3C Trace Context Propagation**: traceparent/tracestate/baggage propagated through build subprocesses (no regression for untraced builds)
+- **OAuth 2.1 Resource-Server**: Bearer-token authorization aligned with the MCP OAuth 2.1 resource-server model
+- **Maven Wrapper**: Project ships mvnw; no host Maven installation needed
+- **OWASP Dependency-Check**: Automated dependency vulnerability scan in CI (weekly + per-PR)
+- **Static Analysis**: SpotBugs + Spotless integrated into verify lifecycle
+- **HTTPS Transport Defaults**: CORS restricted to local origins; health gated
+- **28 MCP Tools** covering Maven, Gradle, and sbt — all verified over stdio and Streamable HTTP
+- **License Header Enforcement**: CI fails on missing license headers
+- **Maven -D Allowlist Removed**: Server trusts the client's -D choices
+- **14 Dependency Updates**: Spring Boot 3.5 to 4.1, Spring AI RC2 to GA, Gradle 8.12, sbt 1.10.10
+
+See the [full changelog](CHANGELOG.md) and [protocol evidence](docs/EVIDENCE.md).
 
 ## Table of Contents
 
@@ -893,7 +891,7 @@ Every PR runs on 3 JDK versions (21, 23, 25) with enforced test coverage (67% in
 
 ## Contributing
 
-Use GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, [WORKFLOW.md](WORKFLOW.md) for the development workflow and branch strategy (`feat/*`, `fix/*` → staging → main), and [ARCHITECTURE.md](ARCHITECTURE.md) for the internal architecture and extension guide.
+Use GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, [WORKFLOW.md](docs/WORKFLOW.md) for the development workflow and branch strategy (`feat/*`, `fix/*` → staging → main), and [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal architecture and extension guide.
 
 ## License
 

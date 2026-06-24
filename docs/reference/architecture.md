@@ -1,8 +1,8 @@
 # Architecture
 
 This server gives AI agents a single, unified interface to JVM build tools — Maven, Gradle, and
-SBT — over the Model Context Protocol. It is built with **Spring Boot 3.5.14** and **Spring AI
-2.0.0-RC2**, which auto-configures the MCP server and discovers tools from annotations.
+SBT — over the Model Context Protocol. It is built with **Spring Boot 4.1.0** and **Spring AI
+2.0.0**, which auto-configures the MCP server and discovers tools from annotations.
 
 ## High-level view
 
@@ -254,8 +254,8 @@ tools/call ─▶ Spring AI MCP SDK ─▶ @Tool method on a service bean
 | Component | Version | Purpose |
 |-----------|---------|---------|
 | Java | 21+ | Runtime |
-| Spring Boot | 3.5.14 | Application framework |
-| Spring AI | 2.0.0-RC2 | MCP server framework |
+| Spring Boot | 4.1.0 | Application framework |
+| Spring AI | 2.0.0 | MCP server framework |
 | Maven Embedder | 3.9.16 | In-process Maven (version queries) |
 | Maven Shared Invoker | 3.3.0 | Out-of-process Maven (builds) |
 

@@ -34,7 +34,7 @@ feature branches (feat/*, fix/*, chore/*)
 
 **Never push directly to `main` or `staging`.** All changes must go through Pull Requests.
 
-See [WORKFLOW.md](WORKFLOW.md) for the full development workflow, branch protection rules, and CI details.
+See [WORKFLOW.md](docs/WORKFLOW.md) for the full development workflow, branch protection rules, and CI details.
 
 ## Commit Conventions
 
@@ -83,7 +83,7 @@ Use [GitHub Issues](https://github.com/thepragmatik/mcp-server-jvm-build-tools/i
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed walkthrough of the codebase structure, class relationships, tool registration, and security model.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed walkthrough of the codebase structure, class relationships, tool registration, and security model.
 
 ## License
 
