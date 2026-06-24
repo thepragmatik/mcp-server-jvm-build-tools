@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        # Pinned to a full commit SHA (v5.6.0) for supply-chain safety.
+        # Pinned to a full commit SHA (v6.2.0) for supply-chain safety.
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.x"
