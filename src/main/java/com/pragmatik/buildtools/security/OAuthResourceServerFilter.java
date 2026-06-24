@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.security;
 
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.transport.McpHeaderValidationFilter;
-
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

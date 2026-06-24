@@ -19,7 +19,6 @@ package com.pragmatik.buildtools.dependency;
 import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.BuildToolProvider;
 import com.pragmatik.buildtools.tool.JsonUtils;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.net.URI;

@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.build;
 
 import com.pragmatik.buildtools.tool.JsonUtils;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

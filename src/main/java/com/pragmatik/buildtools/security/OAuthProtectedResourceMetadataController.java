@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.security;
 
 import com.pragmatik.buildtools.application.McpServerIdentity;
-
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.List;

@@ -16,8 +16,6 @@
  */
 package com.pragmatik.buildtools.build;
 
-import com.pragmatik.buildtools.maven.MavenInvoker;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;

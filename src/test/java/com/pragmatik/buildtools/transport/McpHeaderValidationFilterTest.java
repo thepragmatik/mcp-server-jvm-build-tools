@@ -16,11 +16,10 @@
  */
 package com.pragmatik.buildtools.transport;
 
-import com.pragmatik.buildtools.application.McpServerIdentity;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.pragmatik.buildtools.application.McpServerIdentity;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;

@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.maven;
 
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -230,8 +229,8 @@ public class MavenInvoker {
      * @return a handle to the running process and output collectors
      * @throws IOException if the process cannot be started
      */
-    public static MavenProcessExecution executeWithProcessCapture(String mavenHome, String[] commands, String projectDir)
-            throws IOException {
+    public static MavenProcessExecution executeWithProcessCapture(
+            String mavenHome, String[] commands, String projectDir) throws IOException {
         Path homePath = Path.of(mavenHome);
         Path mvnw = homePath.resolve("mvnw");
         Path mvnBin = homePath.resolve("bin/mvn");

@@ -22,7 +22,6 @@ import com.pragmatik.buildtools.sbt.SbtOutputParser;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tracing.BuildTracer;
 import com.pragmatik.buildtools.tracing.TraceScope;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.nio.file.Files;

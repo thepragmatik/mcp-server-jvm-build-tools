@@ -16,11 +16,10 @@
  */
 package com.pragmatik.buildtools.dependency;
 
-import com.pragmatik.buildtools.build.BuildToolProvider;
-import com.pragmatik.buildtools.tool.JsonUtils;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.build.BuildToolProvider;
+import com.pragmatik.buildtools.tool.JsonUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

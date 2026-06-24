@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.sbt;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
-
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

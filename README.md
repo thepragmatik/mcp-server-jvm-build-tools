@@ -891,7 +891,7 @@ Every PR runs on 3 JDK versions (21, 23, 25) with enforced test coverage (67% in
 
 ## Contributing
 
-Use GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, [WORKFLOW.md](WORKFLOW.md) for the development workflow and branch strategy (`feat/*`, `fix/*` → staging → main), and [ARCHITECTURE.md](ARCHITECTURE.md) for the internal architecture and extension guide.
+Use GitHub Issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide, [WORKFLOW.md](docs/WORKFLOW.md) for the development workflow and branch strategy (`feat/*`, `fix/*` → staging → main), and [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internal architecture and extension guide.
 
 ## License
 

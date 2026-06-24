@@ -29,7 +29,6 @@ import com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider;
 import com.pragmatik.buildtools.tool.JavaVersionService;
 import com.pragmatik.buildtools.tool.PromptService;
 import com.pragmatik.buildtools.tool.ResourceTemplateService;
-
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.boot.SpringApplication;

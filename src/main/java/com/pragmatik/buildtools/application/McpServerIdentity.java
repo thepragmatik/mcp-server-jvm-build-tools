@@ -19,7 +19,6 @@ package com.pragmatik.buildtools.application;
 import com.pragmatik.buildtools.transport.McpDiscoverController;
 import com.pragmatik.buildtools.transport.McpHeaderValidationFilter;
 import com.pragmatik.buildtools.transport.ServerCardController;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;

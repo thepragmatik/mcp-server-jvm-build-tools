@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.security;
 
 import com.pragmatik.buildtools.tool.JsonUtils;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

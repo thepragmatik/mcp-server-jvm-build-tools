@@ -16,11 +16,10 @@
  */
 package com.pragmatik.buildtools.build;
 
-import com.pragmatik.buildtools.gradle.GradleOutputParser;
-import com.pragmatik.buildtools.maven.MavenOutputParser;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.gradle.GradleOutputParser;
+import com.pragmatik.buildtools.maven.MavenOutputParser;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;

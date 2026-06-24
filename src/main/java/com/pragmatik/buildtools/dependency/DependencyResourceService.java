@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.dependency;
 
 import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.BuildToolProvider;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

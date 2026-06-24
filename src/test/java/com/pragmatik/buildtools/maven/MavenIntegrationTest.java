@@ -16,11 +16,11 @@
  */
 package com.pragmatik.buildtools.maven;
 
-import com.pragmatik.buildtools.build.BuildToolsService;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import com.pragmatik.buildtools.application.BuildToolsApplication;
+import com.pragmatik.buildtools.build.BuildToolsService;
 import java.nio.file.Path;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +30,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.pragmatik.buildtools.application.BuildToolsApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(classes = BuildToolsApplication.class)

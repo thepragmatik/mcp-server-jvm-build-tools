@@ -28,7 +28,6 @@ import com.pragmatik.buildtools.tracing.McpTraceContext;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
 import com.pragmatik.buildtools.tracing.TraceScope;
 import com.pragmatik.buildtools.tracing.W3CTraceContext;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.BufferedReader;
 import java.io.File;

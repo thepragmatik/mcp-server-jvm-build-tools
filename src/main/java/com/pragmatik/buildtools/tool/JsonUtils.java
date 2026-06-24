@@ -16,9 +16,6 @@
  */
 package com.pragmatik.buildtools.tool;
 
-import com.pragmatik.buildtools.build.BuildToolsService;
-import com.pragmatik.buildtools.dependency.DependencyService;
-
 import java.util.List;
 import java.util.Map;
 

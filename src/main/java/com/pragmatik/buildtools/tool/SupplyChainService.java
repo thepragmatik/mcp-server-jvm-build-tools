@@ -649,8 +649,10 @@ public class SupplyChainService {
                     vulnCount++;
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             // OSV API unavailable — return empty, note the error
+        } catch (RuntimeException e) {
+            // Unexpected processing error — return empty
         }
 
         return vulnerabilities;

@@ -18,6 +18,7 @@ package com.pragmatik.buildtools.build;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.application.BuildToolsApplication;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.pragmatik.buildtools.application.BuildToolsApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**

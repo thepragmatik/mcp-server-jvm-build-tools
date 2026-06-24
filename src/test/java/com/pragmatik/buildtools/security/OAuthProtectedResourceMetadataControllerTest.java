@@ -16,10 +16,9 @@
  */
 package com.pragmatik.buildtools.security;
 
-import com.pragmatik.buildtools.application.McpServerIdentity;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.application.McpServerIdentity;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;

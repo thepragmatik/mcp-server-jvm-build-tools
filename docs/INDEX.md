@@ -8,12 +8,12 @@ Central documentation hub for the MCP server that gives AI agents hands-on acces
 |----------|---------|
 | [README.md](../README.md) | Project overview, features, quick start, client config |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history and feature releases |
-| [ARCHITECTURE.md](../ARCHITECTURE.md) | Internal architecture, component design, extension guide |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture, component design, extension guide |
 | [TOOLS.md](../TOOLS.md) | Complete MCP tool reference — parameters, schemas, examples |
 | [QUICKSTART.md](../QUICKSTART.md) | Five-minute setup guide |
 | [CONFIGURATION.md](../CONFIGURATION.md) | Environment variables, build tool paths, transport config |
 | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) | Common issues and solutions |
-| [WORKFLOW.md](../WORKFLOW.md) | Branch strategy, PR workflow, release process |
+| [WORKFLOW.md](WORKFLOW.md) | Branch strategy, PR workflow, release process |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributor guide and coding standards |
 | [SECURITY.md](../SECURITY.md) | Security model, threat analysis, hardening |
 | [FAQ.md](../FAQ.md) | Frequently asked questions |

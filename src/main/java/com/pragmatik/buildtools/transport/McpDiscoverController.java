@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.transport;
 
 import com.pragmatik.buildtools.application.McpServerIdentity;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.MediaType;

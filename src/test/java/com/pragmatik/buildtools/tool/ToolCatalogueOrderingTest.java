@@ -18,6 +18,7 @@ package com.pragmatik.buildtools.tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.application.BuildToolsApplication;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -26,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.pragmatik.buildtools.application.BuildToolsApplication;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**

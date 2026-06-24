@@ -17,7 +17,6 @@
 package com.pragmatik.buildtools.maven;
 
 import com.pragmatik.buildtools.build.BuildTool;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

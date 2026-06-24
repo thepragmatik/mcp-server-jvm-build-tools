@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.transport;
 
 import com.pragmatik.buildtools.build.AsyncBuildService;
 import com.pragmatik.buildtools.tool.JsonUtils;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;

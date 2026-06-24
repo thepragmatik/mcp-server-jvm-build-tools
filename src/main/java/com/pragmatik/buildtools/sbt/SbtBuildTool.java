@@ -21,7 +21,6 @@ import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.gradle.GradleBuildTool;
 import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;

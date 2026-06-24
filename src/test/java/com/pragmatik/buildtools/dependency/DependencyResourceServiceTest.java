@@ -16,10 +16,9 @@
  */
 package com.pragmatik.buildtools.dependency;
 
-import com.pragmatik.buildtools.build.BuildToolProvider;
-
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.pragmatik.buildtools.build.BuildToolProvider;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;

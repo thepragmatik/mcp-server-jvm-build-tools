@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.build;
 
 import com.pragmatik.buildtools.gradle.GradleOutputParser;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
-
 import java.util.Map;
 
 /**

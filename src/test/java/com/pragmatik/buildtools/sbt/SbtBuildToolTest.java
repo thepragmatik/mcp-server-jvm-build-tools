@@ -16,13 +16,12 @@
  */
 package com.pragmatik.buildtools.sbt;
 
-import com.pragmatik.buildtools.build.BuildTool;
-import com.pragmatik.buildtools.build.BuildToolProvider;
-import com.pragmatik.buildtools.build.BuildToolsService;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import com.pragmatik.buildtools.build.BuildTool;
+import com.pragmatik.buildtools.build.BuildToolProvider;
+import com.pragmatik.buildtools.build.BuildToolsService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
