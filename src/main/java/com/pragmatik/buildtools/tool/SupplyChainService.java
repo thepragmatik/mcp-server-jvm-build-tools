@@ -18,7 +18,6 @@ package com.pragmatik.buildtools.tool;
 
 import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.BuildToolProvider;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.net.URI;
