@@ -1,5 +1,7 @@
 # One MCP Server for ALL Your JVM Build Tools
 
+📖 **Website:** [https://thepragmatik.github.io/mcp-server-jvm-build-tools/](https://thepragmatik.github.io/mcp-server-jvm-build-tools/) — full docs, 28 MCP tools, MCP-RC features, and protocol evidence  
+
 [![CI](https://github.com/thepragmatik/mcp-server-jvm-build-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/thepragmatik/mcp-server-jvm-build-tools/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
