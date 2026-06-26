@@ -102,6 +102,10 @@
             <artifactId>spring-ai-starter-mcp-server</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-autoconfigure-mcp-server-webmvc</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -145,6 +149,7 @@
                 <filtering>false</filtering>
                 <includes>
                     <include>logback-spring.xml</include>
+                    <include>application-*.properties</include>
                     <include>**/*.yml</include>
                     <include>**/*.yaml</include>
                     <include>**/*.xml</include>
