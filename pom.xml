@@ -90,6 +90,17 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-mcp</artifactId>
         </dependency>
+        <!--
+            MCP Server Spring Boot starter: pulls in
+            spring-ai-autoconfigure-mcp-server-common, which provides the Spring
+            Boot auto-configuration that wires up StdioServerTransport (and SSE /
+            Streamable HTTP) for the MCP protocol transport. Without this the
+            server silently accepts input on stdin but never processes messages.
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -127,6 +138,16 @@
                 <filtering>true</filtering>
                 <includes>
                     <include>application.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>logback-spring.xml</include>
+                    <include>**/*.yml</include>
+                    <include>**/*.yaml</include>
+                    <include>**/*.xml</include>
                 </includes>
             </resource>
         </resources>

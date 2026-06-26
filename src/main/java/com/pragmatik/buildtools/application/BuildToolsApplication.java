@@ -16,6 +16,8 @@
  */
 package com.pragmatik.buildtools.application;
 
+import com.pragmatik.buildtools.build.AsyncBuildService;
+import com.pragmatik.buildtools.build.BuildCacheService;
 import com.pragmatik.buildtools.build.BuildPerformanceService;
 import com.pragmatik.buildtools.build.BuildResourceService;
 import com.pragmatik.buildtools.build.BuildToolsService;
@@ -29,6 +31,8 @@ import com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider;
 import com.pragmatik.buildtools.tool.JavaVersionService;
 import com.pragmatik.buildtools.tool.PromptService;
 import com.pragmatik.buildtools.tool.ResourceTemplateService;
+import com.pragmatik.buildtools.tool.SupplyChainService;
+import com.pragmatik.buildtools.tool.TestFlakinessService;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.boot.SpringApplication;
@@ -70,7 +74,11 @@ public class BuildToolsApplication {
             DependencyConflictService dependencyConflictService,
             BuildPerformanceService buildPerformanceService,
             JavaVersionService javaVersionService,
-            ToolAuthorizationService toolAuthorizationService) {
+            ToolAuthorizationService toolAuthorizationService,
+            AsyncBuildService asyncBuildService,
+            BuildCacheService buildCacheService,
+            TestFlakinessService testFlakinessService,
+            SupplyChainService supplyChainService) {
         ToolCallbackProvider methodProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(
                         buildToolsService,
@@ -84,7 +92,11 @@ public class BuildToolsApplication {
                         dependencyConflictService,
                         buildPerformanceService,
                         javaVersionService,
-                        toolAuthorizationService)
+                        toolAuthorizationService,
+                        asyncBuildService,
+                        buildCacheService,
+                        testFlakinessService,
+                        supplyChainService)
                 .build();
         return new DeterministicToolCallbackProvider(methodProvider);
     }
