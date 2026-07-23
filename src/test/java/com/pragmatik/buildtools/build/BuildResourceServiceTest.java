@@ -201,9 +201,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceOutput(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                "<project><modelVersion>4.0.0</modelVersion></project>");
+        Files.writeString(tempDir.resolve("pom.xml"), "<project><modelVersion>4.0.0</modelVersion></project>");
 
         String resourceUri = "build://" + projectName + "/output";
         String result = service.readBuildResource(resourceUri, tempDir.toString());
@@ -217,9 +215,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceTestResults(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                "<project><modelVersion>4.0.0</modelVersion></project>");
+        Files.writeString(tempDir.resolve("pom.xml"), "<project><modelVersion>4.0.0</modelVersion></project>");
 
         String resourceUri = "build://" + projectName + "/test-results";
         String result = service.readBuildResource(resourceUri, tempDir.toString());
@@ -232,9 +228,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceUnknownUri(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                "<project><modelVersion>4.0.0</modelVersion></project>");
+        Files.writeString(tempDir.resolve("pom.xml"), "<project><modelVersion>4.0.0</modelVersion></project>");
 
         String result = service.readBuildResource("build://" + projectName + "/unknown", tempDir.toString());
 
@@ -257,9 +251,7 @@ class BuildResourceServiceTest {
 
     @Test
     void testListBuildResourcesReturnsValidJson(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                "<project><modelVersion>4.0.0</modelVersion></project>");
+        Files.writeString(tempDir.resolve("pom.xml"), "<project><modelVersion>4.0.0</modelVersion></project>");
 
         String result = service.listBuildResources(tempDir.toString());
 
@@ -279,9 +271,7 @@ class BuildResourceServiceTest {
                 }
                 """);
         Files.writeString(tempDir.resolve("settings.gradle"), "");
-        Files.writeString(
-                tempDir.resolve("gradle.properties"),
-                "org.gradle.caching=true");
+        Files.writeString(tempDir.resolve("gradle.properties"), "org.gradle.caching=true");
 
         String resourceUri = "build://" + projectName + "/config";
         String result = service.readBuildResource(resourceUri, tempDir.toString());

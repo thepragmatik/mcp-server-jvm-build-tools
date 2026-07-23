@@ -173,9 +173,7 @@ class PromptServiceTest {
     @Test
     void testPromptBuildDiagnosisBlankFailedCommand(@TempDir Path tempDir) throws IOException {
         Files.createDirectories(tempDir);
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                "<project><modelVersion>4.0.0</modelVersion></project>");
+        Files.writeString(tempDir.resolve("pom.xml"), "<project><modelVersion>4.0.0</modelVersion></project>");
 
         String result = service.promptBuildDiagnosis(tempDir.toString(), "  ");
 

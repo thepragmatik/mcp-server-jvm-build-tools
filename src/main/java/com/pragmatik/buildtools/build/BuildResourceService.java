@@ -159,8 +159,8 @@ public class BuildResourceService {
         } else if (uri.endsWith("/output") || uri.endsWith("/test-results")) {
             return readBuildOutputNote(dir, result);
         } else {
-            return JsonUtils.errorJson("Unknown resource URI: " + uri
-                    + ". Use list_build_resources to discover available resources.");
+            return JsonUtils.errorJson(
+                    "Unknown resource URI: " + uri + ". Use list_build_resources to discover available resources.");
         }
     }
 

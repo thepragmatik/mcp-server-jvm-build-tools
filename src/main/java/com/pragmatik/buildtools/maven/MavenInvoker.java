@@ -72,8 +72,7 @@ public class MavenInvoker {
                 String errText = errors.toString();
                 String outText = output.toString();
                 finalResult = errText.isEmpty() ? outText : errText + "\n" + outText;
-                throw new RuntimeException(
-                        "Maven exited with code " + result.getExitCode() + ":\n" + finalResult);
+                throw new RuntimeException("Maven exited with code " + result.getExitCode() + ":\n" + finalResult);
             } else {
                 finalResult = output.toString();
             }

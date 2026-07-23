@@ -24,7 +24,6 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
-import io.modelcontextprotocol.spec.McpSchema.Content;
 import io.modelcontextprotocol.spec.McpSchema.Implementation;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
@@ -125,12 +124,13 @@ public class McpServerTransportConfiguration {
             Map<String, Object> inputSchema;
             try {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> parsed =
-                        jsonMapper.readValue(inputSchemaStr, Map.class);
+                Map<String, Object> parsed = jsonMapper.readValue(inputSchemaStr, Map.class);
                 inputSchema = parsed;
             } catch (IOException e) {
-                log.warn("Failed to parse input schema for tool '{}', using empty schema: {}",
-                        def.name(), e.getMessage());
+                log.warn(
+                        "Failed to parse input schema for tool '{}', using empty schema: {}",
+                        def.name(),
+                        e.getMessage());
                 inputSchema = Map.of("type", "object", "properties", Map.of());
             }
 
@@ -138,23 +138,20 @@ public class McpServerTransportConfiguration {
                     .description(def.description())
                     .inputSchema(inputSchema)
                     .build();
-            SyncToolSpecification spec = new SyncToolSpecification(tool,
-                    (exchange, callRequest) -> {
-                        try {
-                            String inputJson = jsonMapper.writeValueAsString(
-                                    callRequest.arguments());
-                            String resultJson = callback.call(inputJson);
-                            return new CallToolResult(
-                                    List.of(new TextContent(resultJson)),
-                                    Boolean.FALSE, null, null);
-                        } catch (Exception e) {
-                            log.error("Tool '{}' execution failed", def.name(), e);
-                            return new CallToolResult(
-                                    List.of(new TextContent(
-                                            "Tool execution error: " + e.getMessage())),
-                                    Boolean.TRUE, null, null);
-                        }
-                    });
+            SyncToolSpecification spec = new SyncToolSpecification(tool, (exchange, callRequest) -> {
+                try {
+                    String inputJson = jsonMapper.writeValueAsString(callRequest.arguments());
+                    String resultJson = callback.call(inputJson);
+                    return new CallToolResult(List.of(new TextContent(resultJson)), Boolean.FALSE, null, null);
+                } catch (Exception e) {
+                    log.error("Tool '{}' execution failed", def.name(), e);
+                    return new CallToolResult(
+                            List.of(new TextContent("Tool execution error: " + e.getMessage())),
+                            Boolean.TRUE,
+                            null,
+                            null);
+                }
+            });
             toolSpecs.add(spec);
         }
 
