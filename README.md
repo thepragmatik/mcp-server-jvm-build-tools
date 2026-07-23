@@ -903,3 +903,5 @@ Apache License 2.0. See [LICENSE](LICENSE).
 
 **Repository:** [github.com/thepragmatik/mcp-server-jvm-build-tools](https://github.com/thepragmatik/mcp-server-jvm-build-tools)
 **Built with:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.16
+---
+> **CI/CD:** This repository uses automated swarm workflows. Pull requests are auto-merged after AI-driven code review (ADVERSARIAL + CODE-QUALITY) once all CI checks pass.
