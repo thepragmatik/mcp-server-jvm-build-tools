@@ -16,7 +16,7 @@ contents. Output may become a PUBLIC PR — treat everything as publishable. Use
 environment variables for keys and generic placeholders otherwise. When in doubt,
 leave it out.
 
-## PR workflow — state machine (never skip a gate, never fake a result)
+## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
 1. **Branch** off `main` (`fix/<issue>-<slug>` or `feat/<issue>-<slug>`). Never
    commit to `main`. Never merge your own work outside the gates below.
 2. **Implement** complete, production-ready code (no placeholders/TODOs/stubs).
@@ -58,9 +58,16 @@ leave it out.
    (b) **reply with a clear rationale** for declining. No comment is left
    unaddressed. If code changed, re-run CI and ask both reviewers to re-confirm
    their blocking comments are resolved.
-7. **MERGE** only when: CI green **AND** both reviewers' blocking comments are
-   resolved / both verdicts APPROVE **AND** every comment has a response.
-   Squash-merge; delete the branch.
+7. **GATE 4 — Auto-merge (squash).** Once all of the following are true:
+   - CI green (all 4 checks pass)
+   - Both reviews posted and verdicts are APPROVE
+   - Every review comment has a response (accepted+implemented or declined with rationale)
+   → Run: `gh pr merge --squash --auto <PR_NUMBER>`
+   Then delete the feature branch:
+   `gh api repos/:owner/:repo/git/refs/heads/<branch> -X DELETE`
+
+   If any condition is not met, block and notify. Never force-push,
+   never modify branch protection, and never merge on red/unknown CI.
 
 ## Honesty & escalation
 - Evidence over assertion: verify with real tool output; never fabricate results,
