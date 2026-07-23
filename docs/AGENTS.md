@@ -58,16 +58,26 @@ leave it out.
    (b) **reply with a clear rationale** for declining. No comment is left
    unaddressed. If code changed, re-run CI and ask both reviewers to re-confirm
    their blocking comments are resolved.
-7. **GATE 4 — Auto-merge (squash).** Once all of the following are true:
+7. **GATE 4 — Merge (squash).** Once all of the following are true:
    - CI green (all 4 checks pass)
    - Both reviews posted and verdicts are APPROVE
    - Every review comment has a response (accepted+implemented or declined with rationale)
-   → Run: `gh pr merge --squash --auto <PR_NUMBER>`
-   Then delete the feature branch:
-   `gh api repos/:owner/:repo/git/refs/heads/<branch> -X DELETE`
+
+   a) If the PR is a draft, mark it ready: `gh pr ready <PR_NUMBER>`
+   b) Merge: `gh pr merge --squash --delete-branch <PR_NUMBER>`
+
+   > **Note on auto-merge:** If the repo setting "Allow auto-merge" is enabled (Settings → General → Pull Requests), replace step (b) with:
+   > `gh pr merge --squash --auto <PR_NUMBER>`
+   > Then delete the branch after merge completes:
+   > `gh api repos/:owner/:repo/git/refs/heads/<branch> -X DELETE`
 
    If any condition is not met, block and notify. Never force-push,
    never modify branch protection, and never merge on red/unknown CI.
+
+   **Restrictions:**
+   - A single bot identity **cannot self-approve** on GitHub (`--approve` returns `GraphQL: Review Can not approve your own pull request`).
+     Always use `gh pr review --comment --body "VERDICT: APPROVE | REQUEST_CHANGES"` instead.
+   - The review verdict lives in the comment body, not GitHub's native approval state.
 
 ## Honesty & escalation
 - Evidence over assertion: verify with real tool output; never fabricate results,
