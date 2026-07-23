@@ -124,4 +124,112 @@ class BuildPerformanceServiceTest {
         String result = service.analyzeBuildPerformance(tempDir.toString(), "maven");
         assertTrue(result.contains("optimizationPotential"));
     }
+
+    // ─── profileBuild ────────────────────────────────────────────────────
+
+    @Test
+    void testProfileBuildInvalidDir() {
+        String result = service.profileBuild(null, null, "/nonexistent/path", "test");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":false"));
+        assertTrue(result.contains("Cannot resolve project directory"));
+    }
+
+    @Test
+    void testProfileBuildNonDirectory(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("notadir.txt");
+        Files.writeString(file, "test");
+
+        String result = service.profileBuild(null, null, file.toString(), "test");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":false"));
+        assertTrue(result.contains("Project directory is not valid"));
+    }
+
+    @Test
+    void testProfileBuildInvalidBuildToolHome(@TempDir Path tempDir) throws IOException {
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.0</version>
+                </project>
+                """);
+
+        String result = service.profileBuild("maven", "/nonexistent/maven/home", tempDir.toString(), "validate");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":false"));
+        assertTrue(result.contains("Cannot resolve build tool home"));
+    }
+
+    @Test
+    void testProfileBuildReturnsPerformanceMetrics(@TempDir Path tempDir) throws IOException {
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.0</version>
+                </project>
+                """);
+
+        // profileBuild with "validate" — a lightweight Maven phase that does no work
+        String result = service.profileBuild("maven", null, tempDir.toString(), "validate");
+
+        assertNotNull(result);
+        // Should return JSON with performance fields even if the build tool isn't available
+        assertTrue(result.startsWith("{"));
+        assertTrue(result.contains("\"tool\":\"maven\""));
+        assertTrue(result.contains("\"command\":\"validate\""));
+    }
+
+    @Test
+    void testProfileBuildWithBlankBuildToolHome(@TempDir Path tempDir) throws IOException {
+        Files.writeString(
+                tempDir.resolve("pom.xml"),
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.0</version>
+                </project>
+                """);
+
+        // Blank buildToolHome should be treated as not provided
+        String result = service.profileBuild("maven", "  ", tempDir.toString(), "validate");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"tool\":\"maven\""));
+    }
+
+    @Test
+    void testProfileBuildAutoDetectGradle(@TempDir Path tempDir) throws IOException {
+        Files.writeString(
+                tempDir.resolve("build.gradle"),
+                """
+                plugins {
+                    id 'java'
+                }
+                """);
+        Files.writeString(tempDir.resolve("settings.gradle"), "");
+
+        // Auto-detect should resolve to gradle
+        String result = service.profileBuild(null, null, tempDir.toString(), "build");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"tool\":\"gradle\""));
+        assertTrue(result.contains("\"command\":\"build\""));
+    }
 }
