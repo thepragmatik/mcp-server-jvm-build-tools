@@ -1,110 +1,189 @@
-# mcp-server-jvm-build-tools — Documentation Index
+# MCP Server — JVM Build Tools
 
-Central documentation hub for the MCP server that gives AI agents hands-on access to JVM build tools (Maven, Gradle, SBT).
+**One MCP server for all your JVM build tools.** Give any MCP-compatible AI agent
+secure, hands-on access to **Maven**, **Gradle**, and **SBT** — compile, test,
+package, inspect dependencies, and validate build configuration through a single,
+unified interface with automatic project-type detection.
 
-## Quick Links
+[Get started in 5 minutes :material-rocket-launch:](user-guide/installation.md){ .md-button .md-button--primary }
+[Browse the MCP API :material-tools:](reference/tools.md){ .md-button }
 
-| Document | Purpose |
-|----------|---------|
-| [README.md](../README.md) | Project overview, features, quick start, client config |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history and feature releases |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Internal architecture, component design, extension guide |
-| [TOOLS.md](../TOOLS.md) | Complete MCP tool reference — parameters, schemas, examples |
-| [QUICKSTART.md](../QUICKSTART.md) | Five-minute setup guide |
-| [CONFIGURATION.md](../CONFIGURATION.md) | Environment variables, build tool paths, transport config |
-| [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) | Common issues and solutions |
-| [WORKFLOW.md](WORKFLOW.md) | Branch strategy, PR workflow, release process |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributor guide and coding standards |
-| [SECURITY.md](../SECURITY.md) | Security model, threat analysis, hardening |
-| [FAQ.md](../FAQ.md) | Frequently asked questions |
-| [MCP_INTEGRATION.md](../MCP_INTEGRATION.md) | Client integration guide with configs for 9+ clients |
-| [mcp-registry.json](../mcp-registry.json) | MCP Registry manifest for ecosystem discoverability |
-| [scripts/launcher.sh](../scripts/launcher.sh) | CLI launcher with auto-discovery |
+---
 
-## MCP Tools Overview (28 tools)
+!!! success "Now available — v1.0.0 :material-rocket-launch:"
+    The first stable release is here: full **MCP 2026-07-28 RC alignment**, **28 MCP tools**, and
+    first-class support for **Maven, Gradle, and sbt**.
 
-### Build Execution (4)
-- `get_build_tool_version` — version query for any registered build tool
-- `execute_build_command` — build with auto-detection of Maven/Gradle/SBT
-- `list_build_tools` — list all registered tools and commands
-- `detect_build_tool` — scan project directory for build markers
+    [Read the v1.0.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0){ .md-button .md-button--primary }
 
-### Build Analysis (4)
-- `analyze_build_output` — execute build + parse into structured JSON
-- `validate_build_configuration` — static analysis of build files
-- `profile_build` — execute build with full timing instrumentation
-- `analyze_build_performance` — read-only configuration and trend analysis
+## What is it?
 
-### Dependency Management (2)
-- `check_dependency_version` — Maven Central version lookups
-- `detect_dependency_conflicts` — version conflict detection across build files
+This project is a [Model Context Protocol](https://spec.modelcontextprotocol.io)
+(MCP) server, built with **Spring Boot 4.1.0** and **Spring AI 2.0.0**, that
+exposes JVM build operations as MCP tools. Any MCP client — Claude Desktop, Cursor,
+Cline, Windsurf, Goose, Continue, GitHub Copilot — can discover and call these tools
+to drive real builds on your machine.
 
-### Credential Scanning (1)
-- `check_credential_status` — read-only Maven/Gradle credential audit
+Instead of an agent only *generating* build files, it can actually **run** the build,
+read the structured results, and act on them — all over a local, network-free
+transport.
 
-### Java Version Compatibility (1)
-- `check_java_compatibility` — validate project config against target Java version
+!!! tip "Why one server for three tools?"
+    Maven, Gradle, and SBT each have different invocation models, flags, and output
+    formats. This server hides those differences behind a consistent set of tools and
+    **auto-detects** the build tool from your project's marker files (`pom.xml`,
+    `build.gradle`, `build.sbt`), so you rarely need to specify it by hand.
 
-### SBT Project Analysis (3)
-- `detect_sbt_modules` — detect SBT sub-modules
-- `detect_sbt_test_frameworks` — detect test frameworks (ScalaTest, Specs2, MUnit)
-- `analyze_sbt_build` — execute SBT build with structured output
+## What's New in v1.0.0
 
-### Prompt Templates (3)
-- `prompt_build_and_test` — structured build-and-test workflow template
-- `prompt_dependency_audit` — dependency audit workflow template
-- `prompt_build_diagnosis` — build failure diagnosis template
+Version **1.0.0** is the first stable release. Highlights:
 
-### Resource Access (6)
-- `list_build_resources` / `read_build_resource` — build configuration resources
-- `list_dependency_resources` / `read_dependency_resource` — dependency resources
-- `list_resource_templates` — list available resource templates
-- `resolve_resource_template` — resolve and apply a resource template
+-   **MCP-RC alignment (2026-07-28 spec).** Streamable HTTP transport, JSON Schema 2020-12
+    validation, deterministic `tools/list` ordering with `ttlMs`/`cacheScope` cache hints, W3C
+    Trace Context propagation, and an OAuth 2.1 resource-server model — all additive and
+    backward-compatible with existing MCP clients.
+-   **28 MCP tools across 12 services.** Build execution, detection, validation, structured output
+    analysis, dependency intelligence, performance profiling, prompts, resources, and optional
+    scope-based authorization. See the [Tools / MCP API](reference/tools.md) reference.
+-   **First-class Maven, Gradle, and sbt support.** A unified `BuildTool` interface with
+    auto-detection from project marker files, verified end-to-end over the MCP protocol — see the
+    [Protocol Evidence](EVIDENCE.md).
+-   **Hardened by default.** HTTPS transport defaults, local-only CORS, SpotBugs + Spotless in
+    `verify`, OWASP Dependency-Check, and license-header enforcement in CI.
 
-### Tool Authorization (4)
-- `check_tool_authorization` — check if a tool is authorized for given permission scopes
-- `list_available_scopes` — list all available permission scopes with tool coverage
-- `audit_tool_access` — read recent tool invocation audit log entries
-- `validate_access_token` — validate an MCP access token and return granted scopes
+For the complete list, read the
+[v1.0.0 release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0).
 
-### Async Build Tasks (4)
-- `execute_build_async` — start a long-running build in the background
-- `get_build_task` — poll an async build task for status, progress, and output
-- `cancel_build_task` — cancel a running async build task
-- `list_build_tasks` — list all active and recent async build tasks
+## Key features
 
-### Test Analysis (2)
-- `detect_flaky_tests` — run tests N times to detect flaky test methods
-- `analyze_test_history` — analyze historical test pass/fail trends
+<div class="grid cards" markdown>
 
-### Build Cache Health (2)
-- `analyze_cache_health` — audit caching configuration and effectiveness
-- `optimize_build_cache` — generate cache optimization config snippets
+-   :material-language-java: **Three build tools, one interface**
 
-### Supply Chain (3)
-- `generate_sbom` — generate a CycloneDX or SPDX SBOM for a project
-- `audit_supply_chain` — audit dependencies for known CVEs via OSV.dev
-- `check_license_compliance` — classify dependency licenses and flag restrictions
+    Maven, Gradle, and SBT behind a unified `BuildTool` SPI with auto-detection by
+    project marker files.
 
-### Server Card Endpoints
-- `GET /.well-known/mcp-server` — discoverability (Streamable HTTP mode)
-- `GET /health` — health check endpoint
-- `GET /health/ready` — readiness probe (Kubernetes, Docker)
-- `GET /health/live` — liveness probe (container orchestration)
+-   :material-shield-check: **Defense-in-depth security**
 
-## Transport Modes
+    A five-layer model — command allowlists, dangerous-flag blocking, shell
+    metacharacter rejection, path canonicalization, and process isolation.
 
-- **stdio** — default, works with Claude Desktop, Cursor, Cline, Goose, Continue, Windsurf
-- **Streamable HTTP** — web service with health checks, SSE, CORS
+-   :material-code-json: **Structured build output**
 
-## Build Tools
+    `analyze_build_output` parses Maven/Gradle/SBT logs into machine-readable JSON:
+    test counts, errors with `file:line`, warnings, and success status.
 
-| Tool | Detection File | Execution Method |
-|------|---------------|-----------------|
-| Maven | pom.xml | MavenInvoker / MavenEmbedder |
-| Gradle | build.gradle, build.gradle.kts | ProcessBuilder + wrapper auto-detect |
-| SBT | build.sbt | ProcessBuilder |
+-   :material-magnify: **Dependency intelligence**
 
-## Version
+    Query Maven Central for the latest versions, detect version conflicts, and check
+    Java/JDK compatibility — with build-tool-aware dependency syntax.
 
-Current: 0.1.1-SNAPSHOT (Java 21+, Spring Boot 3.5.14, Spring AI 2.0.0-RC2)
+-   :material-transit-connection-variant: **Local-first transport**
+
+    Runs over **stdio** by default — no network port, no TLS, no cloud. An opt-in
+    Streamable HTTP transport is available for web deployments.
+
+-   :material-key-variant: **Optional scope-based authorization**
+
+    Fine-grained API-key scopes and per-invocation audit logging, off by default and
+    enforced only when you turn it on.
+
+</div>
+
+## Quick start
+
+!!! note "Prerequisites"
+    - **Java 21+** (the server targets Java 21).
+    - **Apache Maven 3.9+** to build the JAR.
+    - An **MCP-compatible client**.
+
+=== "1. Build the JAR"
+
+    ```bash
+    git clone https://github.com/thepragmatik/mcp-server-jvm-build-tools.git
+    cd mcp-server-jvm-build-tools
+    mvn clean package -DskipTests
+    ```
+
+    The artifact is produced at `target/mcp-server-jvm-build-tools.jar`.
+
+=== "2. Configure your MCP client"
+
+    ```json
+    {
+      "mcpServers": {
+        "jvm-build-tools": {
+          "command": "java",
+          "args": [
+            "-jar",
+            "/absolute/path/to/mcp-server-jvm-build-tools.jar"
+          ],
+          "env": {
+            "MAVEN_HOME": "/opt/maven"
+          }
+        }
+      }
+    }
+    ```
+
+    Restart the client. The build tools appear automatically.
+
+=== "3. Try it"
+
+    Ask your agent:
+
+    ```text
+    What build tools are available?
+    Build and test the project at /path/to/my-project
+    ```
+
+The full walkthrough — including client-specific configuration and Docker — is in the
+[Installation guide](user-guide/installation.md).
+
+## Where to go next
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant: **[Overview](user-guide/overview.md)**
+
+    The problem this solves, who it's for, and how the pieces fit together.
+
+-   :material-download: **[Installation](user-guide/installation.md)**
+
+    Prerequisites, building the JAR, and wiring it into every major MCP client.
+
+-   :material-tune: **[Configuration](user-guide/configuration.md)**
+
+    Environment variables, JVM flags, and Spring Boot properties — the real ones.
+
+-   :material-play-circle: **[Usage](user-guide/usage.md)**
+
+    Connect a client and invoke tools, with the request/response shapes to expect.
+
+-   :material-flask: **[Examples](user-guide/examples.md)**
+
+    Concrete Maven, Gradle, and SBT invocations with sample requests and responses.
+
+-   :material-sitemap: **[Architecture](reference/architecture.md)**
+
+    Components, transports, and the end-to-end request flow.
+
+-   :material-tools: **[Tools / MCP API](reference/tools.md)**
+
+    Every registered tool: purpose, inputs, and outputs, grounded in the source.
+
+-   :material-shield-lock: **[Security](reference/security.md)**
+
+    The threat model, allowlists, blocked flags, timeouts, and transports.
+
+</div>
+
+---
+
+!!! info "Project facts"
+    - **Version:** v1.0.0
+    - **License:** Apache License 2.0
+    - **Language / runtime:** Java 21+
+    - **Frameworks:** Spring Boot 4.1.0, Spring AI 2.0.0
+    - **Transports:** stdio (default), Streamable HTTP (opt-in)
+    - **MCP tools exposed:** 28 across 12 service beans
