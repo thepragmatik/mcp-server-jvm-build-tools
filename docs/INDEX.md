@@ -10,11 +10,11 @@ unified interface with automatic project-type detection.
 
 ---
 
-!!! success "Now available — v1.0.0 :material-rocket-launch:"
-    The first stable release is here: full **MCP 2026-07-28 RC alignment**, **28 MCP tools**, and
+!!! success "Now available — v1.1.0 :material-rocket-launch:"
+    The latest release: **30 MCP tools**, **stdio auto-configuration**, and
     first-class support for **Maven, Gradle, and sbt**.
 
-    [Read the v1.0.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0){ .md-button .md-button--primary }
+    [Read the v1.1.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.1.0){ .md-button .md-button--primary }
 
 ## What is it?
 
@@ -34,25 +34,24 @@ transport.
     **auto-detects** the build tool from your project's marker files (`pom.xml`,
     `build.gradle`, `build.sbt`), so you rarely need to specify it by hand.
 
-## What's New in v1.0.0
+## What's New in v1.1.0
 
-Version **1.0.0** is the first stable release. Highlights:
+Version **1.1.0** builds on the stable foundation. Highlights:
 
--   **MCP-RC alignment (2026-07-28 spec).** Streamable HTTP transport, JSON Schema 2020-12
-    validation, deterministic `tools/list` ordering with `ttlMs`/`cacheScope` cache hints, W3C
-    Trace Context propagation, and an OAuth 2.1 resource-server model — all additive and
-    backward-compatible with existing MCP clients.
--   **28 MCP tools across 12 services.** Build execution, detection, validation, structured output
+-   **30 MCP tools across 12 services** (was 28). Build execution, detection, validation, structured output
     analysis, dependency intelligence, performance profiling, prompts, resources, and optional
     scope-based authorization. See the [Tools / MCP API](reference/tools.md) reference.
--   **First-class Maven, Gradle, and sbt support.** A unified `BuildTool` interface with
-    auto-detection from project marker files, verified end-to-end over the MCP protocol — see the
-    [Protocol Evidence](EVIDENCE.md).
--   **Hardened by default.** HTTPS transport defaults, local-only CORS, SpotBugs + Spotless in
-    `verify`, OWASP Dependency-Check, and license-header enforcement in CI.
+-   **MCP stdio transport auto-configuration.** Spring AI 2.0.0 spring-ai-mcp now auto-configures
+    stdio transport out of the box — no manual transport wiring needed.
+-   **Docker image with JDK 21 + Maven/Gradle/SBT.** Full build toolchain pre-installed in the
+    container for instant readiness.
+-   **Full test suite: 599 tests, 17 MCP protocol tests.** Comprehensive coverage across unit,
+    integration, and MCP protocol layers.
+-   **Real-world usability testing with MCP Inspector CLI.** Verified end-to-end with the MCP
+    Inspector for stdio transport.
 
 For the complete list, read the
-[v1.0.0 release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0).
+[v1.1.0 release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.1.0).
 
 ## Key features
 
@@ -181,9 +180,9 @@ The full walkthrough — including client-specific configuration and Docker — 
 ---
 
 !!! info "Project facts"
-    - **Version:** v1.0.0
+    - **Version:** v1.1.0
     - **License:** Apache License 2.0
     - **Language / runtime:** Java 21+
     - **Frameworks:** Spring Boot 4.1.0, Spring AI 2.0.0
     - **Transports:** stdio (default), Streamable HTTP (opt-in)
-    - **MCP tools exposed:** 28 across 12 service beans
+    - **MCP tools exposed:** 30 across 12 service beans
