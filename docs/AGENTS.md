@@ -28,7 +28,23 @@ leave it out.
 4. **GATE 1 — CI:** all checks pass. Never merge on red/pending/unknown.
 5. **GATE 2 — TWO independent reviews.** Each reviewer does a *fresh checkout*,
    runs `mvn -B verify` itself (don't trust prior runs), leaves **inline comments**
-   (GitHub review API, `path`+`line`), and posts a role-tagged verdict comment:
+   (GitHub review API, `path`+`line`), and posts a role-tagged verdict comment.
+   **Reviews MUST be posted through the GitHub PR interface** using the `gh` CLI —
+   Kanban comments alone are insufficient because they are not visible to the PR
+   author in the GitHub UI and do not trigger CI re-evaluation.
+
+   **Review command example:**
+   ```sh
+   git fetch origin pull/<PR_NUMBER>/head:pr-review && git checkout pr-review
+   mvn -B verify --no-transfer-progress
+   # After full review, post verdict via GitHub:
+   gh pr review <PR_NUMBER> --repo thepragmatik/mcp-server-jvm-build-tools \
+     --request-changes --body "ADVERSARIAL — VERDICT: REQUEST_CHANGES
+
+   <specific findings with file paths and line numbers>"
+   ```
+
+   **Review roles:**
    - **ADVERSARIAL** — correctness, edge cases, concurrency, security, regressions,
      test validity. Verdict: `ADVERSARIAL — VERDICT: APPROVE | REQUEST_CHANGES`.
    - **CODE-QUALITY** — clean design, readability, naming, SOLID/DRY, cohesion,
