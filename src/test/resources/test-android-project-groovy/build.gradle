@@ -1,0 +1,23 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+android {
+    compileSdkVersion 36
+    namespace 'com.example.groovyapp'
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 36
+    }
+
+    buildTypes {
+        debug {
+        }
+        release {
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+}

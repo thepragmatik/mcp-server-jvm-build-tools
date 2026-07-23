@@ -95,6 +95,13 @@ exclude_docs: |
   AUTHORIZATION.md
   DEPENDENCY_MANAGEMENT.md
   requirements.txt
+  ARCHITECTURE.md
+  BACKWARD_COMPAT.md
+  CONFIGURATION.md
+  MCP_INTEGRATION.md
+  QUICKSTART.md
+  TOOLS.md
+  TROUBLESHOOTING.md
   mcp-2026-07-28-transport-audit.md
   mcp-2026-07-28-tool-schema-audit.md
   mcp-cacheable-result-gap.md
@@ -107,7 +114,6 @@ extra:
       name: Source on GitHub
 
 nav:
-  - Home: index.md
   - User Guide:
       - Overview: user-guide/overview.md
       - Installation: user-guide/installation.md
@@ -119,5 +125,14 @@ nav:
       - Tools / MCP API: reference/tools.md
       - Configuration Reference: reference/configuration.md
       - Security: reference/security.md
+      - Design v1.1.0: reference/design-v1.1.0.md
       - Protocol Evidence: EVIDENCE.md
-  - FAQ: faq.md
+  - FAQ: FAQ.md
+  - Project:
+      - Mission: MISSION.md
+      - Roadmap: ROADMAP.md
+      - Workflow: WORKFLOW.md
+      - Agent Guide: AGENTS.md
+      - Release Notes: RELEASE_NOTES.md
+      - Swarm Research: SWARM-RESEARCH.md
+      - MCP Ecosystem: mcp-ecosystem-research-june-2026.md

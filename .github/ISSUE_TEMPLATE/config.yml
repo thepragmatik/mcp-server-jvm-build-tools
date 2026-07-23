@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Hermes Swarm Kanban"
+    url: https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/main/docs/WORKFLOW.md
+    about: "This repository is maintained by an autonomous agent swarm. See WORKFLOW.md for the PR lifecycle and escalation process."
+  - name: "Security Vulnerability (Private)"
+    url: https://github.com/thepragmatik/mcp-server-jvm-build-tools/security/advisories/new
+    about: "Report a security vulnerability privately. Do NOT open a public issue."

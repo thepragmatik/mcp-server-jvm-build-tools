@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.build;
 
+import com.pragmatik.buildtools.gradle.GradleBuildTool;
 import com.pragmatik.buildtools.gradle.GradleOutputParser;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
 import com.pragmatik.buildtools.sbt.SbtOutputParser;
@@ -247,6 +248,18 @@ public class BuildToolsService {
                     }
                     if (Files.exists(dir.resolve("gradle/libs.versions.toml"))) {
                         hints.add("version catalog detected");
+                    }
+                    // Android project detection (v1.1.0 F3)
+                    if (tool instanceof GradleBuildTool gbt) {
+                        Map<String, Object> androidInfo = gbt.detectAndroidProject(dir);
+                        if (androidInfo != null && Boolean.TRUE.equals(androidInfo.get("detected"))) {
+                            detection.put("android", true);
+                            @SuppressWarnings("unchecked")
+                            List<String> androidHints = (List<String>) androidInfo.get("hints");
+                            if (androidHints != null) {
+                                hints.addAll(androidHints);
+                            }
+                        }
                     }
                     break;
                 case "sbt":

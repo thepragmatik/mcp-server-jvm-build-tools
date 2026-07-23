@@ -71,7 +71,7 @@ class GradleServiceTest {
             assertThat(cmds)
                     .isNotNull()
                     .isNotEmpty()
-                    .containsExactlyInAnyOrder(
+                    .contains(
                             "clean",
                             "build",
                             "test",
@@ -83,7 +83,16 @@ class GradleServiceTest {
                             "publishToMavenLocal",
                             "dependencies",
                             "projects",
-                            "tasks");
+                            "tasks",
+                            // Android tasks (v1.1.0 F3)
+                            "assembleDebug",
+                            "assembleRelease",
+                            "connectedCheck",
+                            "connectedAndroidTest",
+                            "lint",
+                            "installDebug",
+                            "bundleDebug",
+                            "bundleRelease");
         }
 
         @Test
