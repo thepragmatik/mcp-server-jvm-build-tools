@@ -1,6 +1,6 @@
 # One MCP Server for ALL Your JVM Build Tools
 
-📖 **Website:** [https://thepragmatik.github.io/mcp-server-jvm-build-tools/](https://thepragmatik.github.io/mcp-server-jvm-build-tools/) — full docs, 28 MCP tools, MCP-RC features, and protocol evidence  
+📖 **Website:** [https://thepragmatik.github.io/mcp-server-jvm-build-tools/](https://thepragmatik.github.io/mcp-server-jvm-build-tools/) — full docs, 30 MCP tools, MCP-RC features, and protocol evidence  
 
 [![CI](https://github.com/thepragmatik/mcp-server-jvm-build-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/thepragmatik/mcp-server-jvm-build-tools/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -15,23 +15,13 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
-## What's New in v1.0.0 (June 2026)
+## What's New in v1.1.0 (July 2026)
 
-**MCP-RC Alignment (2026-07-28 Spec)** — fully backward-compatible with existing MCP clients.
-
-- **Streamable HTTP Transport**: Stateless HTTP transport with  Mcp-Method / Mcp-Name  header validation, server/discover endpoint
-- **JSON Schema 2020-12 Validation**: All tool inputSchema validated as full JSON Schema 2020-12 documents
-- **Deterministic Tool Order + ttlMs/cacheScope**: Tools listed deterministically; results carry expiry hints for caching
-- **W3C Trace Context Propagation**: traceparent/tracestate/baggage propagated through build subprocesses (no regression for untraced builds)
-- **OAuth 2.1 Resource-Server**: Bearer-token authorization aligned with the MCP OAuth 2.1 resource-server model
-- **Maven Wrapper**: Project ships mvnw; no host Maven installation needed
-- **OWASP Dependency-Check**: Automated dependency vulnerability scan in CI (weekly + per-PR)
-- **Static Analysis**: SpotBugs + Spotless integrated into verify lifecycle
-- **HTTPS Transport Defaults**: CORS restricted to local origins; health gated
-- **28 MCP Tools** covering Maven, Gradle, and sbt — all verified over stdio and Streamable HTTP
-- **License Header Enforcement**: CI fails on missing license headers
-- **Maven -D Allowlist Removed**: Server trusts the client's -D choices
-- **14 Dependency Updates**: Spring Boot 3.5 to 4.1, Spring AI RC2 to GA, Gradle 8.12, sbt 1.10.10
+- **30 MCP tools** (was 28)
+- **MCP stdio transport auto-configuration** — Spring AI 2.0.0 spring-ai-mcp now auto-configures stdio transport out of the box
+- **Docker image with JDK 21 + Maven/Gradle/SBT** — full build toolchain pre-installed in the container
+- **Full test suite: 599 tests, 17 MCP protocol tests** — comprehensive coverage across unit, integration, and MCP protocol layers
+- **Real-world usability testing with MCP Inspector CLI** — verified end-to-end with the MCP Inspector for stdio transport
 
 See the [full changelog](CHANGELOG.md) and [protocol evidence](docs/EVIDENCE.md).
 
