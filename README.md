@@ -384,8 +384,7 @@ Prompt template: guides the LLM through diagnosing build failures by analyzing e
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `projectDir` | string | Yes | Path to the project directory. |
-| `buildOutput` | string | Yes | The raw build output/error log to diagnose. |
-| `buildToolName` | string | No | Build tool that produced the output. |
+| `failedCommand` | string | No | The failing command that produced the error. |
 
 ### `list_build_resources`
 List available build resources (build configurations, output files, reports) in the project as MCP resources.
@@ -402,6 +401,7 @@ Read the contents of a specific build resource identified by its URI.
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `uri` | string | Yes | Resource URI (e.g., `build://pom.xml`, `build://build.gradle`). |
+| `projectDir` | string | Yes | Path to the project directory. |
 
 **Returns:** The resource content and metadata.
 
@@ -421,25 +421,24 @@ Read the contents of a specific dependency resource identified by its URI.
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `uri` | string | Yes | Resource URI (e.g., `dependency://tree`). |
+| `projectDir` | string | Yes | Path to the project directory. |
 
 **Returns:** The dependency resource content and metadata.
 
 ### `list_resource_templates`
 List available MCP resource templates that can be resolved for a project. Templates provide reusable patterns for accessing build configuration, dependency metadata, and project structure as structured resources.
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `projectDir` | string | Yes | Path to the project directory. |
+**No parameters required.**
 
 **Returns:** JSON array of template URIs with metadata (name, type, description, requiredParams).
 
 ### `resolve_resource_template`
-Resolve a resource template into concrete MCP resources. Applies template parameters and returns the resolved resource content.
+Resolve a resource template URI into a concrete MCP resource URI by substituting parameter values.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `uri` | string | Yes | Template URI to resolve (e.g., `template://build-config`). |
-| `projectDir` | string | Yes | Path to the project directory. |
+| `templateUri` | string | Yes | Template URI pattern (e.g., `build://{projectName}/dependencies/{buildTool}`). |
+| `paramsJson` | string | Yes | Parameter values as JSON object (e.g., `{"projectName":"myapp","buildTool":"maven"}`). |
 
 **Returns:** The resolved resource content and metadata.
 

@@ -241,7 +241,7 @@ Access build configuration as MCP resources. **2 tools.**
 
 | Parameter | Required | Description |
 |-----------|:--------:|-------------|
-| `resourceUri` | yes | Resource URI from `list_build_resources` (e.g. `build://myproject/config`). |
+| `uri` | yes | Resource URI from `list_build_resources` (e.g. `build://myproject/config`). |
 | `projectDir` | yes | Project directory path. |
 
 **Returns:** the contents of the requested build resource.
@@ -264,7 +264,7 @@ Access extracted dependencies as MCP resources. **2 tools.**
 
 | Parameter | Required | Description |
 |-----------|:--------:|-------------|
-| `resourceUri` | yes | Resource URI (e.g. `build://myproject/dependencies/maven`). |
+| `uri` | yes | Resource URI (e.g. `build://myproject/dependencies/maven`). |
 | `projectDir` | yes | Project directory path. |
 
 **Returns:** the extracted dependencies from the referenced build file.
@@ -398,7 +398,7 @@ Java/JDK compatibility checking. **1 tool.**
 | Parameter | Required | Description |
 |-----------|:--------:|-------------|
 | `projectDir` | yes | Project directory. |
-| `targetJavaVersion` | no | Target Java version (`8`, `11`, `17`, `21`, `22`, `23`, `24`, `25`). If omitted, checks against the project's configured version. |
+| `targetVersion` | no | Target Java version (`8`, `11`, `17`, `21`, `22`, `23`, `24`, `25`). If omitted, checks against the project's configured version. |
 
 **Returns:** JSON describing compatibility of the project and its dependencies with the target
 Java version.
