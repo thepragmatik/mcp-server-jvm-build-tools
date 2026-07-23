@@ -26,17 +26,18 @@ RUN mvn package -DskipTests
 # Runtime stage — JDK base so Maven/Gradle/SBT can compile
 FROM eclipse-temurin:21-jdk-alpine
 
+# Install runtime utilities first (curl needed for Maven download)
+RUN apk add --no-cache bash curl unzip
+
 # Install Maven manually (avoids pulling in Alpine's JDK 25 via apk dependency)
 ENV MAVEN_VERSION=3.9.11
-RUN curl -sSL "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+RUN mkdir -p /usr/share/java && \
+    curl -sSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
         -o /tmp/maven.tar.gz && \
     tar -xzf /tmp/maven.tar.gz -C /usr/share/java && \
     mv /usr/share/java/apache-maven-${MAVEN_VERSION} /usr/share/java/maven-3 && \
     ln -s /usr/share/java/maven-3/bin/mvn /usr/bin/mvn && \
     rm /tmp/maven.tar.gz
-
-# Install runtime utilities (bash, curl, unzip for Gradle/SBT wrapper scripts)
-RUN apk add --no-cache bash curl unzip
 
 # Set JAVA_HOME and ensure JDK 21 is the default
 ENV JAVA_HOME=/opt/java/openjdk
