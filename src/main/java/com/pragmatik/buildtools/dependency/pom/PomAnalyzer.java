@@ -152,12 +152,6 @@ public class PomAnalyzer {
         List<String> importedBoms = new ArrayList<>();
 
         for (DependencyEntry dep : projectPom.managedDependencies()) {
-            if ("import".equals(dep.scope())
-                    && "pom"
-                            .equalsIgnoreCase(
-                                    dep.version() != null && dep.version().endsWith(".pom") ? "pom" : "")) {
-                // Actually check if it's an import-scoped BOM
-            }
             if ("import".equals(dep.scope())) {
                 importedBoms.add(dep.groupId() + ":" + dep.artifactId() + ":" + dep.version());
                 List<DependencyEntry> bomDeps = resolveBom(dep, accumulatedProperties);

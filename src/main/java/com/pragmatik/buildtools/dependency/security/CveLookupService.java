@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Lightweight OSV.dev API client for vulnerability lookups.
@@ -49,6 +50,7 @@ public class CveLookupService {
     private final HttpClient httpClient;
     private final Map<String, CacheEntry> cache;
     private final ConcurrentLinkedQueue<String> lruKeys;
+    private final Object cacheLock = new Object();
 
     public CveLookupService() {
         this.httpClient = HttpClient.newBuilder()
@@ -145,13 +147,15 @@ public class CveLookupService {
     // ── Cache management ────────────────────────────────────────────
 
     private void putCache(String key, List<VulnerabilityEntry> entries) {
-        // Evict if full
-        while (cache.size() >= CACHE_MAX_SIZE) {
-            String oldest = lruKeys.poll();
-            if (oldest != null) cache.remove(oldest);
+        synchronized (cacheLock) {
+            // Evict if full
+            while (cache.size() >= CACHE_MAX_SIZE) {
+                String oldest = lruKeys.poll();
+                if (oldest != null) cache.remove(oldest);
+            }
+            cache.put(key, new CacheEntry(entries));
+            lruKeys.add(key);
         }
-        cache.put(key, new CacheEntry(entries));
-        lruKeys.add(key);
     }
 
     /**
