@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.0] - 2026-07-23
+
+### New Build Tool Features
+
+- **POM Analysis, CVE Scanning, Android Support** (#148): 30 MCP tools for JVM builds — server now supports POM dependency analysis, OWASP CVE vulnerability scanning, and Android/Gradle project detection and build execution.
+- **Auto-Merge Pipeline** (#149, #150): Gate 4 auto-merge workflow integrated into AGENTS.md and README with step-by-step instructions for autonomous PR merge automation.
+
+### Testing and Quality
+
+- **Test Coverage** (#151): Added test coverage for 5 previously untested service classes — `PromptService`, `BuildResourceService`, profile build, and related components. Total test suite now at 599 tests.
+- **@ToolParam Annotation Alignment** (#154): Aligned `@ToolParam` annotations with documentation across 8 tools — parameter names now consistently match the published tool API reference.
+
+### Build and Infrastructure
+
+- **HTTP Transport Profile Fix** (#152): Added `application-http.properties` to correctly enable the HTTP transport profile, resolving a configuration gap that prevented MCP HTTP transport auto-configuration.
+- **Docker Build Tool Installation** (#153): Docker image now includes Gradle 9.6.1 and SBT 2.0.3 alongside Maven 3.9.11, completing the full JVM build toolchain.
+- **MCP Transport Auto-Configuration** (#155, #156): Manual `McpServerTransportConfiguration` bean that registers `StdioServerTransportProvider` and `McpSyncServer`, fixes Docker JDK version conflict, and includes a comprehensive test harness — all 17 MCP protocol test scenarios pass.
+
+### Documentation
+
+- **Test Documentation** (#151, #155, #156): Added `docs/reference/test-results.md`, `docs/reference/test-plan.md`, and `docs/reference/test-tools-recommendations.md` documenting the full Docker-based test suite with MCP protocol validation scenarios.
+
 ## [1.0.0] - 2026-06-24
 
 ### MCP-RC Alignment (2026-07-28 Spec)
@@ -34,5 +56,7 @@ This release adopts the MCP 2026-07-28 Release Candidate specification across al
 ### Evidence
 
 The server exposes **28 MCP tools** covering Maven, Gradle, and sbt build toolkits. Complete protocol-level evidence at `docs/EVIDENCE.md`.
+
+[1.1.0]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.1.0
 
 [1.0.0]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.0.0

@@ -127,6 +127,10 @@ nav:
       - Security: reference/security.md
       - Design v1.1.0: reference/design-v1.1.0.md
       - Protocol Evidence: EVIDENCE.md
+  - Testing:
+      - Test Results: reference/test-results.md
+      - Test Plan: reference/test-plan.md
+      - Test Tools: reference/test-tools-recommendations.md
   - FAQ: FAQ.md
   - Project:
       - Mission: MISSION.md
