@@ -134,7 +134,7 @@ public class BuildResourceService {
             @ToolParam(
                             required = true,
                             description = "Resource URI from list_build_resources (e.g., 'build://myproject/config')")
-                    String resourceUri,
+                    String uri,
             @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
@@ -147,19 +147,19 @@ public class BuildResourceService {
         String projectName = dir.getFileName().toString();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("resourceUri", resourceUri);
+        result.put("uri", uri);
         result.put("project", projectName);
 
-        if (resourceUri.endsWith("/config")) {
+        if (uri.endsWith("/config")) {
             return readBuildConfig(dir, result);
-        } else if (resourceUri.endsWith("/dependencies")) {
+        } else if (uri.endsWith("/dependencies")) {
             return readDependencyInfo(dir, result);
-        } else if (resourceUri.endsWith("/tool-info")) {
+        } else if (uri.endsWith("/tool-info")) {
             return readToolInfo(dir, result);
-        } else if (resourceUri.endsWith("/output") || resourceUri.endsWith("/test-results")) {
+        } else if (uri.endsWith("/output") || uri.endsWith("/test-results")) {
             return readBuildOutputNote(dir, result);
         } else {
-            return JsonUtils.errorJson("Unknown resource URI: " + resourceUri
+            return JsonUtils.errorJson("Unknown resource URI: " + uri
                     + ". Use list_build_resources to discover available resources.");
         }
     }

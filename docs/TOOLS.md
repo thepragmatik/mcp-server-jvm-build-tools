@@ -703,7 +703,7 @@ Check if a JVM project and its dependencies are compatible with a target Java ve
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `projectDir` | string | Yes | Path to the project directory. |
-| `targetJavaVersion` | string | No | Target Java version (8, 11, 17, 21, 22, 23, 24, 25). If omitted, checks against configured version. |
+| `targetVersion` | string | No | Target Java version (8, 11, 17, 21, 22, 23, 24, 25). If omitted, checks against configured version. |
 
 **Returns:** JSON object with compatibility report, dependency checks, breaking changes, and recommendations.
 
@@ -812,7 +812,7 @@ Read a specific build resource by URI.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `resourceUri` | string | Yes | Resource URI. |
+| `uri` | string | Yes | Resource URI. |
 | `projectDir` | string | Yes | Path to the project directory. |
 
 **Implementation:** `BuildResourceService.java`
@@ -839,7 +839,7 @@ Read dependency information for a specific resource URI. Returns structured depe
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `resourceUri` | string | Yes | Resource URI (build://{project}/dependencies/{buildTool}). |
+| `uri` | string | Yes | Resource URI (build://{project}/dependencies/{buildTool}). |
 | `projectDir` | string | Yes | Path to the project directory. |
 
 **Implementation:** `DependencyResourceService.java`

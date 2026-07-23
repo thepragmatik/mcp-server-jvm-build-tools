@@ -730,8 +730,19 @@
         "description": "Get a prompt template to help an LLM diagnose and fix build failures.",
         "inputSchema": {
           "type": "object",
-          "properties": {},
-          "required": []
+          "properties": {
+            "projectDir": {
+              "type": "string",
+              "description": "Project directory path"
+            },
+            "failedCommand": {
+              "type": "string",
+              "description": "The failing command that produced the error"
+            }
+          },
+          "required": [
+            "projectDir"
+          ]
         },
         "category": "prompt_templates"
       },
@@ -758,7 +769,7 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "resourceUri": {
+            "uri": {
               "type": "string",
               "description": "Resource URI (e.g., 'build://myproject/config')"
             },
@@ -768,7 +779,7 @@
             }
           },
           "required": [
-            "resourceUri",
+            "uri",
             "projectDir"
           ]
         },
@@ -797,7 +808,7 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "resourceUri": {
+            "uri": {
               "type": "string",
               "description": "Resource URI (e.g., 'build://myproject/dependencies/maven')"
             },
@@ -807,7 +818,7 @@
             }
           },
           "required": [
-            "resourceUri",
+            "uri",
             "projectDir"
           ]
         },
@@ -829,18 +840,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "templateName": {
+            "templateUri": {
               "type": "string",
-              "description": "Template name from list_resource_templates"
+              "description": "Template URI pattern (e.g., 'build://{projectName}/dependencies/{buildTool}')"
             },
-            "params": {
-              "type": "object",
-              "description": "Template parameter values as key-value pairs"
+            "paramsJson": {
+              "type": "string",
+              "description": "Parameter values as JSON object (e.g., '{\"projectName\":\"myapp\",\"buildTool\":\"maven\"}')"
             }
           },
           "required": [
-            "templateName",
-            "params"
+            "templateUri",
+            "paramsJson"
           ]
         },
         "category": "mcp_resources"
