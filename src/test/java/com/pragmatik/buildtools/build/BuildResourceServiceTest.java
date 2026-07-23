@@ -130,7 +130,7 @@ class BuildResourceServiceTest {
         String result = service.readBuildResource(resourceUri, tempDir.toString());
 
         assertNotNull(result);
-        assertTrue(result.contains("\"resourceUri\":\"" + resourceUri + "\""));
+        assertTrue(result.contains("\"uri\":\"" + resourceUri + "\""));
         assertTrue(result.contains("\"contentType\":\"text/plain\""));
         assertTrue(result.contains("\"files\""));
         assertTrue(result.contains("\"available\":true"));
