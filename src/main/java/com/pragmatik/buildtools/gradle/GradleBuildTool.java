@@ -61,7 +61,16 @@ public class GradleBuildTool implements BuildTool {
             "publishToMavenLocal",
             "dependencies",
             "projects",
-            "tasks");
+            "tasks",
+            // Android tasks (v1.1.0 F3)
+            "assembleDebug",
+            "assembleRelease",
+            "connectedCheck",
+            "connectedAndroidTest",
+            "lint",
+            "installDebug",
+            "bundleDebug",
+            "bundleRelease");
 
     private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
 
@@ -188,6 +197,273 @@ public class GradleBuildTool implements BuildTool {
     @Override
     public String getExecutionPrompt() {
         return EXECUTION_PROMPT;
+    }
+
+    // ─── Android project detection (v1.1.0 F3) ─────────────────────────
+
+    /**
+     * Detect whether this Gradle project is an Android project.
+     */
+    public boolean isAndroidProject(Path projectDir) {
+        return detectAndroidMarker(projectDir) != null || detectAndroidMarker(projectDir.resolve("app")) != null;
+    }
+
+    /**
+     * Detect Android project markers and extract build configuration.
+     *
+     * @return a map with keys: detected, agpVersion, compileSdk, minSdk, targetSdk,
+     *         buildTypes, buildVariants, hints; or null if not an Android project
+     */
+    public Map<String, Object> detectAndroidProject(Path projectDir) {
+        // Check root and app/ subdirectory
+        Path androidBuildFile = detectAndroidMarker(projectDir);
+        if (androidBuildFile == null) {
+            androidBuildFile = detectAndroidMarker(projectDir.resolve("app"));
+        }
+
+        if (androidBuildFile == null) {
+            return null;
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("detected", true);
+
+        try {
+            String content = java.nio.file.Files.readString(androidBuildFile);
+
+            result.put("buildFile", projectDir.relativize(androidBuildFile).toString());
+
+            // Detect AGP version from version catalog or classpath
+            String agpVersion = detectAgpVersion(projectDir, content);
+            if (agpVersion != null) {
+                result.put("agpVersion", agpVersion);
+            }
+
+            // Detect SDK versions
+            Map<String, String> sdkInfo = detectSdkVersions(content);
+            if (!sdkInfo.isEmpty()) {
+                result.putAll(sdkInfo);
+            }
+
+            // Detect build types
+            List<String> buildTypes = detectBuildTypes(content);
+            if (!buildTypes.isEmpty()) {
+                result.put("buildTypes", buildTypes);
+            }
+
+            // Detect build variants
+            List<String> buildVariants = getAndroidBuildVariants(content);
+            if (!buildVariants.isEmpty()) {
+                result.put("buildVariants", buildVariants);
+            }
+
+            // Detect application vs library
+            if (content.contains("com.android.application")) {
+                result.put("projectType", "application");
+            } else if (content.contains("com.android.library")) {
+                result.put("projectType", "library");
+            }
+
+            List<String> hints = new ArrayList<>();
+            hints.add("Android project detected (AGP)");
+            if (projectType(result) != null) {
+                hints.add("Android " + projectType(result) + " module");
+            }
+            if (buildTypes != null && !buildTypes.isEmpty()) {
+                hints.add("buildTypes: " + buildTypes);
+            }
+            if (agpVersion != null) {
+                hints.add("AGP version: " + agpVersion);
+            }
+            result.put("hints", hints);
+
+        } catch (IOException e) {
+            result.put("warning", "Could not read build file: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * Get Android build variants from a build.gradle file.
+     */
+    public List<String> getAndroidBuildVariants(String buildGradleContent) {
+        List<String> buildTypes = detectBuildTypes(buildGradleContent);
+        if (buildTypes.isEmpty()) {
+            buildTypes = List.of("debug", "release");
+        }
+
+        List<String> flavors = detectFlavors(buildGradleContent);
+
+        if (flavors.isEmpty()) {
+            return new ArrayList<>(buildTypes);
+        }
+
+        List<String> variants = new ArrayList<>();
+        for (String flavor : flavors) {
+            for (String buildType : buildTypes) {
+                variants.add(flavor + capitalize(buildType));
+            }
+        }
+        return variants;
+    }
+
+    // ── Private Android helpers ─────────────────────────────────────
+
+    private static Path detectAndroidMarker(Path dir) {
+        for (String marker : List.of("build.gradle.kts", "build.gradle")) {
+            Path file = dir.resolve(marker);
+            if (java.nio.file.Files.exists(file)) {
+                try {
+                    String content = java.nio.file.Files.readString(file);
+                    if (content.contains("com.android.application")
+                            || content.contains("com.android.library")
+                            || content.contains("android {")) {
+                        return file;
+                    }
+                } catch (IOException e) {
+                    // Skip unreadable files
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String detectAgpVersion(Path projectDir, String buildGradleContent) {
+        // Strategy 1: gradle/libs.versions.toml
+        Path versionCatalog = projectDir.resolve("gradle/libs.versions.toml");
+        if (java.nio.file.Files.exists(versionCatalog)) {
+            try {
+                String catalogContent = java.nio.file.Files.readString(versionCatalog);
+                java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                        "(?:agp|com-android-application|com-android-library)\\s*=\\s*\"([^\"]+)\"");
+                java.util.regex.Matcher m = p.matcher(catalogContent);
+                if (m.find()) {
+                    return m.group(1);
+                }
+            } catch (IOException e) {
+                // Skip
+            }
+        }
+
+        // Strategy 2: Kotlin DSL plugin format — id("com.android.application") version "X.Y.Z"
+        java.util.regex.Pattern ktsPluginPattern = java.util.regex.Pattern.compile(
+                "id\\s*\\(\\s*\"com\\.android\\.(?:application|library)\"\\s*\\)\\s*(?:version\\s+|\")\\s*(?:\"version\"\\s*=\\s*)?\"?([0-9.]+)\"?");
+        java.util.regex.Matcher ktsMatcher = ktsPluginPattern.matcher(buildGradleContent);
+        if (ktsMatcher.find()) {
+            return ktsMatcher.group(1);
+        }
+
+        // Strategy 3: root build.gradle classpath
+        Path rootBuildGradle = projectDir.resolve("build.gradle");
+        Path rootBuildGradleKts = projectDir.resolve("build.gradle.kts");
+        Path rootBuildFile = java.nio.file.Files.exists(rootBuildGradleKts) ? rootBuildGradleKts : rootBuildGradle;
+
+        if (java.nio.file.Files.exists(rootBuildFile)) {
+            try {
+                String rootContent = java.nio.file.Files.readString(rootBuildFile);
+                java.util.regex.Pattern p =
+                        java.util.regex.Pattern.compile("com\\.android\\.tools\\.build:gradle:([0-9.]+)");
+                java.util.regex.Matcher m = p.matcher(rootContent);
+                if (m.find()) {
+                    return m.group(1);
+                }
+            } catch (IOException e) {
+                // Skip
+            }
+        }
+
+        return null;
+    }
+
+    private static Map<String, String> detectSdkVersions(String content) {
+        Map<String, String> result = new LinkedHashMap<>();
+        java.util.regex.Pattern compileSdkPattern =
+                java.util.regex.Pattern.compile("compileSdk(?:Version)?\\s*[:=\\s]+\\s*(\\d+)");
+        java.util.regex.Pattern minSdkPattern =
+                java.util.regex.Pattern.compile("minSdk(?:Version)?\\s*[:=\\s]+\\s*(\\d+)");
+        java.util.regex.Pattern targetSdkPattern =
+                java.util.regex.Pattern.compile("targetSdk(?:Version)?\\s*[:=\\s]+\\s*(\\d+)");
+
+        java.util.regex.Matcher m = compileSdkPattern.matcher(content);
+        if (m.find()) result.put("compileSdk", m.group(1));
+        m = minSdkPattern.matcher(content);
+        if (m.find()) result.put("minSdk", m.group(1));
+        m = targetSdkPattern.matcher(content);
+        if (m.find()) result.put("targetSdk", m.group(1));
+
+        return result;
+    }
+
+    private static List<String> detectBuildTypes(String content) {
+        List<String> types = new ArrayList<>();
+        // Find the buildTypes block with brace-depth tracking
+        String buildTypesBlock = extractBraceBlock(content, "buildTypes");
+        if (buildTypesBlock == null || buildTypesBlock.isEmpty()) return types;
+
+        // Extract named blocks inside buildTypes: name { ... }
+        java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile("(\\w+)\\s*\\{");
+        java.util.regex.Matcher nameMatcher = namePattern.matcher(buildTypesBlock);
+        while (nameMatcher.find()) {
+            String name = nameMatcher.group(1);
+            if (!types.contains(name) && !name.startsWith("_")) {
+                types.add(name);
+            }
+        }
+        return types;
+    }
+
+    private static List<String> detectFlavors(String content) {
+        List<String> flavors = new ArrayList<>();
+        if (!content.contains("productFlavors")) return flavors;
+
+        String flavorsBlock = extractBraceBlock(content, "productFlavors");
+        if (flavorsBlock == null || flavorsBlock.isEmpty()) return flavors;
+
+        java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile("(\\w+)\\s*\\{");
+        java.util.regex.Matcher nameMatcher = namePattern.matcher(flavorsBlock);
+        while (nameMatcher.find()) {
+            String name = nameMatcher.group(1);
+            if (!flavors.contains(name) && !name.startsWith("_")) {
+                flavors.add(name);
+            }
+        }
+        return flavors;
+    }
+
+    /**
+     * Extract the content inside a named brace block, handling nested braces.
+     */
+    private static String extractBraceBlock(String content, String blockName) {
+        int idx = content.indexOf(blockName);
+        if (idx < 0) return null;
+
+        // Find opening brace after blockName
+        int braceIdx = content.indexOf('{', idx + blockName.length());
+        if (braceIdx < 0) return null;
+
+        int depth = 0;
+        int i = braceIdx;
+        while (i < content.length()) {
+            char c = content.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return content.substring(braceIdx + 1, i);
+            }
+            i++;
+        }
+        return null;
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private static String projectType(Map<String, Object> androidInfo) {
+        Object type = androidInfo.get("projectType");
+        return type != null ? type.toString() : null;
     }
 
     /**
