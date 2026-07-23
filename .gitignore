@@ -49,3 +49,5 @@ site/
 /.mvn/wrapper/*
 !/.mvn/wrapper/maven-wrapper.properties
 .hermes/
+src/test/resources/test-gradle-project/.gradle/
+src/test/resources/test-gradle-project/bin/

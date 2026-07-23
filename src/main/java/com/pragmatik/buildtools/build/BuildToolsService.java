@@ -138,6 +138,11 @@ public class BuildToolsService {
                 throw new IllegalArgumentException("Cannot resolve build tool home: " + buildToolHome, e);
             }
         }
+
+        // Validate projectDir; Spring AI may pass null for missing required params
+        if (projectDir == null || projectDir.isBlank()) {
+            throw new IllegalArgumentException("projectDir is required and cannot be null or empty.");
+        }
         Path validatedProject;
         try {
             validatedProject = Path.of(projectDir).toRealPath();

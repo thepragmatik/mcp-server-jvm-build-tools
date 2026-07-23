@@ -67,8 +67,13 @@ public class MavenInvoker {
                     System.err.println("[ERROR] Maven execution failed: "
                             + result.getExecutionException().getMessage());
                 }
-                finalResult = errors.toString();
-                throw new RuntimeException(finalResult);
+                // Maven test/compile failures write to stdout, not stderr.
+                // Combine both streams so the caller sees the actual output.
+                String errText = errors.toString();
+                String outText = output.toString();
+                finalResult = errText.isEmpty() ? outText : errText + "\n" + outText;
+                throw new RuntimeException(
+                        "Maven exited with code " + result.getExitCode() + ":\n" + finalResult);
             } else {
                 finalResult = output.toString();
             }
