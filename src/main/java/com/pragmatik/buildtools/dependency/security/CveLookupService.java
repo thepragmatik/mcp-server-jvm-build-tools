@@ -26,7 +26,10 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Lightweight OSV.dev API client for vulnerability lookups.
@@ -43,6 +46,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class CveLookupService {
 
+    private static final Logger logger = LoggerFactory.getLogger(CveLookupService.class);
+
     private static final String OSV_QUERY_URL = "https://api.osv.dev/v1/query";
     private static final int CACHE_MAX_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofHours(1);
@@ -51,6 +56,8 @@ public class CveLookupService {
     private final Map<String, CacheEntry> cache;
     private final ConcurrentLinkedQueue<String> lruKeys;
     private final Object cacheLock = new Object();
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public CveLookupService() {
         this.httpClient = HttpClient.newBuilder()
@@ -137,7 +144,7 @@ public class CveLookupService {
             } catch (IOException e) {
                 // Partial results — mark as unknown with warning
                 results.put(key, List.of());
-                System.err.println("[CveLookupService] Could not scan " + key + ": " + e.getMessage());
+                logger.warn("[CveLookupService] Could not scan {}: {}", key, e.getMessage());
             }
         }
 
@@ -173,131 +180,86 @@ public class CveLookupService {
         return cache.size();
     }
 
-    // ── OSV response parsing ─────────────────────────────────────────
+    // ── OSV response parsing (Jackson) ───────────────────────────────
 
     List<VulnerabilityEntry> parseOsvResponse(String json) {
         List<VulnerabilityEntry> entries = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode vulns = root.get("vulns");
+            if (vulns == null || !vulns.isArray()) return entries;
 
-        // Naive JSON parsing to avoid extra dependencies.
-        // OSV.dev returns {"vulns": [{"id": "...", "summary": "...", "severity": [...], ...}]}
-        String vulnsBlock = extractJsonArray(json, "vulns");
-        if (vulnsBlock == null || vulnsBlock.isEmpty()) return entries;
+            for (JsonNode vuln : vulns) {
+                String id = vuln.has("id") ? vuln.get("id").asText() : null;
+                String summary = vuln.has("summary") ? vuln.get("summary").asText() : null;
+                if (id == null) continue;
 
-        // Split on {"id": to find individual vulnerability objects
-        List<String> vulnObjects = splitJsonObjects(vulnsBlock);
-        for (String vulnObj : vulnObjects) {
-            String id = extractJsonString(vulnObj, "id");
-            String summary = extractJsonString(vulnObj, "summary");
-            if (id == null) continue;
+                String severity = classifySeverity(vuln);
+                String fixedIn = extractFirstFixed(vuln);
+                double cvssScore = extractCvssScore(vuln);
 
-            String severity = classifySeverity(vulnObj);
-            String fixedIn = extractFirstFixed(vulnObj);
-            double cvssScore = extractCvssScore(vulnObj);
-
-            entries.add(new VulnerabilityEntry(id, summary, severity, fixedIn, cvssScore));
+                entries.add(new VulnerabilityEntry(id, summary, severity, fixedIn, cvssScore));
+            }
+        } catch (Exception e) {
+            // JSON parse error — return empty
         }
-
         return entries;
-    }
-
-    // ── JSON field extraction (naive, no library dependency) ─────────
-
-    static String extractJsonString(String json, String key) {
-        // Match "key": "value" or "key":"value"
-        String searchKey = "\"" + key + "\"";
-        int keyIdx = json.indexOf(searchKey);
-        if (keyIdx < 0) return null;
-        int colonIdx = json.indexOf(':', keyIdx + searchKey.length());
-        if (colonIdx < 0) return null;
-        int quoteStart = json.indexOf('"', colonIdx + 1);
-        if (quoteStart < 0) return null;
-        int quoteEnd = json.indexOf('"', quoteStart + 1);
-        if (quoteEnd < 0) return null;
-        return json.substring(quoteStart + 1, quoteEnd);
-    }
-
-    static String extractJsonArray(String json, String key) {
-        String searchKey = "\"" + key + "\"";
-        int keyIdx = json.indexOf(searchKey);
-        if (keyIdx < 0) return null;
-        int colonIdx = json.indexOf(':', keyIdx + searchKey.length());
-        if (colonIdx < 0) return null;
-        int bracketStart = json.indexOf('[', colonIdx + 1);
-        if (bracketStart < 0) return null;
-        int depth = 0;
-        int pos = bracketStart;
-        while (pos < json.length()) {
-            char c = json.charAt(pos);
-            if (c == '[') depth++;
-            else if (c == ']') {
-                depth--;
-                if (depth == 0) return json.substring(bracketStart + 1, pos);
-            }
-            pos++;
-        }
-        return json.substring(bracketStart + 1);
-    }
-
-    static List<String> splitJsonObjects(String jsonArray) {
-        List<String> objects = new ArrayList<>();
-        int depth = 0;
-        int start = -1;
-        for (int i = 0; i < jsonArray.length(); i++) {
-            char c = jsonArray.charAt(i);
-            if (c == '{') {
-                if (depth == 0) start = i;
-                depth++;
-            } else if (c == '}') {
-                depth--;
-                if (depth == 0 && start >= 0) {
-                    objects.add(jsonArray.substring(start, i + 1));
-                    start = -1;
-                }
-            }
-        }
-        return objects;
     }
 
     // ── Severity classification ─────────────────────────────────────
 
-    static String classifySeverity(String vulnObj) {
-        // Parse CVSS score from severity array
-        double score = extractCvssScore(vulnObj);
+    static String classifySeverity(JsonNode vuln) {
+        double score = extractCvssScore(vuln);
         return cvssToSeverity(score);
     }
 
-    static double extractCvssScore(String vulnObj) {
-        // Look for "CVSS_V3" score in severity array
-        String severityBlock = extractJsonArray(vulnObj, "severity");
-        if (severityBlock == null) return 0.0;
+    static double extractCvssScore(JsonNode vuln) {
+        JsonNode severity = vuln.get("severity");
+        if (severity == null || !severity.isArray()) return 0.0;
 
-        // Try to find "score": "X.X"
-        String scoreStr = extractJsonString(severityBlock, "score");
-        if (scoreStr != null) {
-            try {
-                return Double.parseDouble(scoreStr);
-            } catch (NumberFormatException e) {
-                // fall through
+        // Prefer CVSS_V3 scores
+        for (JsonNode sev : severity) {
+            if (sev.has("type") && sev.has("score") && sev.get("type").asText().contains("CVSS_V3")) {
+                try {
+                    return Double.parseDouble(sev.get("score").asText());
+                } catch (NumberFormatException e) {
+                    // fall through
+                }
             }
         }
+
+        // Fallback: any score field
+        for (JsonNode sev : severity) {
+            if (sev.has("score")) {
+                try {
+                    return Double.parseDouble(sev.get("score").asText());
+                } catch (NumberFormatException e) {
+                    // fall through
+                }
+            }
+        }
+
         return 0.0;
     }
 
-    static String extractFirstFixed(String vulnObj) {
-        // Look in "affected[0].ranges[0].events" for "fixed"
-        String affectedBlock = extractJsonArray(vulnObj, "affected");
-        if (affectedBlock == null) return null;
+    static String extractFirstFixed(JsonNode vuln) {
+        // Look in "affected[].ranges[].events[]" for "fixed"
+        JsonNode affected = vuln.get("affected");
+        if (affected == null || !affected.isArray()) return null;
 
-        List<String> affectedObjects = splitJsonObjects(affectedBlock);
-        for (String affected : affectedObjects) {
-            String rangesBlock = extractJsonArray(affected, "ranges");
-            if (rangesBlock == null) continue;
+        for (JsonNode aff : affected) {
+            JsonNode ranges = aff.get("ranges");
+            if (ranges == null || !ranges.isArray()) continue;
 
-            String eventsBlock = extractJsonArray("{\"dummy\":" + rangesBlock + "}", "dummy");
-            // Hmm, this is getting complex. Simplify: just search for "fixed"
-            int fixedIdx = affected.indexOf("\"fixed\"");
-            if (fixedIdx >= 0) {
-                return extractJsonString(affected.substring(fixedIdx), "fixed");
+            for (JsonNode range : ranges) {
+                JsonNode events = range.get("events");
+                if (events == null || !events.isArray()) continue;
+
+                for (JsonNode event : events) {
+                    if (event.has("fixed")) {
+                        return event.get("fixed").asText();
+                    }
+                }
             }
         }
         return null;

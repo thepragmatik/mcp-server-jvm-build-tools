@@ -200,11 +200,11 @@ public final class PomModel {
             this.artifactId = artifactId;
             this.version = version;
             this.packaging = packaging != null ? packaging : "jar";
-            this.parent = parent;
-            this.properties = properties != null ? properties : Map.of();
-            this.dependencies = dependencies != null ? dependencies : List.of();
-            this.managedDependencies = managedDependencies != null ? managedDependencies : List.of();
-            this.importedBoms = importedBoms != null ? importedBoms : List.of();
+            this.parent = parent != null ? Map.copyOf(parent) : null;
+            this.properties = properties != null ? Map.copyOf(properties) : Map.of();
+            this.dependencies = dependencies != null ? List.copyOf(dependencies) : List.of();
+            this.managedDependencies = managedDependencies != null ? List.copyOf(managedDependencies) : List.of();
+            this.importedBoms = importedBoms != null ? List.copyOf(importedBoms) : List.of();
         }
 
         public String groupId() {
@@ -264,11 +264,11 @@ public final class PomModel {
                 List<String> unresolvedProperties,
                 List<String> warnings) {
             this.project = project;
-            this.dependencies = dependencies;
-            this.parentChain = parentChain;
-            this.propertySubstitutions = propertySubstitutions;
-            this.unresolvedProperties = unresolvedProperties;
-            this.warnings = warnings;
+            this.dependencies = List.copyOf(dependencies);
+            this.parentChain = List.copyOf(parentChain);
+            this.propertySubstitutions = Map.copyOf(propertySubstitutions);
+            this.unresolvedProperties = List.copyOf(unresolvedProperties);
+            this.warnings = List.copyOf(warnings);
         }
 
         public PomInfo project() {

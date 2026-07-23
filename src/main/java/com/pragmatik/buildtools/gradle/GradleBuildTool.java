@@ -433,13 +433,18 @@ public class GradleBuildTool implements BuildTool {
 
     /**
      * Extract the content inside a named brace block, handling nested braces.
+     * Uses word-boundary matching to avoid false positives on substring matches
+     * (e.g., "buildTypes" must match as a whole word, not inside "otherBuildTypes").
      */
     private static String extractBraceBlock(String content, String blockName) {
-        int idx = content.indexOf(blockName);
-        if (idx < 0) return null;
+        // Match blockName as a whole word, followed by optional whitespace and an opening brace
+        java.util.regex.Pattern pattern =
+                java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(blockName) + "\\s*\\{");
+        java.util.regex.Matcher matcher = pattern.matcher(content);
+        if (!matcher.find()) return null;
 
-        // Find opening brace after blockName
-        int braceIdx = content.indexOf('{', idx + blockName.length());
+        // Find the opening brace position
+        int braceIdx = content.indexOf('{', matcher.end() - 1);
         if (braceIdx < 0) return null;
 
         int depth = 0;

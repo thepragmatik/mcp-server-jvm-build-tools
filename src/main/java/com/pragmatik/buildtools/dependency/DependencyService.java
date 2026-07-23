@@ -23,6 +23,7 @@ import com.pragmatik.buildtools.dependency.pom.PomModel.AnalysisResult;
 import com.pragmatik.buildtools.dependency.security.CveLookupService;
 import com.pragmatik.buildtools.dependency.security.CveLookupService.VulnerabilityEntry;
 import com.pragmatik.buildtools.tool.JsonUtils;
+import com.pragmatik.buildtools.tool.XmlUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +33,8 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -52,6 +55,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class DependencyService {
+
+    private static final Logger logger = LoggerFactory.getLogger(DependencyService.class);
 
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
 
@@ -397,40 +402,18 @@ public class DependencyService {
             }
         } catch (Exception e) {
             // If project context can't be determined, just omit it
-            System.err.println("[DependencyService] Could not enrich project context: " + e.getMessage());
+            logger.warn("[DependencyService] Could not enrich project context: {}", e.getMessage());
         }
     }
 
     // ─── Version parsing utilities ──────────────────────────────────────
 
     static String extractTag(String xml, String tagName) {
-        if (xml == null) return null;
-        String openTag = "<" + tagName + ">";
-        String closeTag = "</" + tagName + ">";
-        int start = xml.indexOf(openTag);
-        if (start < 0) return null;
-        start += openTag.length();
-        int end = xml.indexOf(closeTag, start);
-        if (end < 0) return null;
-        return xml.substring(start, end).trim();
+        return XmlUtils.extractTag(xml, tagName);
     }
 
     static List<String> extractAllTags(String xml, String tagName) {
-        List<String> values = new ArrayList<>();
-        if (xml == null) return values;
-        String openTag = "<" + tagName + ">";
-        String closeTag = "</" + tagName + ">";
-        int pos = 0;
-        while (true) {
-            int start = xml.indexOf(openTag, pos);
-            if (start < 0) break;
-            start += openTag.length();
-            int end = xml.indexOf(closeTag, start);
-            if (end < 0) break;
-            values.add(xml.substring(start, end).trim());
-            pos = end + closeTag.length();
-        }
-        return values;
+        return XmlUtils.extractAllTags(xml, tagName);
     }
 
     static VersionPreference parseVersionPreference(String filter) {

@@ -21,6 +21,7 @@ import com.pragmatik.buildtools.dependency.pom.PomModel.Classification;
 import com.pragmatik.buildtools.dependency.pom.PomModel.DependencyEntry;
 import com.pragmatik.buildtools.dependency.pom.PomModel.PomInfo;
 import com.pragmatik.buildtools.dependency.pom.PomModel.ResolvedDependency;
+import com.pragmatik.buildtools.tool.XmlUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -229,36 +230,14 @@ public class PomAnalyzer {
         return new AnalysisResult(fullProject, resolvedDeps, parentChain, propertySubs, unresolvedProps, warnings);
     }
 
-    // ── XML helpers (package-private for testing) ──────────────────────
+    // ── XML helpers (package-private for testing, delegated to XmlUtils) ──
 
     static String extractTag(String xml, String tagName) {
-        if (xml == null) return null;
-        String openTag = "<" + tagName + ">";
-        String closeTag = "</" + tagName + ">";
-        int start = xml.indexOf(openTag);
-        if (start < 0) return null;
-        start += openTag.length();
-        int end = xml.indexOf(closeTag, start);
-        if (end < 0) return null;
-        return xml.substring(start, end).trim();
+        return XmlUtils.extractTag(xml, tagName);
     }
 
     static List<String> extractAllTags(String xml, String tagName) {
-        List<String> values = new ArrayList<>();
-        if (xml == null) return values;
-        String openTag = "<" + tagName + ">";
-        String closeTag = "</" + tagName + ">";
-        int pos = 0;
-        while (true) {
-            int start = xml.indexOf(openTag, pos);
-            if (start < 0) break;
-            start += openTag.length();
-            int end = xml.indexOf(closeTag, start);
-            if (end < 0) break;
-            values.add(xml.substring(start, end).trim());
-            pos = end + closeTag.length();
-        }
-        return values;
+        return XmlUtils.extractAllTags(xml, tagName);
     }
 
     // ── POM parsing ───────────────────────────────────────────────────
