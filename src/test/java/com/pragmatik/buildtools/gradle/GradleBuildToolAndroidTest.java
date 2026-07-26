@@ -144,8 +144,7 @@ class GradleBuildToolAndroidTest {
         @Test
         @DisplayName("getAndroidBuildVariants combines flavors and build types")
         void combinesFlavorsAndBuildTypes() {
-            String content =
-                    """
+            String content = """
                     android {
                         flavorDimensions "env"
                         productFlavors { prod {} staging {} }

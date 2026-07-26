@@ -158,10 +158,12 @@ class PlanExecutionEngineTest {
 
         PlanResult result = engine.getPlanStatus("plan-cancel");
         assertNotNull(result);
-        assertTrue(cancelled, "Cancellation should have been delivered mid-execution. "
-                + "If Maven is not available at " + MAVEN_HOME
-                + ", the step may have failed before cancellation took effect. "
-                + "Actual status: " + result.status());
+        assertTrue(
+                cancelled,
+                "Cancellation should have been delivered mid-execution. "
+                        + "If Maven is not available at " + MAVEN_HOME
+                        + ", the step may have failed before cancellation took effect. "
+                        + "Actual status: " + result.status());
         assertEquals("cancelled", result.status());
     }
 

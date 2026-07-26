@@ -147,9 +147,7 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testProfileBuildInvalidBuildToolHome(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -168,9 +166,7 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testProfileBuildReturnsPerformanceMetrics(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -192,9 +188,7 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testProfileBuildWithBlankBuildToolHome(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -213,9 +207,7 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testProfileBuildAutoDetectGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }

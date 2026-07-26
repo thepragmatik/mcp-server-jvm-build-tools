@@ -43,9 +43,7 @@ class BuildResourceServiceTest {
 
     @Test
     void testListBuildResourcesMaven(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -72,9 +70,7 @@ class BuildResourceServiceTest {
 
     @Test
     void testListBuildResourcesGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }
@@ -114,9 +110,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceConfig(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -139,9 +133,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceDependencies(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -177,9 +169,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceToolInfo(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -263,9 +253,7 @@ class BuildResourceServiceTest {
     @Test
     void testReadBuildResourceConfigWithBuildGradle(@TempDir Path tempDir) throws IOException {
         String projectName = tempDir.getFileName().toString();
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }
