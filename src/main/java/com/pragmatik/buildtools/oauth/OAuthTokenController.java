@@ -16,6 +16,8 @@
  */
 package com.pragmatik.buildtools.oauth;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -134,10 +136,13 @@ public class OAuthTokenController {
 
         OAuthClientRegistration client = clientOpt.get();
 
-        // Validate client_secret (for client_secret_basic and client_secret_post)
+        // Validate client_secret (for client_secret_basic and client_secret_post) using
+        // constant-time comparison to prevent timing side-channel attacks (CWE-208)
         if (client.clientSecret() != null
                 && !client.clientSecret().isEmpty()
-                && !client.clientSecret().equals(clientSecret)) {
+                && !MessageDigest.isEqual(
+                        client.clientSecret().getBytes(StandardCharsets.UTF_8),
+                        clientSecret.getBytes(StandardCharsets.UTF_8))) {
             log.warn("Token request with invalid secret for client: {}", clientId);
             return errorResponse(HttpStatus.UNAUTHORIZED, "invalid_client", "Client authentication failed");
         }

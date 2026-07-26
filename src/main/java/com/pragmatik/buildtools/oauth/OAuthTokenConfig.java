@@ -23,14 +23,14 @@ import org.springframework.context.annotation.Configuration;
  * Configuration for the OAuth 2.1 Client Credentials Grant token endpoint.
  *
  * <p>Registers the {@link JwtTokenService} and {@link OAuthTokenController} beans conditionally
- * on {@code buildtools.oauth.token-endpoint.enabled=true}.
+ * on {@code buildtools.oauth.token-endpoint.enabled=true (disabled by default)}.
  *
  * <p>Both beans are also discoverable via {@code @SpringBootApplication(scanBasePackages =
  * "com.pragmatik.buildtools")} component scanning, but this explicit configuration provides an
  * additional conditional guard so the token endpoint is only active when explicitly enabled.
  */
 @Configuration
-@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)
 public class OAuthTokenConfig {
 
     /**
