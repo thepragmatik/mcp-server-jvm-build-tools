@@ -38,8 +38,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testNoConflictsInCleanPom(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -64,8 +63,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testDuplicateDependencyWithDifferentVersions(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -99,8 +97,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testDependencyVsManagementConflict(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -135,8 +132,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testMavenPropertiesResolution(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -173,8 +169,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testGradleConflictDetection(@TempDir Path tempDir) throws IOException {
-        String gradle =
-                """
+        String gradle = """
                 dependencies {
                     implementation 'com.google.guava:guava:31.0-jre'
                     testImplementation 'com.google.guava:guava:33.0-jre'
@@ -189,8 +184,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testSbtConflictDetection(@TempDir Path tempDir) throws IOException {
-        String sbt =
-                """
+        String sbt = """
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.9.0"
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
                 """;
@@ -203,8 +197,7 @@ class DependencyConflictServiceTest {
 
     @Test
     void testNoSbtConflicts(@TempDir Path tempDir) throws IOException {
-        String sbt =
-                """
+        String sbt = """
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
                 libraryDependencies += "org.typelevel" %% "cats-effect" % "3.5.0"
                 """;

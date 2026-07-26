@@ -42,9 +42,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomMavenNoPlugin(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -73,9 +71,7 @@ class SupplyChainServiceTest {
     @Test
     void testGenerateSbomWithExistingBom(@TempDir Path tempDir) throws IOException {
         // Create project
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -87,9 +83,7 @@ class SupplyChainServiceTest {
 
         // Create a fake bom.json
         Files.createDirectories(tempDir.resolve("target"));
-        Files.writeString(
-                tempDir.resolve("target/bom.json"),
-                """
+        Files.writeString(tempDir.resolve("target/bom.json"), """
                 {
                   "bomFormat": "CycloneDX",
                   "specVersion": "1.6",
@@ -114,9 +108,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomPluginAlreadyConfigured(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -142,9 +134,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }
@@ -162,9 +152,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomSbt(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.sbt"),
-                """
+        Files.writeString(tempDir.resolve("build.sbt"), """
                 name := "test"
                 version := "1.0.0"
                 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % Test
@@ -178,9 +166,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testAuditSupplyChainNoSbom(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -205,9 +191,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testAuditSupplyChainWithSbom(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -218,9 +202,7 @@ class SupplyChainServiceTest {
                 """);
 
         Files.createDirectories(tempDir.resolve("target"));
-        Files.writeString(
-                tempDir.resolve("target/bom.json"),
-                """
+        Files.writeString(tempDir.resolve("target/bom.json"), """
                 {
                   "bomFormat": "CycloneDX",
                   "components": [
@@ -239,9 +221,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testCheckLicenseComplianceMaven(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -272,9 +252,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testCheckLicenseComplianceGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }
@@ -324,9 +302,7 @@ class SupplyChainServiceTest {
 
     @Test
     void testGenerateSbomSpdxFormat(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>

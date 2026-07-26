@@ -36,8 +36,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testDetectMavenJavaVersion(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -59,8 +58,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testMavenSourceTargetDetection(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -83,9 +81,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testGradleJavaVersionDetection(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins { id 'java' }
                 java {
                     toolchain {
@@ -103,8 +99,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testBreakingChangesWarning(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -124,8 +119,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testNonLtsWarning(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -146,8 +140,7 @@ class JavaVersionServiceTest {
 
     @Test
     void testFrameworkCompatibility(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>

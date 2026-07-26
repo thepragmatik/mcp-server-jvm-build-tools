@@ -42,8 +42,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects multi-module project with lazy vals")
         void detectsMultiModule(@TempDir Path tmp) throws Exception {
-            String buildSbt =
-                    """
+            String buildSbt = """
                 lazy val root = project.in(file("."))
                   .aggregate(core, api)
                   .settings(name := "myapp")
@@ -95,8 +94,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects ScalaTest and specs2")
         void detectsTestFrameworks(@TempDir Path tmp) throws Exception {
-            String buildSbt =
-                    """
+            String buildSbt = """
                 scalaVersion := "2.13.15"
                 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test
                 libraryDependencies += "org.specs2" %% "specs2-core" % "4.20.0" % Test
@@ -114,8 +112,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("detects test settings")
         void detectsTestSettings(@TempDir Path tmp) throws Exception {
-            String buildSbt =
-                    """
+            String buildSbt = """
                 scalaVersion := "2.13.15"
                 Test / fork := true
                 Test / parallelExecution := false
@@ -147,9 +144,7 @@ class SbtProjectServiceTest {
         @Test
         @DisplayName("analyzes complete build configuration")
         void analyzesBuild(@TempDir Path tmp) throws Exception {
-            Files.writeString(
-                    tmp.resolve("build.sbt"),
-                    """
+            Files.writeString(tmp.resolve("build.sbt"), """
                 organization := "com.example"
                 name := "myapp"
                 scalaVersion := "2.13.15"

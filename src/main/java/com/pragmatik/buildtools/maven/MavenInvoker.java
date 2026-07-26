@@ -51,7 +51,16 @@ public class MavenInvoker {
 
         Invoker invoker = new DefaultInvoker();
         invoker.setWorkingDirectory(new File(currentProjectDirectory));
-        invoker.setMavenHome(new File(mavenHome));
+
+        // If the configured mavenHome directory doesn't exist, skip
+        // setMavenHome so the DefaultInvoker falls back to the system
+        // PATH. This handles CI runners (setup-java, SDKMAN) where mvn
+        // is on PATH but the home directory may not be at the configured
+        // path (e.g. a contributor's local SDKMAN path hard-coded in tests).
+        File mavenHomeFile = new File(mavenHome);
+        if (mavenHomeFile.exists() && mavenHomeFile.isDirectory()) {
+            invoker.setMavenHome(mavenHomeFile);
+        }
 
         StringBuilder output = new StringBuilder();
         StringBuilder errors = new StringBuilder();

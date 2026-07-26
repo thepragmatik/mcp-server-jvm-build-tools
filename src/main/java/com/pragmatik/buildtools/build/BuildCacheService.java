@@ -58,6 +58,22 @@ public class BuildCacheService {
 
     private final BuildToolProvider toolProvider;
 
+    /**
+     * Tracks the last cache health score (0-100) per tool name. Updated on every
+     * {@link #analyzeCacheHealth} call. Used by {@link CacheMetricsCollector} to expose
+     * {@code buildtools.cache.score} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Double> lastScores =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Tracks the last cache hit rate (0.0-1.0) per tool name. Updated on every
+     * {@link #analyzeCacheHealth} call. Used by {@link CacheMetricsCollector} to expose
+     * {@code buildtools.cache.hit.rate} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Double> lastHitRates =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     public BuildCacheService(BuildToolProvider toolProvider) {
         this.toolProvider = toolProvider;
     }
@@ -99,6 +115,11 @@ public class BuildCacheService {
 
         Map<String, Object> cacheHealth = analyzeToolCache(dir, tool.getName());
         result.put("cacheHealth", cacheHealth);
+
+        // Update gauge trackers for Micrometer
+        Object scoreObj = cacheHealth.get("score");
+        lastScores.put(tool.getName(), scoreObj instanceof Number n ? n.doubleValue() : 0.0);
+        lastHitRates.put(tool.getName(), 0.0); // hit rate not computed by analysis; default to 0
 
         return JsonUtils.toJson(result);
     }
@@ -160,6 +181,22 @@ public class BuildCacheService {
         result.put("optimizationPotential", potential);
 
         return JsonUtils.toJson(result);
+    }
+
+    /**
+     * @param tool the build tool name (e.g. "maven", "gradle", "sbt")
+     * @return the last recorded cache health score for the given tool, or 0.0 if never analysed
+     */
+    public double getLastScore(String tool) {
+        return lastScores.getOrDefault(tool, 0.0);
+    }
+
+    /**
+     * @param tool the build tool name (e.g. "maven", "gradle", "sbt")
+     * @return the last recorded cache hit rate for the given tool, or 0.0 if never analysed
+     */
+    public double getLastHitRate(String tool) {
+        return lastHitRates.getOrDefault(tool, 0.0);
     }
 
     // ─── Cache health analysis per tool ─────────────────────────────────
@@ -526,8 +563,7 @@ public class BuildCacheService {
                 "priority", "HIGH",
                 "recommendation", "Add maven-build-cache-extension for incremental build caching",
                 "configFile", "pom.xml (build/extensions)",
-                "config",
-                        """
+                "config", """
                         <build>
                           <extensions>
                             <extension>
@@ -545,8 +581,7 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Enable incremental compilation in maven-compiler-plugin",
                 "configFile", "pom.xml (build/plugins)",
-                "config",
-                        """
+                "config", """
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-compiler-plugin</artifactId>
@@ -607,8 +642,7 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Optimize Gradle daemon JVM memory and GC settings",
                 "configFile", "gradle.properties",
-                "config",
-                        """
+                "config", """
                         org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m \\
                           -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8""",
                 "estimatedImprovement", "10-20% for memory-intensive builds"));
@@ -618,8 +652,7 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Configure remote build cache for team-wide caching",
                 "configFile", "settings.gradle",
-                "config",
-                        """
+                "config", """
                         buildCache {
                           remote(HttpBuildCache) {
                             url = 'https://your-build-cache.example.com/cache/'
@@ -647,8 +680,7 @@ public class BuildCacheService {
                 "priority", "HIGH",
                 "recommendation", "Optimize incremental compilation settings",
                 "configFile", "build.sbt",
-                "config",
-                        """
+                "config", """
                         incOptions := incOptions.value
                           .withRecompileOnMacroDef(false)
                           .withApiDebug(false)""",
@@ -659,8 +691,7 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Enable parallel test execution",
                 "configFile", "build.sbt",
-                "config",
-                        """
+                "config", """
                         Test / parallelExecution := true
                         Global / concurrentRestrictions += Tags.limit(Tags.Test, 4)""",
                 "estimatedImprovement", "40-60% faster test execution"));
@@ -670,8 +701,7 @@ public class BuildCacheService {
                 "priority", "MEDIUM",
                 "recommendation", "Configure JVM forking to reuse JVM across runs",
                 "configFile", "build.sbt",
-                "config",
-                        """
+                "config", """
                         fork := true
                         javaOptions ++= Seq("-Xmx2g", "-XX:+UseG1GC")""",
                 "estimatedImprovement", "15-25% for JVM-heavy tasks"));

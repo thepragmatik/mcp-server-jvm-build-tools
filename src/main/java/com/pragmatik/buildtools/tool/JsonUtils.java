@@ -125,4 +125,23 @@ public final class JsonUtils {
         }
         return sb.toString();
     }
+
+    /**
+     * Parse a JSON string into a Map using SnakeYAML (JSON is valid YAML).
+     *
+     * @param json  JSON string to parse
+     * @return Parsed Map
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> parseJson(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        Object parsed = yaml.load(json);
+        if (parsed instanceof Map) {
+            return (Map<String, Object>) parsed;
+        }
+        return Map.of();
+    }
 }

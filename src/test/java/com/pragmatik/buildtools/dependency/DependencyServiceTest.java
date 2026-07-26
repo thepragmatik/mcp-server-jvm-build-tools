@@ -53,8 +53,7 @@ class DependencyServiceTest {
         @Test
         @DisplayName("extracts latest and release versions from well-formed XML")
         void extractsLatestAndReleaseVersions() {
-            String xml =
-                    """
+            String xml = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <metadata>
                       <groupId>com.example</groupId>
@@ -90,8 +89,7 @@ class DependencyServiceTest {
         @Test
         @DisplayName("handles missing releaseVersion gracefully")
         void handlesMissingReleaseVersion() {
-            String xml =
-                    """
+            String xml = """
                     <?xml version="1.0"?>
                     <metadata>
                       <groupId>com.example</groupId>
@@ -116,8 +114,7 @@ class DependencyServiceTest {
         @Test
         @DisplayName("extracts all versions including snapshots")
         void extractsAllVersions() {
-            String xml =
-                    """
+            String xml = """
                     <?xml version="1.0"?>
                     <metadata>
                       <groupId>com.example</groupId>

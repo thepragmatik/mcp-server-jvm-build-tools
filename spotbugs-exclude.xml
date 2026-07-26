@@ -46,4 +46,29 @@
         <Method name="auditDependencies" />
         <Bug pattern="REC_CATCH_EXCEPTION" />
     </Match>
+
+    <!--
+        CiCdValidator#validate defensively handles YAML 1.1 boolean coercion of
+        the 'on' key: SnakeYAML converts the unquoted YAML key "on" to
+        Boolean.TRUE, so root.get(Boolean.TRUE) is intentional defensive code.
+        SpotBugs flags this as GC_UNRELATED_TYPES.
+    -->
+    <Match>
+        <Class name="com.pragmatik.buildtools.cicd.CiCdValidator" />
+        <Method name="validate" />
+        <Bug pattern="GC_UNRELATED_TYPES" />
+    </Match>
+
+    <!--
+        JwtTokenService#generateEphemeralKey creates a fresh SecureRandom per
+        call because the key is generated exactly once (at startup when no
+        signing key is configured). Caching the PRNG instance would make this
+        marginally faster but adds no security value; keeping it simple.
+        SpotBugs flags this as DMI_RANDOM_USED_ONLY_ONCE.
+    -->
+    <Match>
+        <Class name="com.pragmatik.buildtools.oauth.JwtTokenService" />
+        <Method name="generateEphemeralKey" />
+        <Bug pattern="DMI_RANDOM_USED_ONLY_ONCE" />
+    </Match>
 </FindBugsFilter>

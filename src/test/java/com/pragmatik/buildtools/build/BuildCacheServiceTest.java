@@ -41,9 +41,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testAnalyzeCacheHealthMavenNoCache(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -63,9 +61,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testAnalyzeCacheHealthMavenWithCache(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -91,8 +87,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testAnalyzeCacheHealthGradleNoCache(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"), """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins { id 'java' }
                 """);
 
@@ -104,13 +99,10 @@ class BuildCacheServiceTest {
 
     @Test
     void testAnalyzeCacheHealthGradleOptimized(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"), """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins { id 'java' }
                 """);
-        Files.writeString(
-                tempDir.resolve("gradle.properties"),
-                """
+        Files.writeString(tempDir.resolve("gradle.properties"), """
                 org.gradle.caching=true
                 org.gradle.configuration-cache=true
                 org.gradle.parallel=true
@@ -126,9 +118,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testAnalyzeCacheHealthSbt(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.sbt"),
-                """
+        Files.writeString(tempDir.resolve("build.sbt"), """
                 name := "test"
                 version := "1.0.0"
                 """);
@@ -140,9 +130,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testOptimizeBuildCacheMaven(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -161,8 +149,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testOptimizeBuildCacheGradle(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("build.gradle"), """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins { id 'java' }
                 """);
 
@@ -200,9 +187,7 @@ class BuildCacheServiceTest {
 
     @Test
     void testAutoDetectTool(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
