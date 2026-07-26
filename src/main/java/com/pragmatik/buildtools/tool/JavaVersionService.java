@@ -136,7 +136,7 @@ public class JavaVersionService {
                             required = false,
                             description = "Target Java version to check compatibility against. "
                                     + "If omitted, checks against the project's currently configured Java version.")
-                    String targetJavaVersion) {
+                    String targetVersion) {
 
         Path dir;
         try {
@@ -154,12 +154,12 @@ public class JavaVersionService {
 
         // Determine current and target Java versions
         int currentJavaVersion = detectCurrentJavaVersion(dir);
-        int target = (targetJavaVersion != null && !targetJavaVersion.isBlank())
-                ? Integer.parseInt(targetJavaVersion.trim())
+        int target = (targetVersion != null && !targetVersion.isBlank())
+                ? Integer.parseInt(targetVersion.trim())
                 : currentJavaVersion;
 
         result.put("currentJavaVersion", currentJavaVersion);
-        result.put("targetJavaVersion", target);
+        result.put("targetVersion", target);
 
         // Build tool detection
         BuildTool tool = new BuildToolProvider().resolve(null, dir);

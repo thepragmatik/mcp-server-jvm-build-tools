@@ -28,7 +28,7 @@
 
     <groupId>com.thepragmatik.ai</groupId>
     <artifactId>mcp-server-jvm-build-tools</artifactId>
-    <version>0.2.0</version>
+    <version>1.2.0</version>
     <name>MCP Server - Build Tools for the JVM</name>
     <description>MCP Server - Build tools for the JVM.</description>
 
@@ -156,6 +156,17 @@
                     <delimiters>
                         <delimiter>@</delimiter> <!-- avoid possible conflicts with Spring's property resolution -->
                     </delimiters>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+                <configuration>
+                    <!-- Prevent JVM exit hang (observed in CI on JDK 21+): force
+                         the forked JVM to terminate after 10 s instead of the
+                         default 30 s, so JaCoCo gets a clean exec file. -->
+                    <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
                 </configuration>
             </plugin>
             <plugin>

@@ -128,7 +128,8 @@ class CveLookupServiceTest {
         @Test
         @DisplayName("parseOsvResponse extracts vulnerability IDs")
         void extractsVulnerabilityIds() {
-            String json = """
+            String json =
+                    """
                     {"vulns":[{"id":"CVE-2024-1234","summary":"Test vuln","severity":[{"type":"CVSS_V3","score":"9.8"}],"affected":[{"ranges":[{"type":"ECOSYSTEM","events":[{"introduced":"1.0.0"},{"fixed":"1.2.0"}]}]}]}]}""";
 
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);
@@ -159,7 +160,8 @@ class CveLookupServiceTest {
         @Test
         @DisplayName("parseOsvResponse handles multiple vulnerabilities")
         void handlesMultipleVulnerabilities() {
-            String json = """
+            String json =
+                    """
                     {"vulns":[{"id":"CVE-2024-AAAA","summary":"A","severity":[{"type":"CVSS_V3","score":"7.5"}]},{"id":"CVE-2024-BBBB","summary":"B","severity":[{"type":"CVSS_V3","score":"5.0"}]}]}""";
 
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);

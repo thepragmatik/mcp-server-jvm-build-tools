@@ -282,12 +282,12 @@ This is a fast, static check (no build process is spawned). It validates `pom.xm
       "name": "check_java_compatibility",
       "arguments": {
         "projectDir": "/path/to/my-project",
-        "targetJavaVersion": "17"
+        "targetVersion": "17"
       }
     }
     ```
 
-Omit `targetJavaVersion` to check against the project's configured target.
+Omit `targetVersion` to check against the project's configured target.
 
 ---
 

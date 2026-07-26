@@ -31,8 +31,10 @@ jobs:
       # once in the single-JDK `quality` job below. They are skipped here so the
       # cross-JDK runtime/test matrix never breaks on formatter/analyzer JDK
       # compatibility (they still run in a plain local `mvn verify`).
+      # JaCoCo branch coverage instrumentation does not work on JDK 25 (ratio 0.00);
+      # skip the check on that JDK so the test matrix stays green.
       - name: Build, test, and verify coverage
-        run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true -Dspring-boot.repackage.skip=true
+        run: ./mvnw -B verify --file pom.xml --no-transfer-progress -Dspotless.check.skip=true -Dspotbugs.skip=true -Dspring-boot.repackage.skip=true ${{ matrix.java == 25 && '-Djacoco.skip=true' || '' }}
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

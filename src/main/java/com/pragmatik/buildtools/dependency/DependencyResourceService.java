@@ -119,7 +119,7 @@ public class DependencyResourceService {
                     + "Use list_dependency_resources first to discover available URIs.")
     public String readDependencyResource(
             @ToolParam(required = true, description = "Resource URI (e.g., 'build://myproject/dependencies/maven')")
-                    String resourceUri,
+                    String uri,
             @ToolParam(required = true, description = "Project directory path") String projectDir) {
 
         Path dir;
@@ -131,21 +131,21 @@ public class DependencyResourceService {
 
         String projectName = dir.getFileName().toString();
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("resourceUri", resourceUri);
+        result.put("uri", uri);
         result.put("project", projectName);
 
-        if (resourceUri.endsWith("/dependencies/maven") && Files.exists(dir.resolve("pom.xml"))) {
+        if (uri.endsWith("/dependencies/maven") && Files.exists(dir.resolve("pom.xml"))) {
             return extractMavenDependencies(dir, result);
-        } else if (resourceUri.endsWith("/dependencies/gradle")) {
+        } else if (uri.endsWith("/dependencies/gradle")) {
             Path gf = findGradleFile(dir);
             if (gf != null) return extractGradleDependencies(gf, result);
             result.put("available", false);
             result.put("error", "No Gradle build file found");
             return toJson(result);
-        } else if (resourceUri.endsWith("/dependencies/sbt") && Files.exists(dir.resolve("build.sbt"))) {
+        } else if (uri.endsWith("/dependencies/sbt") && Files.exists(dir.resolve("build.sbt"))) {
             return extractSbtDependencies(dir, result);
         } else {
-            return errorJson("Unknown resource URI: " + resourceUri);
+            return errorJson("Unknown resource URI: " + uri);
         }
     }
 
