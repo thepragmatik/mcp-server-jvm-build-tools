@@ -19,9 +19,11 @@ package com.pragmatik.buildtools.application;
 import com.pragmatik.buildtools.build.BuildPerformanceService;
 import com.pragmatik.buildtools.build.BuildResourceService;
 import com.pragmatik.buildtools.build.BuildToolsService;
+import com.pragmatik.buildtools.cicd.CiCdFlowService;
 import com.pragmatik.buildtools.dependency.DependencyConflictService;
 import com.pragmatik.buildtools.dependency.DependencyResourceService;
 import com.pragmatik.buildtools.dependency.DependencyService;
+import com.pragmatik.buildtools.plan.BuildPlanService;
 import com.pragmatik.buildtools.sbt.SbtProjectService;
 import com.pragmatik.buildtools.security.BuildAuthService;
 import com.pragmatik.buildtools.security.ToolAuthorizationService;
@@ -70,7 +72,9 @@ public class BuildToolsApplication {
             DependencyConflictService dependencyConflictService,
             BuildPerformanceService buildPerformanceService,
             JavaVersionService javaVersionService,
-            ToolAuthorizationService toolAuthorizationService) {
+            ToolAuthorizationService toolAuthorizationService,
+            BuildPlanService buildPlanService,
+            CiCdFlowService ciCdFlowService) {
         ToolCallbackProvider methodProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(
                         buildToolsService,
@@ -84,7 +88,9 @@ public class BuildToolsApplication {
                         dependencyConflictService,
                         buildPerformanceService,
                         javaVersionService,
-                        toolAuthorizationService)
+                        toolAuthorizationService,
+                        buildPlanService,
+                        ciCdFlowService)
                 .build();
         return new DeterministicToolCallbackProvider(methodProvider);
     }

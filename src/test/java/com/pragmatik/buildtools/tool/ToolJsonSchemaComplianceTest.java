@@ -237,8 +237,7 @@ class ToolJsonSchemaComplianceTest {
         @Test
         @DisplayName("collectRefs flags an external $ref in a composition schema")
         void collectRefsFindsExternalRef() {
-            String schema =
-                    """
+            String schema = """
                     {
                       "$schema": "https://json-schema.org/draft/2020-12/schema",
                       "type": "object",
@@ -267,8 +266,7 @@ class ToolJsonSchemaComplianceTest {
             String deep = open + "{\"type\":\"string\"}" + close;
             assertThat(maxDepth(mapper.readTree(deep))).isGreaterThan(MAX_SCHEMA_DEPTH);
 
-            String shallow =
-                    """
+            String shallow = """
                     { "type": "object", "properties": { "name": { "type": "string" } } }
                     """;
             assertThat(maxDepth(mapper.readTree(shallow))).isLessThanOrEqualTo(MAX_SCHEMA_DEPTH);
@@ -292,8 +290,7 @@ class ToolJsonSchemaComplianceTest {
         @Test
         @DisplayName("a valid composition schema validates within budget and resolves local $ref")
         void compositionSchemaResolvesLocalRefWithinBudget() {
-            String schema =
-                    """
+            String schema = """
                     {
                       "$schema": "https://json-schema.org/draft/2020-12/schema",
                       "type": "object",

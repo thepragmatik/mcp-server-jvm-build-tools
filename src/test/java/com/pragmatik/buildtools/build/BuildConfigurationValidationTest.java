@@ -44,8 +44,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("validates a valid pom.xml successfully")
         void validatesValidPomXml() throws Exception {
-            String pomXml =
-                    """
+            String pomXml = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                         <modelVersion>4.0.0</modelVersion>
@@ -66,8 +65,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("detects missing required elements in pom.xml")
         void detectsMissingRequiredElements() throws Exception {
-            String pomXml =
-                    """
+            String pomXml = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -105,8 +103,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("handles pom.xml with parent POM inheritance")
         void handlesParentPomInheritance() throws Exception {
-            String pomXml =
-                    """
+            String pomXml = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                         <modelVersion>4.0.0</modelVersion>
@@ -145,8 +142,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("validates a basic build.gradle successfully")
         void validatesBasicBuildGradle() throws Exception {
-            String buildGradle =
-                    """
+            String buildGradle = """
                     plugins {
                         id 'java'
                     }
@@ -170,8 +166,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("detects unbalanced braces in build.gradle")
         void detectsUnbalancedBraces() throws Exception {
-            String buildGradle =
-                    """
+            String buildGradle = """
                     plugins {
                         id 'java'
                     // missing closing brace
@@ -186,8 +181,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("validates build.gradle.kts (Kotlin DSL)")
         void validatesBuildGradleKts() throws Exception {
-            String buildGradleKts =
-                    """
+            String buildGradleKts = """
                     plugins {
                         kotlin("jvm") version "1.9.0"
                     }
@@ -228,8 +222,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("warns about missing plugin declarations")
         void warnsAboutMissingPluginDeclarations() throws Exception {
-            String buildGradle =
-                    """
+            String buildGradle = """
                     dependencies {
                         implementation 'com.google.guava:guava:33.0.0-jre'
                     }
@@ -251,8 +244,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("validates pom.xml when both Maven and Gradle markers exist")
         void validatesPomXmlInHybridProject() throws Exception {
-            String pomXml =
-                    """
+            String pomXml = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                         <modelVersion>4.0.0</modelVersion>

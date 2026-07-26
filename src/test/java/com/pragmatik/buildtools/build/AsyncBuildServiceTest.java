@@ -64,9 +64,7 @@ class AsyncBuildServiceTest {
     @Test
     void testExecuteBuildAsyncReturnsTaskHandle(@TempDir Path tempDir, @TempDir Path mavenHome) throws IOException {
         // Create a basic Maven project so auto-detection works
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -112,9 +110,7 @@ class AsyncBuildServiceTest {
     @Test
     void testCancelBuildTaskNotRunning(@TempDir Path tempDir, @TempDir Path mavenHome) throws IOException {
         // Create a task then manually set it to completed
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -139,9 +135,7 @@ class AsyncBuildServiceTest {
 
     @Test
     void testListBuildTasks(@TempDir Path tempDir) throws IOException {
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -165,9 +159,7 @@ class AsyncBuildServiceTest {
     @Test
     void testExecuteBuildAsyncAutoDetectTool(@TempDir Path tempDir) throws IOException {
         // Create Gradle project markers
-        Files.writeString(
-                tempDir.resolve("build.gradle"),
-                """
+        Files.writeString(tempDir.resolve("build.gradle"), """
                 plugins {
                     id 'java'
                 }

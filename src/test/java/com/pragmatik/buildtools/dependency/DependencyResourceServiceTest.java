@@ -44,8 +44,7 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts dependencies from pom.xml")
         void extractsMavenDeps(@TempDir Path tmp) throws Exception {
-            String pom =
-                    """
+            String pom = """
                 <project>
                   <dependencies>
                     <dependency>
@@ -85,8 +84,7 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts groovy DSL dependencies")
         void extractsGroovyDeps(@TempDir Path tmp) throws Exception {
-            String gradle =
-                    """
+            String gradle = """
                 dependencies {
                     implementation 'org.springframework.boot:spring-boot-starter:3.2.0'
                     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
@@ -109,8 +107,7 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts kotlin DSL dependencies")
         void extractsKotlinDeps(@TempDir Path tmp) throws Exception {
-            String gradle =
-                    """
+            String gradle = """
                 dependencies {
                     implementation("org.springframework.boot:spring-boot-starter:3.2.0")
                     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
@@ -132,8 +129,7 @@ class DependencyResourceServiceTest {
         @Test
         @DisplayName("extracts SBT dependencies with % and %%")
         void extractsSbtDeps(@TempDir Path tmp) throws Exception {
-            String sbt =
-                    """
+            String sbt = """
                 scalaVersion := "2.13.15"
                 libraryDependencies += "org.typelevel" %% "cats-core" % "2.12.0"
                 libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.10.0"

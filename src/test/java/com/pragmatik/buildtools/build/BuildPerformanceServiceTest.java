@@ -49,8 +49,7 @@ class BuildPerformanceServiceTest {
 
     @Test
     void testAnalyzeBuildPerformanceMaven(@TempDir Path tempDir) throws IOException {
-        String pom =
-                """
+        String pom = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -109,9 +108,7 @@ class BuildPerformanceServiceTest {
     @Test
     void testOptimizationPotentialLevels(@TempDir Path tempDir) throws IOException {
         // Maven with standard POM — should have MEDIUM potential
-        Files.writeString(
-                tempDir.resolve("pom.xml"),
-                """
+        Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0"?>
                 <project>
                     <modelVersion>4.0.0</modelVersion>

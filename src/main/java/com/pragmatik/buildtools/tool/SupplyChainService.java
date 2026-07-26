@@ -485,9 +485,7 @@ public class SupplyChainService {
         result.put("pluginVersion", "2.0.0");
 
         Map<String, Object> setup = new LinkedHashMap<>();
-        setup.put(
-                "buildScript",
-                """
+        setup.put("buildScript", """
                 plugins {
                     id 'org.cyclonedx.bom' version '2.0.0'
                 }

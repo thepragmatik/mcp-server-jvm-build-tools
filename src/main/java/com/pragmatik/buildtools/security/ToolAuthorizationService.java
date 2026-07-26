@@ -60,6 +60,20 @@ public class ToolAuthorizationService {
     private final String authMode;
 
     /**
+     * Running counter of successful authorization checks. Used by {@link SecurityMetricsCollector}
+     * to expose {@code buildtools.auth.success.count} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.atomic.AtomicLong authSuccessCount =
+            new java.util.concurrent.atomic.AtomicLong(0);
+
+    /**
+     * Running counter of failed authorization checks. Used by {@link SecurityMetricsCollector}
+     * to expose {@code buildtools.auth.failure.count} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.atomic.AtomicLong authFailureCount =
+            new java.util.concurrent.atomic.AtomicLong(0);
+
+    /**
      * Convenience constructor used by unit tests (and any direct instantiation). The active Spring
      * profiles are read from the {@code spring.profiles.active} system property so the production-key
      * guard can be exercised without a Spring context.
@@ -458,14 +472,17 @@ public class ToolAuthorizationService {
      */
     public boolean isAccessTokenValid(String token) {
         if (token == null || token.isBlank()) {
+            authFailureCount.incrementAndGet();
             return false;
         }
         String tokenHash = sha256(token);
         for (ToolApiKey key : apiKeys.values()) {
             if (tokenHash.equals(sha256(key.key))) {
+                authSuccessCount.incrementAndGet();
                 return true;
             }
         }
+        authFailureCount.incrementAndGet();
         return false;
     }
 
@@ -480,6 +497,20 @@ public class ToolAuthorizationService {
         } catch (Exception e) {
             throw new RuntimeException("SHA-256 not available", e);
         }
+    }
+
+    /**
+     * @return total number of successful authorization checks since server start
+     */
+    public long getAuthSuccessCount() {
+        return authSuccessCount.get();
+    }
+
+    /**
+     * @return total number of failed authorization checks since server start
+     */
+    public long getAuthFailureCount() {
+        return authFailureCount.get();
     }
 
     /**

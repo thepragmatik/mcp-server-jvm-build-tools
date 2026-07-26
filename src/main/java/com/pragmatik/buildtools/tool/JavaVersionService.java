@@ -396,13 +396,16 @@ public class JavaVersionService {
 
     private String buildToolJavaUpgradeInstructions(String tool, int targetVersion) {
         return switch (tool) {
-            case "maven" -> "Add <maven.compiler.release>" + targetVersion
-                    + "</maven.compiler.release> to <properties> in pom.xml, "
-                    + "or update <source>/<target> in maven-compiler-plugin configuration.";
-            case "gradle" -> "Set java { toolchain { languageVersion = JavaLanguageVersion.of(" + targetVersion
-                    + ") } } or update sourceCompatibility/targetCompatibility.";
-            case "sbt" -> "Set javacOptions ++= Seq(\"-source\", \"" + targetVersion + "\", \"-target\", \""
-                    + targetVersion + "\")";
+            case "maven" ->
+                "Add <maven.compiler.release>" + targetVersion
+                        + "</maven.compiler.release> to <properties> in pom.xml, "
+                        + "or update <source>/<target> in maven-compiler-plugin configuration.";
+            case "gradle" ->
+                "Set java { toolchain { languageVersion = JavaLanguageVersion.of(" + targetVersion
+                        + ") } } or update sourceCompatibility/targetCompatibility.";
+            case "sbt" ->
+                "Set javacOptions ++= Seq(\"-source\", \"" + targetVersion + "\", \"-target\", \"" + targetVersion
+                        + "\")";
             default -> "Update compiler settings to target Java " + targetVersion;
         };
     }

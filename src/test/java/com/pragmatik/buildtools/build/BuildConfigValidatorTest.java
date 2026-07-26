@@ -55,8 +55,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates a well-formed pom.xml as valid")
         void validatesWellFormedPom() throws Exception {
-            String pom =
-                    """
+            String pom = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -84,8 +83,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags missing required elements in pom.xml")
         void flagsMissingRequiredElements() throws Exception {
-            String pom =
-                    """
+            String pom = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -103,8 +101,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags duplicate dependency declarations")
         void flagsDuplicateDependencies() throws Exception {
-            String pom =
-                    """
+            String pom = """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                       <modelVersion>4.0.0</modelVersion>
@@ -158,8 +155,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates a well-formed build.gradle")
         void validatesWellFormedBuildGradle() throws Exception {
-            String gradle =
-                    """
+            String gradle = """
                     plugins {
                         id 'java'
                     }
@@ -184,8 +180,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("flags unbalanced braces in build.gradle")
         void flagsUnbalancedBraces() throws Exception {
-            String gradle =
-                    """
+            String gradle = """
                     plugins {
                         id 'java'
                     // missing closing brace for plugins block
@@ -216,8 +211,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("validates build.gradle.kts")
         void validatesBuildGradleKts() throws Exception {
-            String gradleKts =
-                    """
+            String gradleKts = """
                     plugins {
                         id("java")
                     }

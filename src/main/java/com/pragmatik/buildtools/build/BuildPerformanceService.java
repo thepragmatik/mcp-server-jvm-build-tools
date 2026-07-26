@@ -67,6 +67,19 @@ public class BuildPerformanceService {
 
     private final BuildToolProvider toolProvider;
 
+    /**
+     * Running counter of profiled builds. Used by {@link BuildMetricsCollector} to expose
+     * {@code buildtools.build.count} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.atomic.AtomicLong buildCount = new java.util.concurrent.atomic.AtomicLong(0);
+
+    /**
+     * Duration (seconds) of the most recent profiled build. Used by {@link BuildMetricsCollector} to
+     * expose {@code buildtools.build.duration.last} as a Micrometer gauge.
+     */
+    private final java.util.concurrent.atomic.AtomicReference<Double> lastDurationSeconds =
+            new java.util.concurrent.atomic.AtomicReference<>(0.0);
+
     public BuildPerformanceService(BuildToolProvider toolProvider) {
         this.toolProvider = toolProvider;
     }
@@ -126,6 +139,10 @@ public class BuildPerformanceService {
         }
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
+
+        // Update counters for Micrometer gauge collection
+        buildCount.incrementAndGet();
+        lastDurationSeconds.set(duration.toMillis() / 1000.0);
 
         result.put("tool", tool.getName());
         result.put("command", command);
@@ -289,6 +306,20 @@ public class BuildPerformanceService {
         result.put("optimizationPotential", potential);
 
         return JsonUtils.toJson(result);
+    }
+
+    /**
+     * @return the total number of profiled builds executed since server start
+     */
+    public long getBuildCount() {
+        return buildCount.get();
+    }
+
+    /**
+     * @return the duration (seconds) of the most recent profiled build
+     */
+    public double getLastDurationSeconds() {
+        return lastDurationSeconds.get();
     }
 
     // ─── Time extraction ────────────────────────────────────────────────

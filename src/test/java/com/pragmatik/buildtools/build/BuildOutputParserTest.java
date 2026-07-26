@@ -46,8 +46,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses successful Maven build output")
         void parsesSuccessfulBuild() {
-            String output =
-                    """
+            String output = """
                     [INFO] Scanning for projects...
                     [INFO] -------------------< com.example:my-app >-------------------
                     [INFO] Building my-app 1.0.0
@@ -86,8 +85,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Maven build failure with test failures")
         void parsesFailedBuildWithTestFailures() {
-            String output =
-                    """
+            String output = """
                     [INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0
                     [INFO]
                     [INFO] ------------------------------------------------------------------------
@@ -110,8 +108,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Maven compile errors with file:line")
         void parsesCompileErrorsWithFileLine() {
-            String output =
-                    """
+            String output = """
                     [INFO] Scanning for projects...
                     [INFO] -------------------------------------------------------
                     [INFO] Compiling 5 source files
@@ -139,8 +136,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Maven warnings")
         void parsesWarnings() {
-            String output =
-                    """
+            String output = """
                     [WARNING] Using platform encoding (UTF-8 actually)
                     [WARNING] The artifact org.slf4j:slf4j-api has been relocated
                     [INFO] BUILD SUCCESS
@@ -182,8 +178,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("aggregates multiple test module results")
         void aggregatesMultipleTestModules() {
-            String output =
-                    """
+            String output = """
                     [INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
                     [INFO] Tests run: 5, Failures: 1, Errors: 0, Skipped: 2
                     [INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0
@@ -213,8 +208,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses successful Gradle build output")
         void parsesSuccessfulBuild() {
-            String output =
-                    """
+            String output = """
                     > Task :test
 
                     25 tests completed, 0 failed
@@ -242,8 +236,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Gradle build failure with task error")
         void parsesBuildFailure() {
-            String output =
-                    """
+            String output = """
                     > Task :compileJava FAILED
 
                     FAILURE: Build failed with an exception.
@@ -267,8 +260,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Gradle test failures")
         void parsesTestFailures() {
-            String output =
-                    """
+            String output = """
                     > Task :test
 
                     com.example.UserServiceTest > testLogin() FAILED
@@ -293,8 +285,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("parses Gradle deprecation warnings")
         void parsesDeprecationWarnings() {
-            String output =
-                    """
+            String output = """
                     > Task :compileJava
                     warning: [options] source value 8 is obsolete
 
@@ -338,8 +329,7 @@ class BuildOutputParserTest {
         @Test
         @DisplayName("extracts file location from stack trace")
         void extractsFileLocationFromError() {
-            String output =
-                    """
+            String output = """
                     com.example.UserServiceTest > testLogin() FAILED
                         at com.example.UserServiceTest.testLogin(UserServiceTest.java:42)
 

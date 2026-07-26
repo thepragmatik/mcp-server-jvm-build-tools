@@ -34,8 +34,7 @@ public class MavenBuildTool implements BuildTool {
     private static final List<String> SUPPORTED_COMMANDS =
             List.of("clean", "compile", "test", "package", "install", "deploy", "validate");
 
-    private static final String EXECUTION_PROMPT =
-            """
+    private static final String EXECUTION_PROMPT = """
             You are an assistant for executing Maven build commands. Follow these rules:
 
             1. Only execute Maven lifecycle phases: clean, compile, test, package, install, deploy, validate.

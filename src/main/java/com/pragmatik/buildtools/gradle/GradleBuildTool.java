@@ -95,8 +95,7 @@ public class GradleBuildTool implements BuildTool {
 
     private static final int MAX_COMMAND_LENGTH = 500;
 
-    private static final String EXECUTION_PROMPT =
-            """
+    private static final String EXECUTION_PROMPT = """
             You are an assistant for executing Gradle build commands. Follow these rules:
 
             1. Only execute Gradle lifecycle tasks: clean, build, test, compileJava, compileTestJava,
