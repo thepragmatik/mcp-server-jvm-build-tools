@@ -126,6 +126,11 @@ nav:
       - Configuration Reference: reference/configuration.md
       - Security: reference/security.md
       - Design v1.1.0: reference/design-v1.1.0.md
+      - Design v1.2.0: reference/design-v1.2.0.md
+      - CI/CD Flow Interpreter: specs/cicd-flow-interpreter.md
+      - Build Plan Authoring: specs/build-plan-authoring.md
+      - OAuth 2.1 Credentials: specs/oauth-client-credentials.md
+      - Observability: specs/observability.md
       - Protocol Evidence: EVIDENCE.md
   - Testing:
       - Test Results: reference/test-results.md

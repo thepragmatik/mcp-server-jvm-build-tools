@@ -170,4 +170,93 @@ v0.2.0 is a major expansion of the MCP Server for JVM Build Tools. This release 
 
 ---
 
+## v1.2.0 — CI/CD Flow Interpreter, Build Plan Authoring, OAuth 2.1, Observability
+
+*2026-07-26*
+
+### Overview
+
+v1.2.0 adds four new feature packages: CI/CD Flow Interpreter & Generation, Build Plan Authoring, OAuth 2.1 Client Credentials Grant, and Micrometer/Prometheus Observability. Implemented via a fully autonomous swarm workflow (research → architecture → engineering → QA → VRFY).
+
+### New Features
+
+- **CI/CD Flow Interpreter** (#143, #158): GitHub Actions pipeline ingestion, analysis, and generation — `PipelineShapeDetector` auto-detects CI/CD shape, `GitHubActionsGenerator` produces valid YAML workflows.
+- **Build Plan Authoring** (#144, #158): `PlanExecutionEngine` for sequential multi-step build plans with cancellation, retry, and dependency ordering.
+- **OAuth 2.1 Client Credentials** (#145, #158): Bearer token endpoint (`POST /oauth/token`) with HMAC-signed JWT tokens and client registration via config.
+- **Micrometer / Prometheus Observability** (#146, #158): 3 `MeterBinder` implementations exposing auth metrics, cache performance, and build counters.
+
+### Testing & Quality
+
+- **713 tests passing** across JDK 21/23/25 matrix (from 599 in v1.1.0)
+- Cancellation test now polling-based (no timing races on CI)
+- Maven Invoker PATH fallback for CI compatibility
+
+### Breaking Changes
+
+- **OAuth token endpoint disabled by default** — must set `buildtools.oauth.token-endpoint.enabled=true` explicitly
+
+### Statistics
+
+| Metric | v0.2.0 | v1.2.0 |
+|--------|--------|--------|
+| MCP Tools | 39 | 43 |
+| Tests | 375 | 713 |
+| Build Systems | Maven, Gradle, SBT | Maven, Gradle, SBT |
+| Java Version | 21 | 21 / 23 / 25 |
+| Spring Boot | 3.5.14 | 4.1 |
+| Spring AI | 2.0.0-RC2 | 2.0.0-GA |
+
+### All PRs
+
+| PR | Title |
+|----|-------|
+| [#158](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/158) | feat: v1.2.0 — CI/CD Flow Interpreter, Build Plan, OAuth, Observability |
+| [#157](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/157) | fix: remove duplicate YAML run: key (#160) |
+| [#147](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/147) | ci(deps): bump actions/setup-python |
+| [#146](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/146) | build(deps): bump build-quality-plugins |
+
+---
+
+## v1.1.0 — POM Analysis, CVE Scanning, Android Support
+
+*2026-07-23*
+
+### Overview
+
+v1.1.0 introduces POM analysis, CVE scanning, Android/Gradle project support, Docker toolchain with Gradle 9.6.1 and SBT 2.0.3, and MCP transport auto-configuration. 599 tests across the JDK 21/23/25 matrix.
+
+### New Features
+
+- **POM Analysis & CVE Scanning**: 30 MCP tools for JVM builds — dependency graph analysis, OWASP CVE vulnerability scanning, and remediation suggestions.
+- **Android/Gradle Project Support**: Full Android project detection and build execution via Gradle.
+- **Docker Toolchain**: Gradle 9.6.1 and SBT 2.0.3 alongside Maven 3.9.11.
+- **MCP Transport Auto-Configuration**: `StdioServerTransportProvider` and `McpSyncServer` with comprehensive test harness — all 17 MCP protocol scenarios pass.
+- **Auto-Merge Pipeline** (#149, #150): Autonomous PR merge workflow integrated into AGENTS.md.
+
+### Testing & Quality
+
+- **599 tests passing** (from 375 in v0.2.0)
+- Tool param alignment across 8 tools
+- HTTP transport profile fix for MCP HTTP transport auto-configuration
+
+---
+
+## v1.0.0 — MCP-RC Alignment Release
+
+*2026-06-24*
+
+### Overview
+
+Adopts the MCP 2026-07-28 Release Candidate specification across all transport, security, and tool layers — fully backward-compatible with existing MCP clients. 376 tests.
+
+### Key Changes
+
+- **MCP-RC Alignment**: Transport, tool schema, and security alignment with the 2026-07-28 RC
+- **OAuth 2.1 Resource Server**: Bearer token authentication for MCP HTTP transport
+- **JSON Schema 2020-12**: Updated tool parameter schemas with `@Schema(allowableValues)` enum constraints
+- **28 MCP Tools** for build execution, analysis, dependency management, and diagnostics
+- **Spring AI 2.0.0-GA**: Migration from RC2 to GA
+
+---
+
 **Upgrading:** JDK 21+ required. Docker image bundles JDK 21.
