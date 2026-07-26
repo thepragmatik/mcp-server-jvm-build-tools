@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.2.0] - 2026-07-26
+
+### New Feature Packages
+
+- **CI/CD Flow Interpreter** (#143, #158): GitHub Actions pipeline ingestion, analysis, and generation — `PipelineShapeDetector` auto-detects the CI/CD shape, `GitHubActionsGenerator` produces valid YAML workflows from an abstract pipeline model.
+- **Build Plan Authoring** (#144, #158): `PlanExecutionEngine` for sequential multi-step build plans with cancellation, retry, and dependency ordering. `PlanStepGenerator` converts build tool commands into structured plans.
+- **OAuth 2.1 Client Credentials** (#145, #158): Bearer token endpoint (`POST /oauth/token`) with HMAC-signed JWT tokens, client registration via config, and resource-server-style authorization for MCP transports.
+- **Micrometer / Prometheus Observability** (#146, #158): 3 `MeterBinder` implementations (`SecurityMetricsCollector`, `CacheMetricsCollector`, `BuildMetricsCollector`) exposing auth metrics, cache performance, and build counters via `/actuator/prometheus`.
+
+### Testing and Quality
+
+- **Test Suite Growth**: Total suite now at **713 tests** (from 599 in v1.1.0) — covering 4 new packages across JDK 21/23/25 matrix CI.
+- **Cancellation Test Robustness**: `PlanExecutionEngineTest.testPlanCancellation` now uses polling-based coordination instead of fragile `Thread.sleep()`, eliminating timing races on CI.
+- **Maven Invoker PATH Fallback**: `MavenInvoker` gracefully falls back to system `mvn` from PATH when the configured `buildToolHome` directory doesn't exist, fixing CI test execution across environments.
+
+### Build and Infrastructure
+
+- **Docker Toolchain**: Gradle updated to 9.6.1, SBT to 2.0.3.
+- **Merge Workflow**: PR #158 merged and deployed with full autonomous swarm workflow (research → architecture → engineering → QA → VRFY).
+
+### Documentation
+
+- **Design Specs**: Four specification documents in `docs/specs/` covering CI/CD Flow Interpreter, Build Plan Authoring, OAuth 2.1 Client Credentials, and Observability.
+- **AGENTS.md**: Updated for autonomous swarm workflow with GitHub transparency requirements.
+
+### Known Issues (QA Findings)
+
+- #159 — Timing side-channel in OAuth client_secret comparison
+- #160 — Duplicate YAML `run:` key in CI/CD generator defaults
+- #161 — OAuth token endpoint enabled by default when config guard is ineffective
+
 ## [1.1.0] - 2026-07-23
 
 ### New Build Tool Features
@@ -56,6 +87,12 @@ This release adopts the MCP 2026-07-28 Release Candidate specification across al
 ### Evidence
 
 The server exposes **28 MCP tools** covering Maven, Gradle, and sbt build toolkits. Complete protocol-level evidence at `docs/EVIDENCE.md`.
+
+[1.2.0]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.2.0
+
+[#159]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/issues/159
+[#160]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/issues/160
+[#161]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/issues/161
 
 [1.1.0]: https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.1.0
 
