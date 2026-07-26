@@ -81,17 +81,18 @@ public class GitHubActionsGenerator implements CiCdTarget {
         }
 
         // defaults (optional)
-        if (pipeline.defaults() != null) {
+        if (pipeline.defaults() != null
+                && (pipeline.defaults().shell() != null
+                        || pipeline.defaults().workingDirectory() != null)) {
             yaml.append("defaults:\n");
+            yaml.append(INDENT).append("run:\n");
             if (pipeline.defaults().shell() != null) {
-                yaml.append(INDENT).append("run:\n");
                 yaml.append(DOUBLE_INDENT)
                         .append("shell: ")
                         .append(yamlValue(pipeline.defaults().shell()))
                         .append("\n");
             }
             if (pipeline.defaults().workingDirectory() != null) {
-                yaml.append(INDENT).append("run:\n");
                 yaml.append(DOUBLE_INDENT)
                         .append("working-directory: ")
                         .append(yamlValue(pipeline.defaults().workingDirectory()))
