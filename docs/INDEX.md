@@ -10,11 +10,11 @@ unified interface with automatic project-type detection.
 
 ---
 
-!!! success "Now available — v1.1.0 :material-rocket-launch:"
-    The latest release: **30 MCP tools**, **stdio auto-configuration**, and
-    first-class support for **Maven, Gradle, and sbt**.
+!!! success "Now available — v1.2.0 :material-rocket-launch:"
+    The latest release: **CI/CD Flow Interpreter**, **Build Plan Authoring**,
+    **OAuth 2.1**, **Micrometer Observability**, and **713 tests passing**.
 
-    [Read the v1.1.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.1.0){ .md-button .md-button--primary }
+    [Read the v1.2.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.2.0){ .md-button .md-button--primary }
 
 ## What is it?
 
