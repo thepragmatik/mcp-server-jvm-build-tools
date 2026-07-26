@@ -22,6 +22,7 @@ import com.pragmatik.buildtools.build.BuildToolProvider;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +32,22 @@ class PlanExecutionEngineTest {
 
     private PlanExecutionEngine engine;
     private BuildToolProvider provider;
-    private static final String MAVEN_HOME = "/Users/rath/.sdkman/candidates/maven/current";
     private static final String MAVEN_WRAPPER = "mvn";
+
+    /**
+     * Resolve the Maven home directory, preferring environment variables
+     * (set by CI runners like GitHub Actions' setup-java) over the
+     * local SDKMAN path used on the developer machine.
+     */
+    private static String resolveMavenHome() {
+        String envHome = System.getenv("M2_HOME");
+        if (envHome != null && !envHome.isEmpty()) return envHome;
+        envHome = System.getenv("MAVEN_HOME");
+        if (envHome != null && !envHome.isEmpty()) return envHome;
+        return "/Users/rath/.sdkman/candidates/maven/current";
+    }
+
+    private static final String MAVEN_HOME = resolveMavenHome();
 
     @BeforeEach
     void setUp() {
@@ -110,13 +125,29 @@ class PlanExecutionEngineTest {
         Thread executor = new Thread(() -> engine.executePlan(plan));
         executor.start();
 
-        // Cancel after a short delay to allow Maven to start
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        // Poll until execution is actively running, then cancel.
+        // This avoids timing races: regardless of Maven startup time,
+        // we cancel as soon as the execution is registered.
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        boolean cancelled = false;
+        while (System.nanoTime() < deadline) {
+            PlanResult status = engine.getPlanStatus("plan-cancel");
+            if (status != null && "running".equals(status.status())) {
+                engine.cancelPlan("plan-cancel");
+                cancelled = true;
+                break;
+            }
+            // If execution already finished before we could cancel, bail
+            if (!executor.isAlive()) {
+                break;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
-        engine.cancelPlan("plan-cancel");
 
         // Wait for execution to finish
         try {
@@ -127,6 +158,10 @@ class PlanExecutionEngineTest {
 
         PlanResult result = engine.getPlanStatus("plan-cancel");
         assertNotNull(result);
+        assertTrue(cancelled, "Cancellation should have been delivered mid-execution. "
+                + "If Maven is not available at " + MAVEN_HOME
+                + ", the step may have failed before cancellation took effect. "
+                + "Actual status: " + result.status());
         assertEquals("cancelled", result.status());
     }
 
