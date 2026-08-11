@@ -50,7 +50,7 @@
         <palantir-java-format.version>2.96.0</palantir-java-format.version>
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <spotbugs.version>4.10.3</spotbugs.version>
-        <dependency-check-maven.version>12.2.2</dependency-check-maven.version>
+        <dependency-check-maven.version>13.0.0</dependency-check-maven.version>
         <!--
             CVSS score at/above which the OWASP scan fails the build (issue #78).
             7.0 is the High threshold under CVSS v3 (7.0–8.9 = High, 9.0–10.0 =
