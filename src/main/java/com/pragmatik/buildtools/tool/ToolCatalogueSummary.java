@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.util.Assert;
 
 /**
@@ -193,14 +194,21 @@ public final class ToolCatalogueSummary {
      * for {@link Tool @Tool} annotations. The service key is the decapitalised simple class name
      * of the declaring bean.
      *
-     * @param toolObjects the registered {@code @Tool}-annotated service beans
+     * <p>Tool service beans may arrive as Spring AOP proxies (e.g. {@code ToolMetricsAspect}
+     * advises every {@code @Tool} method, so every service bean is CGLIB-proxied at runtime).
+     * Scanning a proxy class yields no {@code @Tool} annotations and a mangled class name, so the
+     * proxy is unwrapped to its user class first — the fix for issue #189 (grouping collapsed to
+     * a single {@code ungrouped} bucket at runtime).
+     *
+     * @param toolObjects the registered {@code @Tool}-annotated service beans (possibly proxied)
      * @return an ordered map of MCP tool name to service group name
      */
     private static Map<String, String> serviceGroups(List<Object> toolObjects) {
         Map<String, String> serviceByToolName = new LinkedHashMap<>();
         for (Object toolObject : toolObjects) {
-            String service = Introspector.decapitalize(toolObject.getClass().getSimpleName());
-            for (Method method : toolObject.getClass().getDeclaredMethods()) {
+            Class<?> targetClass = AopUtils.getTargetClass(toolObject);
+            String service = Introspector.decapitalize(targetClass.getSimpleName());
+            for (Method method : targetClass.getDeclaredMethods()) {
                 Tool tool = method.getAnnotation(Tool.class);
                 if (tool != null && !tool.name().isBlank()) {
                     serviceByToolName.putIfAbsent(tool.name(), service);
