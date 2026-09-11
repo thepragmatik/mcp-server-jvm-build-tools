@@ -17,8 +17,10 @@
 package com.pragmatik.buildtools.transport;
 
 import com.pragmatik.buildtools.application.McpServerIdentity;
+import com.pragmatik.buildtools.tool.ToolCatalogueSummary;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,9 +56,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class McpDiscoverController {
 
     private final McpServerIdentity identity;
+    private final ToolCatalogueSummary toolSummary;
 
-    public McpDiscoverController(McpServerIdentity identity) {
+    /**
+     * Spring injection point. The summary level binds from
+     * {@code buildtools.discover.tools-summary} with a literal fallback to {@code full}, so a
+     * directly-constructed instance and the property-bound runtime agree on the default
+     * (same {@code @Value}-with-fallback pattern as {@code McpServerIdentity}).
+     */
+    @Autowired
+    public McpDiscoverController(McpServerIdentity identity, ToolCatalogueSummary toolSummary) {
         this.identity = identity;
+        this.toolSummary = toolSummary;
     }
 
     /**
@@ -118,6 +129,13 @@ public class McpDiscoverController {
 
         // Transport characteristics (RC: stateless Streamable HTTP, no sessions/SSE-resumability).
         result.put("transport", identity.transportProfile());
+
+        // Additive tool catalogue summary (mcp-005 slice 2, issue #177), driven by the
+        // deterministic provider. 'none' emits no 'tools' key at all, reproducing the exact
+        // legacy payload; count/full add summary data as configured.
+        if (!toolSummary.mode().equals(ToolCatalogueSummary.Mode.NONE)) {
+            result.put("tools", toolSummary.summary());
+        }
 
         return result;
     }

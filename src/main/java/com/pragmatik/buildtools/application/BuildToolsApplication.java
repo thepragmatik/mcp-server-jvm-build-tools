@@ -31,8 +31,11 @@ import com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider;
 import com.pragmatik.buildtools.tool.JavaVersionService;
 import com.pragmatik.buildtools.tool.PromptService;
 import com.pragmatik.buildtools.tool.ResourceTemplateService;
+import com.pragmatik.buildtools.tool.ToolCatalogueSummary;
+import java.util.List;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -93,5 +96,49 @@ public class BuildToolsApplication {
                         ciCdFlowService)
                 .build();
         return new DeterministicToolCallbackProvider(methodProvider);
+    }
+
+    /**
+     * The single shared source for the discover result's additive {@code tools} summary
+     * (mcp-005 slice 2, issue #177): driven by the same deterministic provider bean the MCP
+     * runtime serves {@code tools/list} from, so the summary can never drift from the real
+     * catalogue. The summary level binds from {@code buildtools.discover.tools-summary}
+     * ({@code none | count | full}, default {@code full}); the literal fallback means the
+     * default also holds where the property is absent.
+     */
+    @Bean
+    public ToolCatalogueSummary toolCatalogueSummary(
+            ToolCallbackProvider buildTools,
+            BuildToolsService buildToolsService,
+            DependencyService dependencyService,
+            PromptService promptService,
+            BuildResourceService buildResourceService,
+            DependencyResourceService dependencyResourceService,
+            ResourceTemplateService resourceTemplateService,
+            SbtProjectService sbtProjectService,
+            BuildAuthService buildAuthService,
+            DependencyConflictService dependencyConflictService,
+            BuildPerformanceService buildPerformanceService,
+            JavaVersionService javaVersionService,
+            ToolAuthorizationService toolAuthorizationService,
+            BuildPlanService buildPlanService,
+            CiCdFlowService ciCdFlowService,
+            @Value("${buildtools.discover.tools-summary:full}") String toolsSummary) {
+        List<Object> toolObjects = List.of(
+                buildToolsService,
+                dependencyService,
+                promptService,
+                buildResourceService,
+                dependencyResourceService,
+                resourceTemplateService,
+                sbtProjectService,
+                buildAuthService,
+                dependencyConflictService,
+                buildPerformanceService,
+                javaVersionService,
+                toolAuthorizationService,
+                buildPlanService,
+                ciCdFlowService);
+        return new ToolCatalogueSummary(buildTools, toolObjects, ToolCatalogueSummary.Mode.fromConfig(toolsSummary));
     }
 }
