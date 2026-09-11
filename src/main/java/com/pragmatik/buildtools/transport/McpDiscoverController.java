@@ -59,10 +59,10 @@ public class McpDiscoverController {
     private final ToolCatalogueSummary toolSummary;
 
     /**
-     * Spring injection point. The summary level binds from
-     * {@code buildtools.discover.tools-summary} with a literal fallback to {@code full}, so a
-     * directly-constructed instance and the property-bound runtime agree on the default
-     * (same {@code @Value}-with-fallback pattern as {@code McpServerIdentity}).
+     * Spring injection point. The additive {@code tools} summary is resolved from the shared
+     * {@link ToolCatalogueSummary} bean, whose level binds from
+     * {@code buildtools.discover.tools-summary} (default {@code full}) — the same single shared
+     * source pattern as {@code McpServerIdentity}.
      */
     @Autowired
     public McpDiscoverController(McpServerIdentity identity, ToolCatalogueSummary toolSummary) {
