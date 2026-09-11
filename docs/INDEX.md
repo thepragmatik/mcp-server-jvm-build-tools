@@ -10,11 +10,13 @@ unified interface with automatic project-type detection.
 
 ---
 
-!!! success "Now available — v1.2.0 :material-rocket-launch:"
-    The latest release: **CI/CD Flow Interpreter**, **Build Plan Authoring**,
-    **OAuth 2.1**, **Micrometer Observability**, and **713 tests passing**.
+!!! success "Now available — v1.3.0 :material-rocket-launch:"
+    The latest release: **`server/discover` over MCP JSON-RPC**, **deterministic tool
+    catalogue summary**, **stdio backward-compat probe**, **security hardening**
+    (OAuth token endpoint defaults off, constant-time secret compare), and
+    **744 tests passing**.
 
-    [Read the v1.2.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.2.0){ .md-button .md-button--primary }
+    [Read the v1.3.0 release notes :material-text-box-outline:](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.3.0){ .md-button .md-button--primary }
 
 ## What is it?
 
@@ -33,6 +35,25 @@ transport.
     formats. This server hides those differences behind a consistent set of tools and
     **auto-detects** the build tool from your project's marker files (`pom.xml`,
     `build.gradle`, `build.sbt`), so you rarely need to specify it by hand.
+
+## What's New in v1.3.0
+
+Version **1.3.0** adds MCP spec-alignment discovery and security hardening. Highlights:
+
+-   **`server/discover` over MCP JSON-RPC.** The discover endpoint (SEP-2575) is answered
+    as a JSON-RPC method on `POST /mcp`, alongside the existing `/mcp/discover` probe —
+    and over stdio for legacy clients.
+-   **Deterministic tool catalogue summary.** An additive `tools` summary on every
+    discover surface, controlled by `buildtools.discover.tools-summary`
+    (`none | count | full`, default `full`), with deterministic grouping.
+-   **Security fixes.** The OAuth token endpoint now defaults to off and honors
+    `enabled=false`; client secrets are compared in constant time; generated GitHub
+    Actions YAML no longer emits a duplicate `run:` key.
+-   **Full test suite: 744 tests.** Includes a cross-surface consistency suite
+    enforcing that the discover payload is deep-equal across all delivery surfaces.
+
+For the complete list, read the
+[v1.3.0 release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v1.3.0).
 
 ## What's New in v1.1.0
 
