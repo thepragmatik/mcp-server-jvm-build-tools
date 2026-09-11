@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.3.0] - 2026-09-11
+
+### New Feature Packages
+
+- **server/discover RPC Routing** (#176): `server/discover` (SEP-2575) is now answered as a JSON-RPC method on the MCP protocol endpoint (`POST /mcp`), alongside the existing `/mcp/discover` probe and stdio delivery — protocol-speaking clients no longer need the standalone route.
+- **Deterministic Tool Catalogue Summary + Grouping** (#177): additive `tools` summary on every discover surface, driven by `ToolCatalogueSummary` and the `buildtools.discover.tools-summary` knob (`none | count | full`, default `full`), with deterministic grouping of the tool catalogue.
+- **stdio Backward-Compat Probe** (#178): `server/discover` remains answered over stdio (`StdioDiscoverSession`) for clients that predate the HTTP routes, so legacy stdio integrations keep working.
+
+### Security Fixes
+
+- **#161 — OAuth token endpoint honors `enabled=false` and defaults to off**: all OAuth beans (`OAuthTokenConfig`, `JwtTokenService`, `OAuthClientRegistrationRepository`, `OAuthTokenController`) are now guarded by `@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)`. The endpoint is disabled unless explicitly enabled in configuration.
+
+### Testing and Quality
+
+- **Cross-Surface Consistency Suite** (#179): `DiscoverCrossSurfaceConsistencyTest` enforces that the `server/discover` payload is deep-equal across `POST /mcp`, `GET /mcp/discover`, and stdio, and that the well-known card shares its fields with discover from the single `McpServerIdentity` source.
+- **#159 — Constant-time secret comparison**: `OAuthTokenController` now uses `MessageDigest.isEqual` for client_secret verification, eliminating the timing side-channel (CWE-208).
+- **#160 — Duplicate YAML key fix**: `GitHubActionsGenerator` emits a single `run:` key under `defaults:` (shell/working-directory written inside the one block), fixing invalid generated workflow YAML.
+
+### Documentation
+
+- **docs/TOOLS.md**: documented all three `server/discover` delivery surfaces (JSON-RPC on `POST /mcp`, plain-JSON `/mcp/discover` probe, stdio probe), the tools-summary knob, and the card/discover consistency contract.
+- **docs/ARCHITECTURE.md**: documented `McpServerDiscoverJsonRpcController` and the shared single-source discover result construction.
+
+
 ## [1.2.0] - 2026-07-26
 
 ### New Feature Packages

@@ -15,13 +15,13 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
-## What's New in v1.1.0 (July 2026)
+## What's New in v1.3.0 (September 2026)
 
-- **30 MCP tools** (was 28)
-- **MCP stdio transport auto-configuration** — Spring AI 2.0.0 spring-ai-mcp now auto-configures stdio transport out of the box
-- **Docker image with JDK 21 + Maven/Gradle/SBT** — full build toolchain pre-installed in the container
-- **Full test suite: 599 tests, 17 MCP protocol tests** — comprehensive coverage across unit, integration, and MCP protocol layers
-- **Real-world usability testing with MCP Inspector CLI** — verified end-to-end with the MCP Inspector for stdio transport
+- **`server/discover` over the MCP JSON-RPC endpoint** — protocol-speaking clients get SEP-2575 discover on `POST /mcp`; the `/mcp/discover` probe and stdio delivery remain supported
+- **Deterministic tool catalogue summary + grouping** on every discover surface, controlled by `buildtools.discover.tools-summary` (`none | count | full`)
+- **stdio backward-compat probe** — legacy stdio clients keep `server/discover`
+- **Security: OAuth token endpoint defaults to off** and honors `enabled=false` across all OAuth beans (#161); constant-time client-secret comparison (#159); duplicate YAML `run:` key fix in the CI/CD generator (#160)
+- **Cross-surface consistency suite** — deep-equality of the discover payload across HTTP and stdio enforced by tests (#179)
 
 See the [full changelog](CHANGELOG.md) and [protocol evidence](docs/EVIDENCE.md).
 
