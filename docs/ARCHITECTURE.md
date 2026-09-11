@@ -287,6 +287,19 @@ Low-level Maven execution with two modes:
 
 Used by MCP clients for auto-discovery without requiring full MCP protocol connection.
 
+#### McpDiscoverController (server/discover)
+- GET /mcp/discover - Plain-JSON `server/discover` probe (bare result object)
+- POST /mcp/discover - JSON-RPC form of the probe at the standalone route
+- POST /mcp - Answers the `server/discover` JSON-RPC method (SEP-2575) on the MCP protocol
+  endpoint via `McpServerDiscoverJsonRpcController`; other methods get `-32601`
+
+All three surfaces plus the stdio probe (`StdioDiscoverSession`) build the result from the single
+shared `McpServerIdentity` source, so the `server/discover` payload is deep-equal across HTTP
+(POST /mcp, GET /mcp/discover) and stdio modulo the JSON-RPC envelope. The additive `tools`
+summary is driven by `ToolCatalogueSummary`, bound to `buildtools.discover.tools-summary`
+(`none | count | full`, default `full`). Cross-surface agreement is enforced by
+`DiscoverCrossSurfaceConsistencyTest`.
+
 #### BuildEventController
 - GET /mcp/build-events/stream - SSE stream for real-time build events
 
