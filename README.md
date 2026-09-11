@@ -15,6 +15,14 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
+## What's New in v1.3.1 (September 2026)
+
+- **HTTP transport fixed** — `--spring.profiles.active=http` (and `scripts/launcher.sh --http`) now actually binds a servlet web server and serves `GET /health` (#187)
+- **`profile_build` fails loudly** — Maven home validated up front (`MAVEN_HOME` / `maven.home` / `mvn` on PATH); failed validation no longer writes fake entries to `.buildtools/history/` (#188)
+- **Tool catalogue grouping restored** — CGLIB-proxied tool services are unwrapped, so discover summaries advertise real per-service groups instead of a single `ungrouped` bucket (#189)
+
+See the [full changelog](CHANGELOG.md) and [protocol evidence](docs/EVIDENCE.md).
+
 ## What's New in v1.3.0 (September 2026)
 
 - **`server/discover` over the MCP JSON-RPC endpoint** — protocol-speaking clients get SEP-2575 discover on `POST /mcp`; the `/mcp/discover` probe and stdio delivery remain supported

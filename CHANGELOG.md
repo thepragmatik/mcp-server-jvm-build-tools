@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.1] - 2026-09-11
 
 ### Fixed
 
-- **#189 — Tool catalogue grouping collapsed to a single `ungrouped` bucket at runtime**: `ToolMetricsAspect` CGLIB-proxies every tool service bean, and `ToolCatalogueSummary` scanned the proxy class (no `@Tool` annotations, mangled class name), so `full` mode advertised `{"ungrouped": [all tools]}` instead of real per-service groups. `serviceGroups` now resolves groups through `AopUtils.getTargetClass`, restoring the deterministic per-service grouping advertised in v1.3.0. `none`/`count` semantics and the legacy payload shape are unchanged. The ordered tool-object list now has a single source of truth shared by tool registration and summary wiring (`BuildToolsApplication#toolObjects`).
+- **#187 — `http` profile started no web server**: `application.properties` hard-coded `spring.main.web-application-type=none`, so the documented `--spring.profiles.active=http` (and `scripts/launcher.sh --http`) started the Spring context with no TCP listener. A new `application-http.properties` re-enables the servlet web server (`spring.main.web-application-type=servlet` + `spring.ai.mcp.server.http=true`); `server.port` remains user-configurable (`-Dserver.port`, launcher `--port`). Regression test `HttpProfileWebServerTest`: http profile binds a real TCP listener and serves `GET /health` 200; default profile stays stdio-only with no web server. (#190)
+- **#188 — `profile_build` silent failure + poisoned history entries**: `profile_build` now resolves a Maven home up front (new `MavenHomeResolver` reads `MAVEN_HOME` / `maven.home` / `mvn` on PATH) and returns the canonical `Maven requires buildToolHome` error instead of recording a fake 0.0s failed build; validation failures write nothing to `.buildtools/history/`, so the history is no longer poisoned. Docs clarify MAVEN_HOME detection. (#192)
+- **#189 — Tool catalogue grouping collapsed to a single `ungrouped` bucket at runtime**: `ToolMetricsAspect` CGLIB-proxies every tool service bean, and `ToolCatalogueSummary` scanned the proxy class (no `@Tool` annotations, mangled class name), so `full` mode advertised `{"ungrouped": [all tools]}` instead of real per-service groups. `serviceGroups` now resolves groups through `AopUtils.getTargetClass`, restoring the deterministic per-service grouping advertised in v1.3.0. `none`/`count` semantics and the legacy payload shape are unchanged. The ordered tool-object list now has a single source of truth shared by tool registration and summary wiring (`BuildToolsApplication#toolObjects`). (#191)
 
 ## [1.3.0] - 2026-09-11
 

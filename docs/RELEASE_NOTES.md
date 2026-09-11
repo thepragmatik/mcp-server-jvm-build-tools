@@ -170,6 +170,35 @@ v0.2.0 is a major expansion of the MCP Server for JVM Build Tools. This release 
 
 ---
 
+## v1.3.1 — HTTP Profile Fix, profile_build Validation, Tool Grouping Fix
+
+*2026-09-11*
+
+### Overview
+
+v1.3.1 is a bugfix release closing three issues: the documented `http` profile now actually binds a web server (#187), `profile_build` fails loudly and no longer poisons its history (#188), and the tool catalogue summary advertises real per-service groups through AOP proxies (#189).
+
+### Fixes
+
+- **#187 — `http` profile started no web server**: new `application-http.properties` re-enables the servlet web server (`spring.main.web-application-type=servlet` + `spring.ai.mcp.server.http=true`); `server.port` stays user-configurable. Regression test verifies TCP bind + `GET /health` 200 under the http profile and stdio-only behavior under the default profile. (#190)
+- **#188 — `profile_build` silent failure + poisoned history entries**: Maven home is resolved up front by the new `MavenHomeResolver` (`MAVEN_HOME` / `maven.home` / `mvn` on PATH); validation failures return the canonical `Maven requires buildToolHome` error and write nothing to `.buildtools/history/`. (#192)
+- **#189 — Tool catalogue grouping collapsed to `ungrouped`**: `serviceGroups` resolves groups through `AopUtils.getTargetClass` so CGLIB-proxied tool services are scanned for `@Tool` annotations; deterministic per-service grouping restored. (#191)
+
+### Testing & Quality
+
+- **755 tests passing** (JDK 21); CI green on JDK 21/23/25.
+
+### All PRs
+
+| PR | Title |
+|----|-------|
+| [#190](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/190) | fix(#187): re-enable servlet web server for the http profile |
+| [#192](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/192) | fix(#188): profile_build silent failure + poisoned history entries |
+| [#191](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/191) | fix(#189): resolve tool service groups through AOP proxies |
+| [this PR] | release: v1.3.1 — bump version, changelog, release notes |
+
+---
+
 ## v1.3.0 — server/discover RPC Routing, Tool Catalogue Summary, Security Hardening
 
 *2026-09-11*
