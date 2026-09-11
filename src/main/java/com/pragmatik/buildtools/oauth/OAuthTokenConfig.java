@@ -39,10 +39,11 @@ public class OAuthTokenConfig {
      * are discovered via component scanning. This configuration class serves as a conditional guard
      * and a documentation point for the token endpoint feature.
      *
-     * <p>If the token endpoint is disabled ({@code buildtools.oauth.token-endpoint.enabled=false}),
-     * this configuration class is not loaded, and any component-scanned beans in the
-     * {@code com.pragmatik.buildtools.oauth} package will still be created. To fully disable the
-     * token endpoint, use a profile-based exclusion or exclude the package from component scanning.
+     * <p>All component-scanned beans in this package ({@link JwtTokenService},
+     * {@link OAuthTokenController} and {@link OAuthClientRegistrationRepository}) carry the same
+     * {@code @ConditionalOnProperty} guard, so when the token endpoint is disabled
+     * ({@code buildtools.oauth.token-endpoint.enabled=false} or absent) none of them are created
+     * and {@code POST /oauth/token} is not served.
      */
     public OAuthTokenConfig() {
         // Configuration marker — beans are discovered via component scanning
