@@ -187,7 +187,7 @@ public class OAuthResourceServerFilter implements Filter {
             return false;
         }
         // The protocol endpoint (POST /mcp) is enforced like /mcp/** (its discover-method
-        // exemption is body-based, see isServerDiscoverRequest); the probe path stays exempt.
+        // exemption is body-based, see isServerDiscoverBody); the probe path stays exempt.
         if (MCP_PROTOCOL_PATH.equals(path)) {
             return true;
         }
