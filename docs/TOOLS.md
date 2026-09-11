@@ -1241,6 +1241,35 @@ after `initialize`) and the response carries the same result object the HTTP
 
 Returns JSON with server metadata: name, version, description, vendor, capabilities, transports, supported build tools, requirements, features, security posture, and registry information.
 
+**Consistency with `server/discover` (issue #179):** the card and the discover result share a
+single source (`McpServerIdentity`), so their shared fields always agree — `name`, `version`,
+`vendor`, `capabilities` (core entries), `cacheHints`, and the transport profile (`transportProfile`
+on the card, `transport` on discover). The versions list is published as `mcpVersions` on the card
+and `protocolVersions` in the discover result — the same list under two documented keys. The card
+layers card-only metadata on top (`logging`/`extensions` capability entries, plus its own metadata
+blocks) and does not carry the discover `tools` summary; those keys are intentionally card-specific.
+Cross-surface agreement is enforced by `DiscoverCrossSurfaceConsistencyTest`.
+
+### GET /mcp/discover — plain-JSON probe
+
+Returns the bare `server/discover` result object (`serverInfo`, `protocolVersions`,
+`latestProtocolVersion`, `capabilities`, `cacheHints`, `transport`, plus the additive `tools`
+summary). The same result object is served by `POST /mcp` (in a JSON-RPC envelope) and over stdio
+(see below), so all three delivery surfaces are deep-equal modulo the envelope.
+
+**Tools summary knob:** `buildtools.discover.tools-summary` = `none | count | full` (default
+`full`) controls the additive `tools` object on every discover surface — `none` emits no `tools`
+key at all (exact legacy payload), `count` advertises only `{"count": N}`, and `full` advertises
+`{"count": N, "names": [...], "groups": {...}}`. The knob propagates identically to `GET
+/mcp/discover`, `POST /mcp`, and the stdio probe.
+
+### POST /mcp — `server/discover` JSON-RPC method
+
+A protocol-speaking client sends `{"jsonrpc":"2.0","id":1,"method":"server/discover"}` to the MCP
+JSON-RPC endpoint (`POST /mcp`); the response wraps the same result object as the `/mcp/discover`
+probe in a JSON-RPC envelope echoing the request `id`. Discover is a pre-auth surface (exempt from
+bearer enforcement). See `docs/MCP_INTEGRATION.md`.
+
 ### GET /health
 
 Returns `{"status":"UP","version":"0.1.1-SNAPSHOT","transport":"streamable-http"}`.
