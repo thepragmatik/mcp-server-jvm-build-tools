@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **#189 — Tool catalogue grouping collapsed to a single `ungrouped` bucket at runtime**: `ToolMetricsAspect` CGLIB-proxies every tool service bean, and `ToolCatalogueSummary` scanned the proxy class (no `@Tool` annotations, mangled class name), so `full` mode advertised `{"ungrouped": [all tools]}` instead of real per-service groups. `serviceGroups` now resolves groups through `AopUtils.getTargetClass`, restoring the deterministic per-service grouping advertised in v1.3.0. `none`/`count` semantics and the legacy payload shape are unchanged. The ordered tool-object list now has a single source of truth shared by tool registration and summary wiring (`BuildToolsApplication#toolObjects`).
+
 ## [1.3.0] - 2026-09-11
 
 ### New Feature Packages
