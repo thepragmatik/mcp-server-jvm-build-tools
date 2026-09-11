@@ -263,6 +263,35 @@ The Streamable HTTP transport is **stateless** (MCP 2026-07-28 RC):
   protocol-version selection and as a backward-compatibility probe (the `initialize`
   handshake is no longer required).
 
+### server/discover over stdio (backward-compatibility probe)
+
+The MCP 2026-07-28 RC (SEP-2575) allows `server/discover` as a
+**backward-compatibility probe on stdio**. The server supports this for stdio-only
+deployments (the default, `spring.main.web-application-type=none`), where the HTTP
+discover controllers are inactive:
+
+- Send `{"jsonrpc":"2.0","id":1,"method":"server/discover"}` as a newline-delimited
+  JSON-RPC line to the server's stdin, **before or after** the `initialize` handshake.
+- The response carries the **same result object** as the HTTP `/mcp/discover` probe —
+  `serverInfo`, `protocolVersions`, `latestProtocolVersion`, `capabilities`,
+  `cacheHints`, `transport`, and the additive `tools` summary — wrapped in a JSON-RPC
+  envelope echoing the request `id`. Both surfaces are built from the single shared
+  `McpServerIdentity` source, so the stdio and HTTP payloads cannot drift.
+- A client can therefore read `protocolVersions` up-front over stdio and pick its
+  protocol version without attempting (and failing) an `initialize` first.
+
+Example (stdio):
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"server/discover"}
+{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"mcp-server-jvm-build-tools","version":"...","vendor":"The Pragmatik"},"protocolVersions":["2024-11-05","2025-03-26","2026-07-28"],"latestProtocolVersion":"2026-07-28","capabilities":{...},"cacheHints":{...},"transport":{...},"tools":{...}}}
+```
+
+Only the transport envelope differs (newline-delimited JSON-RPC over stdio instead of
+HTTP); the discover result itself is identical to the HTTP surface.
+
+See `docs/mcp-005-research.md` (Slice 3) for the design rationale.
+
 See `docs/mcp-2026-07-28-transport-audit.md` for the full framework audit.
 
 ### OAuth 2.1 resource-server discovery (RFC9728)
