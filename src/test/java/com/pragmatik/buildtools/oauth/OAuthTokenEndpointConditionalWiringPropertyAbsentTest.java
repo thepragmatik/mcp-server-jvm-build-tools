@@ -24,18 +24,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * Regression tests for issue #161 (property-absent case): when {@code
  * buildtools.oauth.token-endpoint.enabled} is not set at all, no OAuth token endpoint beans may
  * be registered ({@code matchIfMissing = false}).
  *
- * <p>{@code locations} replaces the default {@code application.properties} so the shipped default
- * does not leak into this test's environment.
+ * <p>{@code spring.config.name} points the bootstrap at a minimal properties file instead of the
+ * shipped {@code application.properties}, so the token-endpoint property is genuinely absent
+ * from the environment (inlined test properties would only override, not remove, it).
  */
-@SpringBootTest(classes = BuildToolsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestPropertySource(locations = "classpath:oauth-absent-test.properties")
+@SpringBootTest(
+        classes = BuildToolsApplication.class,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.config.name=application-absent-test")
 @DisplayName("OAuthTokenEndpointConditionalWiringPropertyAbsent — issue #161 matchIfMissing")
 class OAuthTokenEndpointConditionalWiringPropertyAbsentTest {
 
