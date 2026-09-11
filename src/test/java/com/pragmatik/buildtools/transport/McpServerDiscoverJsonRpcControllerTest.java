@@ -25,6 +25,7 @@ import com.pragmatik.buildtools.application.McpServerIdentity;
 import com.pragmatik.buildtools.security.OAuthResourceServerConfig;
 import com.pragmatik.buildtools.security.OAuthResourceServerFilter;
 import com.pragmatik.buildtools.security.ToolAuthorizationService;
+import com.pragmatik.buildtools.tool.ToolCatalogueSummary;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,27 @@ class McpServerDiscoverJsonRpcControllerTest {
 
     private static final String DISCOVER_BODY = "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"server/discover\"}";
 
+    /** Fake tool service driving the tools summary (service group: fakeSummaryTools). */
+    static class FakeSummaryTools {
+        @org.springframework.ai.tool.annotation.Tool(name = "summary_alpha", description = "fake")
+        public String summaryAlpha() {
+            return "ok";
+        }
+
+        @org.springframework.ai.tool.annotation.Tool(name = "summary_beta", description = "fake")
+        public String summaryBeta() {
+            return "ok";
+        }
+    }
+
+    /** Second fake tool service (service group: fakeOtherTools). */
+    static class FakeOtherTools {
+        @org.springframework.ai.tool.annotation.Tool(name = "other_gamma", description = "fake")
+        public String otherGamma() {
+            return "ok";
+        }
+    }
+
     private McpServerIdentity identity;
     private McpDiscoverController discoverController;
     private McpServerDiscoverJsonRpcController jsonRpcController;
@@ -65,7 +87,14 @@ class McpServerDiscoverJsonRpcControllerTest {
     @BeforeEach
     void setUp() {
         identity = new McpServerIdentity(SERVER_NAME, "9.9.9");
-        discoverController = new McpDiscoverController(identity);
+        // Two fake tool services drive the deterministic tools summary through both surfaces.
+        FakeSummaryTools toolsA = new FakeSummaryTools();
+        FakeOtherTools toolsB = new FakeOtherTools();
+        var provider = new com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider(
+                org.springframework.ai.tool.ToolCallbackProvider.from(
+                        org.springframework.ai.support.ToolCallbacks.from(toolsA, toolsB)));
+        ToolCatalogueSummary toolSummary = new ToolCatalogueSummary(provider, List.of(toolsA, toolsB));
+        discoverController = new McpDiscoverController(identity, toolSummary);
         jsonRpcController = new McpServerDiscoverJsonRpcController(discoverController);
         headerFilter =
                 new McpHeaderValidationFilter(identity, McpHeaderValidationFilter.DEFAULT_MAX_VALIDATION_BODY_BYTES);
@@ -132,6 +161,20 @@ class McpServerDiscoverJsonRpcControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.error.code").value(-32601))
                     .andExpect(jsonPath("$.result").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("POST /mcp discover result carries the additive tools summary")
+        void discoverResultCarriesToolsSummary() throws Exception {
+            mockMvc.perform(post("/mcp").contentType(MediaType.APPLICATION_JSON).content(DISCOVER_BODY))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.tools.count").value(3))
+                    .andExpect(jsonPath("$.result.tools.names[0]").value("other_gamma"))
+                    .andExpect(jsonPath("$.result.tools.names.length()").value(3))
+                    .andExpect(jsonPath("$.result.tools.groups.fakeSummaryTools.length()")
+                            .value(2))
+                    .andExpect(
+                            jsonPath("$.result.tools.groups.fakeOtherTools[0]").value("other_gamma"));
         }
     }
 
