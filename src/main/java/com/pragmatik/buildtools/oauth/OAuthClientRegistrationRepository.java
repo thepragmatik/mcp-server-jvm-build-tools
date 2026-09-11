@@ -25,6 +25,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Repository;
 
@@ -45,6 +46,7 @@ import org.springframework.stereotype.Repository;
  * <p>No database dependency. For dynamic client registration, front with an external OAuth
  * authorization server (Keycloak, Okta, etc.).
  */
+@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)
 @Repository
 @ConfigurationProperties(prefix = "buildtools.oauth")
 public class OAuthClientRegistrationRepository implements InitializingBean {

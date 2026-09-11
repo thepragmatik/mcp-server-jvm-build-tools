@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -54,6 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code 401} {@code invalid_client} — unknown or unauthenticated client</li>
  * </ul>
  */
+@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)
 @RestController
 public class OAuthTokenController {
 

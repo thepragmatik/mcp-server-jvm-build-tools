@@ -36,6 +36,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -50,6 +51,7 @@ import org.springframework.stereotype.Service;
  * configure {@code buildtools.oauth.token-endpoint.signing-key} with a securely generated,
  * base64-encoded HMAC key (at least 256 bits).
  */
+@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)
 @Service
 public class JwtTokenService {
 
