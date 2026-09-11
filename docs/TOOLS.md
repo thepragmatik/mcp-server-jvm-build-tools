@@ -1228,6 +1228,15 @@ Response: {"projectDir":"/path/to/project","dependencyCount":15,
 
 When running in Streamable HTTP mode, the server exposes discoverability endpoints:
 
+**stdio deployments:** the default stdio transport has no HTTP endpoints, but the
+`server/discover` JSON-RPC method (SEP-2575) is still answered over stdio as a
+backward-compatibility probe — send
+`{"jsonrpc":"2.0","id":1,"method":"server/discover"}` to the server's stdin (before or
+after `initialize`) and the response carries the same result object the HTTP
+`/mcp/discover` probe returns (`serverInfo`, `protocolVersions`, capabilities,
+`cacheHints`, transport, tools summary). See `docs/MCP_INTEGRATION.md`
+("server/discover over stdio").
+
 ### GET /.well-known/mcp-server
 
 Returns JSON with server metadata: name, version, description, vendor, capabilities, transports, supported build tools, requirements, features, security posture, and registry information.

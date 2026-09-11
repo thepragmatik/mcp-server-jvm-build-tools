@@ -28,6 +28,7 @@ import io.modelcontextprotocol.spec.McpSchema.Implementation;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import io.modelcontextprotocol.spec.McpServerSession;
 import io.modelcontextprotocol.spec.McpServerTransportProvider;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -87,10 +88,28 @@ public class McpServerTransportConfiguration {
     /**
      * Stdio transport provider — reads JSON-RPC from {@code System.in},
      * writes responses to {@code System.out}.
+     * <p>
+     * Wrapped in {@link StdioServerTransportDiscoverProvider} so the stdio session also
+     * answers the {@code server/discover} JSON-RPC method (2026-07-28 RC, SEP-2575) —
+     * the RC's backward-compatibility probe on stdio, for stdio-only deployments where
+     * the HTTP discover controllers are inactive. The discover result is built by the
+     * shared {@code McpDiscoverController#discoverResult()} source, so the stdio and
+     * HTTP payloads cannot drift.
      */
     @Bean
-    public McpServerTransportProvider stdioServerTransportProvider(McpJsonMapper jsonMapper) {
-        return new StdioServerTransportProvider(jsonMapper);
+    public McpServerTransportProvider stdioServerTransportProvider(
+            McpJsonMapper jsonMapper, McpDiscoverController discoverController) {
+        McpServerTransportProvider stdio = new StdioServerTransportProvider(jsonMapper);
+        return new StdioServerTransportDiscoverProvider(
+                stdio,
+                // Wrap the framework session factory: sessions created from it answer
+                // server/discover ahead of the SDK handler map and delegate everything
+                // else to the framework session over the same 1:1 stdio transport.
+                frameworkFactory -> sessionTransport -> {
+                    McpServerSession frameworkSession = frameworkFactory.create(sessionTransport);
+                    return new StdioDiscoverSession(
+                            sessionTransport, frameworkSession, discoverController::discoverResult);
+                });
     }
 
     /**
