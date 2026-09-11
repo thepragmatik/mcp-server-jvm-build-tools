@@ -101,7 +101,10 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
-Set `MAVEN_HOME` in your environment or in the `env` block above. Gradle works with the wrapper or a system Gradle on PATH — no extra config needed.
+Set `MAVEN_HOME` in your environment or in the `env` block above. The server reads
+`MAVEN_HOME` from its own process environment (inherited on stdio launches), so a Maven
+installation pointed at by `MAVEN_HOME` (or `mvn` on the server's `PATH`) is used whenever
+`buildToolHome` is not passed explicitly. Gradle works with the wrapper or a system Gradle on PATH — no extra config needed.
 
 #### Cursor
 
