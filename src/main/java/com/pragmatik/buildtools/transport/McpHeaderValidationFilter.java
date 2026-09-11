@@ -98,6 +98,9 @@ public class McpHeaderValidationFilter implements Filter {
     /** Path prefix of the MCP Streamable HTTP transport endpoints. */
     static final String MCP_PATH_PREFIX = "/mcp/";
 
+    /** The MCP protocol endpoint itself ({@code POST /mcp}), also validated. */
+    static final String MCP_PROTOCOL_PATH = "/mcp";
+
     static final String HEADER_MCP_METHOD = "Mcp-Method";
     static final String HEADER_MCP_NAME = "Mcp-Name";
 
@@ -105,7 +108,7 @@ public class McpHeaderValidationFilter implements Filter {
     static final int JSONRPC_INVALID_REQUEST = -32600;
 
     /** Default body-buffer cap for validation: 1 MiB. */
-    static final int DEFAULT_MAX_VALIDATION_BODY_BYTES = 1_048_576;
+    public static final int DEFAULT_MAX_VALIDATION_BODY_BYTES = 1_048_576;
 
     // Jackson 3 (Spring Boot 4) makes ObjectMapper immutable: configuration must be
     // supplied through the builder rather than post-construction setters.
@@ -225,7 +228,9 @@ public class McpHeaderValidationFilter implements Filter {
         if (path == null || path.isEmpty()) {
             path = req.getRequestURI();
         }
-        return path != null && path.startsWith(MCP_PATH_PREFIX);
+        // The protocol endpoint itself (POST /mcp) is validated the same way as the
+        // /mcp/** sub-paths, so a server/discover request cannot bypass the check.
+        return path != null && (path.startsWith(MCP_PATH_PREFIX) || MCP_PROTOCOL_PATH.equals(path));
     }
 
     private void rejectMismatch(HttpServletResponse response, Object id, String detail) throws IOException {
@@ -290,12 +295,12 @@ public class McpHeaderValidationFilter implements Filter {
      * {@link #exceedsLimit()} reports {@code true}; callers must reject such a request
      * (the buffered prefix must not be forwarded as if it were a complete body).
      */
-    static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+    public static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
         private final byte[] cachedBody;
         private final boolean exceedsLimit;
 
-        CachedBodyHttpServletRequest(HttpServletRequest request, int maxBytes) throws IOException {
+        public CachedBodyHttpServletRequest(HttpServletRequest request, int maxBytes) throws IOException {
             super(request);
             int cap = maxBytes > 0 ? maxBytes : DEFAULT_MAX_VALIDATION_BODY_BYTES;
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -319,12 +324,12 @@ public class McpHeaderValidationFilter implements Filter {
         }
 
         /** Whether the request body exceeded the validation byte cap. */
-        boolean exceedsLimit() {
+        public boolean exceedsLimit() {
             return exceedsLimit;
         }
 
         /** Whether the buffered body is empty. */
-        boolean isBodyEmpty() {
+        public boolean isBodyEmpty() {
             return cachedBody.length == 0;
         }
 

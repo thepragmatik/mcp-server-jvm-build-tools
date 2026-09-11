@@ -29,8 +29,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Enforces the MCP server's role as an <b>OAuth 2.1 resource server</b> on the Streamable HTTP
@@ -74,8 +80,14 @@ public class OAuthResourceServerFilter implements Filter {
     /** Path prefix of the MCP Streamable HTTP transport endpoints. */
     static final String MCP_PATH_PREFIX = "/mcp/";
 
+    /** The MCP protocol endpoint itself ({@code POST /mcp}), subject to the same exemption rules. */
+    static final String MCP_PROTOCOL_PATH = "/mcp";
+
     /** Discovery probe path, exempt from enforcement so clients can learn how to authenticate. */
     static final String DISCOVER_PATH = "/mcp/discover";
+
+    /** The JSON-RPC discover method: a pre-auth surface on any MCP transport path (SEP-2575). */
+    static final String DISCOVER_METHOD = "server/discover";
 
     /** Case-insensitive {@code Bearer } scheme prefix (note the trailing space). */
     private static final String BEARER_PREFIX = "bearer ";
@@ -83,9 +95,30 @@ public class OAuthResourceServerFilter implements Filter {
     private final OAuthResourceServerConfig config;
     private final ToolAuthorizationService authorizationService;
 
+    /**
+     * Body-buffer cap for the server/discover method check, mirroring
+     * {@code McpHeaderValidationFilter}'s bound so an oversized body is never fully
+     * materialised by the exemption check (fail closed to the bearer challenge).
+     */
+    private final int maxValidationBodyBytes;
+
+    /** Jackson 3 mapper for the bounded body inspection (immutable, built once). */
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
+
     public OAuthResourceServerFilter(OAuthResourceServerConfig config, ToolAuthorizationService authorizationService) {
+        this(config, authorizationService, McpHeaderValidationFilter.DEFAULT_MAX_VALIDATION_BODY_BYTES);
+    }
+
+    @Autowired
+    public OAuthResourceServerFilter(
+            OAuthResourceServerConfig config,
+            ToolAuthorizationService authorizationService,
+            @Value("${mcp.transport.max-validation-body-bytes:1048576}") int maxValidationBodyBytes) {
         this.config = config;
         this.authorizationService = authorizationService;
+        this.maxValidationBodyBytes = maxValidationBodyBytes > 0
+                ? maxValidationBodyBytes
+                : McpHeaderValidationFilter.DEFAULT_MAX_VALIDATION_BODY_BYTES;
     }
 
     @Override
@@ -101,6 +134,21 @@ public class OAuthResourceServerFilter implements Filter {
         if (!config.enforcementEnabled() || !isEnforcedPath(httpReq)) {
             chain.doFilter(request, response);
             return;
+        }
+
+        // server/discover on the protocol endpoint (POST /mcp) is a pre-auth surface
+        // (SEP-2575): a client must negotiate protocol versions before it can obtain a
+        // token. Detect it from the JSON-RPC body (bounded buffering, replayed downstream);
+        // an unparseable body is not exempt — the enforcement decision falls through to
+        // the bearer challenge, keeping non-discover traffic fully authenticated.
+        McpHeaderValidationFilter.CachedBodyHttpServletRequest discoverCandidate = null;
+        if ("POST".equalsIgnoreCase(httpReq.getMethod())
+                && (MCP_PROTOCOL_PATH.equals(pathOf(httpReq)) || pathOf(httpReq).startsWith(MCP_PATH_PREFIX))) {
+            discoverCandidate = bufferForMethodCheck(httpReq);
+            if (discoverCandidate != null) {
+                chain.doFilter(discoverCandidate, response);
+                return;
+            }
         }
 
         String token = bearerToken(httpReq.getHeader("Authorization"));
@@ -125,14 +173,57 @@ public class OAuthResourceServerFilter implements Filter {
      *     {@code server/discover} probe is exempt so discovery remains unauthenticated.
      */
     private boolean isEnforcedPath(HttpServletRequest req) {
+        String path = pathOf(req);
+        if (path == null) {
+            return false;
+        }
+        // The protocol endpoint (POST /mcp) is enforced like /mcp/** (its discover-method
+        // exemption is body-based, see isServerDiscoverRequest); the probe path stays exempt.
+        if (MCP_PROTOCOL_PATH.equals(path)) {
+            return true;
+        }
+        if (!path.startsWith(MCP_PATH_PREFIX)) {
+            return false;
+        }
+        return !DISCOVER_PATH.equals(path);
+    }
+
+    /**
+     * Buffers a POST body (bounded, replayable) and returns the wrapped request when its
+     * JSON-RPC {@code method} is {@code server/discover} — the pre-auth surface (SEP-2575):
+     * a client must negotiate protocol versions before it can obtain a token. A body that
+     * exceeds the cap or fails to parse is NOT exempt (fail closed to the bearer challenge),
+     * in which case {@code null} is returned and the original request is untouched.
+     */
+    private McpHeaderValidationFilter.CachedBodyHttpServletRequest bufferForMethodCheck(HttpServletRequest req)
+            throws IOException {
+        McpHeaderValidationFilter.CachedBodyHttpServletRequest cached =
+                new McpHeaderValidationFilter.CachedBodyHttpServletRequest(req, maxValidationBodyBytes);
+        if (cached.exceedsLimit() || cached.isBodyEmpty()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(cached.getInputStream());
+            if (root != null && root.isObject()) {
+                JsonNode methodNode = root.get("method");
+                if (methodNode != null && methodNode.isTextual() && DISCOVER_METHOD.equals(methodNode.asText())) {
+                    return cached;
+                }
+            }
+        } catch (JacksonException parseFailure) {
+            // Unparseable body: not exempt. The challenge response does not need the body.
+            return null;
+        }
+        return null;
+    }
+
+    /** Resolves the request path ({@code servletPath}, falling back to {@code requestURI}). */
+    private static String pathOf(HttpServletRequest req) {
         String path = req.getServletPath();
         if (path == null || path.isEmpty()) {
             path = req.getRequestURI();
         }
-        if (path == null || !path.startsWith(MCP_PATH_PREFIX)) {
-            return false;
-        }
-        return !DISCOVER_PATH.equals(path);
+        return path;
     }
 
     /**
