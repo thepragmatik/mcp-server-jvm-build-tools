@@ -139,8 +139,7 @@ public class BuildPerformanceService {
         String effectiveHome = validatedHome;
         if (effectiveHome == null && "maven".equals(tool.getName())) {
             try {
-                effectiveHome = com.pragmatik.buildtools.maven.MavenBuildTool.requireMavenHome(
-                        null, mavenHomeResolver);
+                effectiveHome = com.pragmatik.buildtools.maven.MavenBuildTool.requireMavenHome(null, mavenHomeResolver);
             } catch (IllegalArgumentException e) {
                 return JsonUtils.errorJson(e.getMessage());
             }

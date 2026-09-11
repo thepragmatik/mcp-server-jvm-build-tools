@@ -42,8 +42,7 @@ class BuildPerformanceServiceTest {
 
     @AfterEach
     void restoreResolver() {
-        BuildPerformanceService.mavenHomeResolver =
-                com.pragmatik.buildtools.maven.MavenHomeResolver::resolveMavenHome;
+        BuildPerformanceService.mavenHomeResolver = com.pragmatik.buildtools.maven.MavenHomeResolver::resolveMavenHome;
     }
 
     @Test
@@ -189,8 +188,8 @@ class BuildPerformanceServiceTest {
         // maven.home system property, or mvn on PATH). In the test JVM we inject
         // the resolved home explicitly so the test is hermetic even when the
         // invoking shell has no Maven on PATH.
-        BuildPerformanceService.mavenHomeResolver = () ->
-                Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
+        BuildPerformanceService.mavenHomeResolver =
+                () -> Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
 
         // profileBuild with "validate" — a lightweight Maven phase that does no work
         String result = service.profileBuild("maven", null, tempDir.toString(), "validate");
@@ -215,8 +214,8 @@ class BuildPerformanceServiceTest {
                 """);
 
         // Blank buildToolHome should be treated as not provided
-        BuildPerformanceService.mavenHomeResolver = () ->
-                Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
+        BuildPerformanceService.mavenHomeResolver =
+                () -> Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
         String result = service.profileBuild("maven", "  ", tempDir.toString(), "validate");
 
         assertNotNull(result);
@@ -270,7 +269,8 @@ class BuildPerformanceServiceTest {
                 result.contains("Maven requires buildToolHome. Specify a Maven installation directory."),
                 "Should return the SAME clear validation error as execute_build_command");
         assertFalse(result.contains("durationSeconds"), "Must not record a fake 0.0s build");
-        assertFalse(Files.exists(tempDir.resolve(".buildtools/history/maven_clean_test.json")),
+        assertFalse(
+                Files.exists(tempDir.resolve(".buildtools/history/maven_clean_test.json")),
                 "Validation failures must not write history entries");
     }
 
@@ -291,7 +291,8 @@ class BuildPerformanceServiceTest {
 
         assertNotNull(result);
         assertTrue(result.contains("\"success\":true"), "Genuine build execution should succeed: " + result);
-        assertTrue(Files.exists(tempDir.resolve(".buildtools/history/maven_validate.json")),
+        assertTrue(
+                Files.exists(tempDir.resolve(".buildtools/history/maven_validate.json")),
                 "Genuine build execution must write a history entry");
     }
 
@@ -319,26 +320,25 @@ class BuildPerformanceServiceTest {
         Path envHome = Files.createDirectories(tempDir.resolve("env-home"));
         Path propHome = Files.createDirectories(tempDir.resolve("prop-home"));
 
-        Optional<String> resolved =
-                com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
-                        envHome.toString(), null, propHome.toString());
+        Optional<String> resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
+                envHome.toString(), null, propHome.toString());
         assertTrue(resolved.isPresent());
         assertEquals(envHome.toRealPath().toString(), resolved.get());
 
-        resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
-                null, null, propHome.toString());
+        resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(null, null, propHome.toString());
         assertTrue(resolved.isPresent());
         assertEquals(propHome.toRealPath().toString(), resolved.get());
 
         // Non-existent candidates fall through to empty
-        assertTrue(com.pragmatik.buildtools.maven.MavenHomeResolver
-                .resolveMavenHome("/nonexistent/maven", "/nonexistent/bin", null)
+        assertTrue(com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
+                        "/nonexistent/maven", "/nonexistent/bin", null)
                 .isEmpty());
     }
 
     @Test
     void testMavenHomeResolverFromPathLookup(@TempDir Path tempDir) throws IOException {
-        Path mavenHome = Files.createDirectories(tempDir.resolve("apache-maven-3.9.9").resolve("bin"));
+        Path mavenHome =
+                Files.createDirectories(tempDir.resolve("apache-maven-3.9.9").resolve("bin"));
         Path mvn = mavenHome.resolve("mvn");
         Files.writeString(mvn, "#!/bin/sh\nexit 0\n");
         mvn.toRealPath().toFile().setExecutable(true);

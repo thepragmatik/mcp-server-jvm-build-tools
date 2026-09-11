@@ -58,8 +58,7 @@ public class MavenBuildTool implements BuildTool {
     @Override
     public String executeCommand(String buildToolHome, String projectDir, String command) {
         String home = requireMavenHome(buildToolHome);
-        return MavenInvoker.executeCommandUsingMavenInvoker(
-                home, MavenInvoker.getCommands(command), projectDir);
+        return MavenInvoker.executeCommandUsingMavenInvoker(home, MavenInvoker.getCommands(command), projectDir);
     }
 
     /**
@@ -86,8 +85,9 @@ public class MavenBuildTool implements BuildTool {
         if (buildToolHome != null && !buildToolHome.isBlank()) {
             return buildToolHome;
         }
-        return resolver.get().orElseThrow(() -> new IllegalArgumentException(
-                "Maven requires buildToolHome. Specify a Maven installation directory."));
+        return resolver.get()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Maven requires buildToolHome. Specify a Maven installation directory."));
     }
 
     @Override

@@ -16,7 +16,6 @@
  */
 package com.pragmatik.buildtools.maven;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -82,7 +81,8 @@ public final class MavenHomeResolver {
                 if (java.nio.file.Files.isExecutable(mvnPath)) {
                     try {
                         java.nio.file.Path real = mvnPath.toRealPath();
-                        java.nio.file.Path home = real.getParent() != null ? real.getParent().getParent() : null;
+                        java.nio.file.Path home =
+                                real.getParent() != null ? real.getParent().getParent() : null;
                         Optional<String> resolved = fromDirectory(home != null ? home.toString() : null);
                         if (resolved.isPresent()) {
                             return resolved;
