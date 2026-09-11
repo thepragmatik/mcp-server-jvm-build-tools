@@ -79,7 +79,7 @@ public class BuildToolsApplication {
             BuildPlanService buildPlanService,
             CiCdFlowService ciCdFlowService) {
         ToolCallbackProvider methodProvider = MethodToolCallbackProvider.builder()
-                .toolObjects(
+                .toolObjects(toolObjects(
                         buildToolsService,
                         dependencyService,
                         promptService,
@@ -93,9 +93,22 @@ public class BuildToolsApplication {
                         javaVersionService,
                         toolAuthorizationService,
                         buildPlanService,
-                        ciCdFlowService)
+                        ciCdFlowService))
                 .build();
         return new DeterministicToolCallbackProvider(methodProvider);
+    }
+
+    /**
+     * The single source of truth for the ordered list of {@code @Tool}-annotated service beans.
+     * Both {@link #buildTools(...)} (tool registration) and {@link #toolCatalogueSummary(...)}
+     * (service grouping, issue #189) consume this list, so the two wirings cannot drift out of
+     * sync — a drift would silently regroup unknown tools under {@code ungrouped}.
+     *
+     * @param toolObjects the registered tool service beans, in registration order
+     * @return the same beans as an array, spreadable into varargs consumers
+     */
+    private static Object[] toolObjects(Object... toolObjects) {
+        return toolObjects;
     }
 
     /**
@@ -124,7 +137,7 @@ public class BuildToolsApplication {
             BuildPlanService buildPlanService,
             CiCdFlowService ciCdFlowService,
             @Value("${buildtools.discover.tools-summary:full}") String toolsSummary) {
-        List<Object> toolObjects = List.of(
+        List<Object> toolObjects = List.of(toolObjects(
                 buildToolsService,
                 dependencyService,
                 promptService,
@@ -138,7 +151,7 @@ public class BuildToolsApplication {
                 javaVersionService,
                 toolAuthorizationService,
                 buildPlanService,
-                ciCdFlowService);
+                ciCdFlowService));
         return new ToolCatalogueSummary(buildTools, toolObjects, ToolCatalogueSummary.Mode.fromConfig(toolsSummary));
     }
 }
