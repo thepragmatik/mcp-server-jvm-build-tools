@@ -57,11 +57,37 @@ public class MavenBuildTool implements BuildTool {
 
     @Override
     public String executeCommand(String buildToolHome, String projectDir, String command) {
-        if (buildToolHome == null || buildToolHome.isBlank()) {
-            throw new IllegalArgumentException("Maven requires buildToolHome. Specify a Maven installation directory.");
+        String home = requireMavenHome(buildToolHome);
+        return MavenInvoker.executeCommandUsingMavenInvoker(home, MavenInvoker.getCommands(command), projectDir);
+    }
+
+    /**
+     * Resolve the effective Maven home for a command execution.
+     * <p>
+     * Falls back to {@link MavenHomeResolver} ({@code MAVEN_HOME} env var,
+     * {@code maven.home} system property, {@code mvn} on PATH) when no explicit
+     * {@code buildToolHome} is provided, so the documented environment-variable
+     * path actually works in the server process.
+     *
+     * @throws IllegalArgumentException with the canonical validation message when
+     *                                  no Maven installation can be resolved
+     */
+    public static String requireMavenHome(String buildToolHome) {
+        return requireMavenHome(buildToolHome, MavenHomeResolver::resolveMavenHome);
+    }
+
+    /**
+     * Resolve the effective Maven home for a command execution using an explicit
+     * resolver (test hook).
+     */
+    public static String requireMavenHome(
+            String buildToolHome, java.util.function.Supplier<java.util.Optional<String>> resolver) {
+        if (buildToolHome != null && !buildToolHome.isBlank()) {
+            return buildToolHome;
         }
-        return MavenInvoker.executeCommandUsingMavenInvoker(
-                buildToolHome, MavenInvoker.getCommands(command), projectDir);
+        return resolver.get()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Maven requires buildToolHome. Specify a Maven installation directory."));
     }
 
     @Override

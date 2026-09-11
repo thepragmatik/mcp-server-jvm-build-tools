@@ -18,11 +18,14 @@ package com.pragmatik.buildtools.build;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.pragmatik.buildtools.maven.MavenBuildTool;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +38,11 @@ class BuildPerformanceServiceTest {
     void setUp() {
         BuildToolProvider provider = new BuildToolProvider();
         service = new BuildPerformanceService(provider);
+    }
+
+    @AfterEach
+    void restoreResolver() {
+        BuildPerformanceService.mavenHomeResolver = com.pragmatik.buildtools.maven.MavenHomeResolver::resolveMavenHome;
     }
 
     @Test
@@ -176,6 +184,13 @@ class BuildPerformanceServiceTest {
                 </project>
                 """);
 
+        // The server resolves a real Maven installation (MAVEN_HOME env var,
+        // maven.home system property, or mvn on PATH). In the test JVM we inject
+        // the resolved home explicitly so the test is hermetic even when the
+        // invoking shell has no Maven on PATH.
+        BuildPerformanceService.mavenHomeResolver =
+                () -> Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
+
         // profileBuild with "validate" — a lightweight Maven phase that does no work
         String result = service.profileBuild("maven", null, tempDir.toString(), "validate");
 
@@ -199,6 +214,8 @@ class BuildPerformanceServiceTest {
                 """);
 
         // Blank buildToolHome should be treated as not provided
+        BuildPerformanceService.mavenHomeResolver =
+                () -> Optional.of(com.pragmatik.buildtools.transport.TestUtils.resolveMavenHome());
         String result = service.profileBuild("maven", "  ", tempDir.toString(), "validate");
 
         assertNotNull(result);
@@ -220,5 +237,126 @@ class BuildPerformanceServiceTest {
         assertNotNull(result);
         assertTrue(result.contains("\"tool\":\"gradle\""));
         assertTrue(result.contains("\"command\":\"build\""));
+    }
+
+    // ─── Issue #188: profile_build validation & history hygiene ─────────
+
+    private Path writePom(Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.0</version>
+                </project>
+                """);
+        return tempDir;
+    }
+
+    @Test
+    void testProfileBuildWithoutBuildToolHomeReturnsClearErrorAndWritesNoHistory(@TempDir Path tempDir)
+            throws IOException {
+        writePom(tempDir);
+        // No Maven installation resolvable in this test scenario
+        BuildPerformanceService.mavenHomeResolver = Optional::empty;
+
+        String result = service.profileBuild("maven", null, tempDir.toString(), "clean test");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":false"));
+        assertTrue(
+                result.contains("Maven requires buildToolHome. Specify a Maven installation directory."),
+                "Should return the SAME clear validation error as execute_build_command");
+        assertFalse(result.contains("durationSeconds"), "Must not record a fake 0.0s build");
+        assertFalse(
+                Files.exists(tempDir.resolve(".buildtools/history/maven_clean_test.json")),
+                "Validation failures must not write history entries");
+    }
+
+    @Test
+    void testProfileBuildWithBuildToolHomeSucceedsAndWritesHistory(@TempDir Path tempDir) throws IOException {
+        // A stub Maven home so the build executes (command validation still applies,
+        // and the invoker fails on the stub — the point is a genuine execution
+        // attempt that lands in history, not a silent validation failure).
+        Path mavenHome = tempDir.resolve("maven-stub");
+        Files.createDirectories(mavenHome.resolve("bin"));
+        Path mvn = mavenHome.resolve("bin/mvn");
+        Files.writeString(mvn, "#!/bin/sh\nexit 0\n");
+        mvn.toFile().setExecutable(true);
+
+        writePom(tempDir);
+
+        String result = service.profileBuild("maven", mavenHome.toString(), tempDir.toString(), "validate");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":true"), "Genuine build execution should succeed: " + result);
+        assertTrue(
+                Files.exists(tempDir.resolve(".buildtools/history/maven_validate.json")),
+                "Genuine build execution must write a history entry");
+    }
+
+    @Test
+    void testProfileBuildMavenHomeEnvOnlyPathSucceeds(@TempDir Path tempDir) throws IOException {
+        Path mavenHome = tempDir.resolve("maven-stub-env");
+        Files.createDirectories(mavenHome.resolve("bin"));
+        Path mvn = mavenHome.resolve("bin/mvn");
+        Files.writeString(mvn, "#!/bin/sh\nexit 0\n");
+        mvn.toFile().setExecutable(true);
+        // No explicit buildToolHome — the resolver stands in for a MAVEN_HOME env var
+        // set in the invoking shell (inherited by the stdio-launched server process).
+        BuildPerformanceService.mavenHomeResolver = () -> Optional.of(mavenHome.toString());
+
+        writePom(tempDir);
+
+        String result = service.profileBuild("maven", null, tempDir.toString(), "validate");
+
+        assertNotNull(result);
+        assertTrue(result.contains("\"success\":true"), "MAVEN_HOME-only path should work: " + result);
+    }
+
+    @Test
+    void testMavenHomeResolverPrefersEnvThenPropThenPath(@TempDir Path tempDir) throws IOException {
+        Path envHome = Files.createDirectories(tempDir.resolve("env-home"));
+        Path propHome = Files.createDirectories(tempDir.resolve("prop-home"));
+
+        Optional<String> resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
+                envHome.toString(), null, propHome.toString());
+        assertTrue(resolved.isPresent());
+        assertEquals(envHome.toRealPath().toString(), resolved.get());
+
+        resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(null, null, propHome.toString());
+        assertTrue(resolved.isPresent());
+        assertEquals(propHome.toRealPath().toString(), resolved.get());
+
+        // Non-existent candidates fall through to empty
+        assertTrue(com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
+                        "/nonexistent/maven", "/nonexistent/bin", null)
+                .isEmpty());
+    }
+
+    @Test
+    void testMavenHomeResolverFromPathLookup(@TempDir Path tempDir) throws IOException {
+        Path mavenHome =
+                Files.createDirectories(tempDir.resolve("apache-maven-3.9.9").resolve("bin"));
+        Path mvn = mavenHome.resolve("mvn");
+        Files.writeString(mvn, "#!/bin/sh\nexit 0\n");
+        mvn.toRealPath().toFile().setExecutable(true);
+
+        Optional<String> resolved = com.pragmatik.buildtools.maven.MavenHomeResolver.resolveMavenHome(
+                null, tempDir.resolve("apache-maven-3.9.9").resolve("bin").toString(), null);
+        assertTrue(resolved.isPresent(), "mvn on PATH should resolve to the installation dir");
+        assertEquals(tempDir.resolve("apache-maven-3.9.9").toRealPath().toString(), resolved.get());
+    }
+
+    @Test
+    void testRequireMavenHomeThrowsCanonicalErrorWhenUnresolvable() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            MavenBuildTool.requireMavenHome(null, Optional::empty);
+        });
+        assertEquals("Maven requires buildToolHome. Specify a Maven installation directory.", ex.getMessage());
+
+        // Explicit buildToolHome is returned verbatim
+        assertEquals("/opt/maven", MavenBuildTool.requireMavenHome("/opt/maven", Optional::empty));
     }
 }

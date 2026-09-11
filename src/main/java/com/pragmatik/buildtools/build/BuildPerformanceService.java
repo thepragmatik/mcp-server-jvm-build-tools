@@ -68,6 +68,13 @@ public class BuildPerformanceService {
     private final BuildToolProvider toolProvider;
 
     /**
+     * Injectable Maven-home resolution hook for tests. Production resolves from the
+     * server process environment ({@code MAVEN_HOME}, {@code maven.home}, PATH).
+     */
+    static java.util.function.Supplier<java.util.Optional<String>> mavenHomeResolver =
+            com.pragmatik.buildtools.maven.MavenHomeResolver::resolveMavenHome;
+
+    /**
      * Running counter of profiled builds. Used by {@link BuildMetricsCollector} to expose
      * {@code buildtools.build.count} as a Micrometer gauge.
      */
@@ -124,6 +131,20 @@ public class BuildPerformanceService {
         }
 
         BuildTool tool = toolProvider.resolve(buildToolName, dir);
+
+        // Validate up front (issue #188): Maven requires a resolvable home. Fail
+        // loudly with the SAME error execute_build_command surfaces instead of
+        // recording a fake 0.0s failed build, and never touch the persistent
+        // history on a validation failure.
+        String effectiveHome = validatedHome;
+        if (effectiveHome == null && "maven".equals(tool.getName())) {
+            try {
+                effectiveHome = com.pragmatik.buildtools.maven.MavenBuildTool.requireMavenHome(null, mavenHomeResolver);
+            } catch (IllegalArgumentException e) {
+                return JsonUtils.errorJson(e.getMessage());
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
 
         // Time the build
@@ -131,7 +152,7 @@ public class BuildPerformanceService {
         String rawOutput;
         int exitCode;
         try {
-            rawOutput = tool.executeCommand(validatedHome, dir.toString(), command);
+            rawOutput = tool.executeCommand(effectiveHome, dir.toString(), command);
             exitCode = 0;
         } catch (RuntimeException e) {
             rawOutput = e.getMessage();

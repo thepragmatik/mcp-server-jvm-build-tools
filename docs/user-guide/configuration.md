@@ -14,7 +14,7 @@ There are three places configuration comes from:
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `MAVEN_HOME` | For Maven builds | Path to a Maven installation; the server expects `MAVEN_HOME/bin/mvn` to be executable. Without it, every Maven call must pass `buildToolHome`. |
+| `MAVEN_HOME` | For Maven builds | Path to a Maven installation; the server expects `MAVEN_HOME/bin/mvn` to be executable. Read from the server process environment (inherited on stdio launch); also falls back to `maven.home` and `mvn` on `PATH`. Without any of these, every Maven call must pass `buildToolHome`. |
 | `MAVEN_OPTS` | No | JVM options for the **Maven** build process (e.g. `-Xmx1024m`). The server itself ignores this; only out-of-process Maven uses it. |
 | `GRADLE_OPTS` | No | JVM options for the **Gradle** build process. |
 | `JAVA_HOME` | No | Used by Maven/Gradle/SBT to locate a JVM if they cannot find one. |
