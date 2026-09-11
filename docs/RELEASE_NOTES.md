@@ -170,6 +170,44 @@ v0.2.0 is a major expansion of the MCP Server for JVM Build Tools. This release 
 
 ---
 
+## v1.3.0 — server/discover RPC Routing, Tool Catalogue Summary, Security Hardening
+
+*2026-09-11*
+
+### Overview
+
+v1.3.0 aligns discovery with the MCP spec (SEP-2575) by answering `server/discover` as a JSON-RPC method on the MCP protocol endpoint (`POST /mcp`), alongside the existing `/mcp/discover` probe and a stdio backward-compat probe, and adds a deterministic tool catalogue summary to every discover surface. Ships two security fixes and a cross-surface consistency test suite.
+
+### New Features
+
+- **server/discover RPC Routing** (#176): `server/discover` (SEP-2575) is answered as a JSON-RPC method on `POST /mcp`, alongside the existing `/mcp/discover` probe and stdio delivery.
+- **Deterministic Tool Catalogue Summary + Grouping** (#177): additive `tools` summary on every discover surface, driven by `ToolCatalogueSummary` and the `buildtools.discover.tools-summary` knob (`none | count | full`, default `full`).
+- **stdio Backward-Compat Probe** (#178): `server/discover` remains answered over stdio (`StdioDiscoverSession`) for clients that predate the HTTP routes.
+
+### Security Fixes
+
+- **#161 — OAuth token endpoint honors `enabled=false` and defaults to off**: all OAuth beans guarded by `@ConditionalOnProperty(name = "buildtools.oauth.token-endpoint.enabled", havingValue = "true", matchIfMissing = false)`.
+- **#159 — Constant-time secret comparison**: `MessageDigest.isEqual` in `OAuthTokenController` (CWE-208).
+- **#160 — Duplicate YAML key fix**: `GitHubActionsGenerator` emits a single `run:` key under `defaults:`.
+
+### Testing & Quality
+
+- **Cross-Surface Consistency Suite** (#179): `DiscoverCrossSurfaceConsistencyTest` enforces that the discover payload is deep-equal across `POST /mcp`, `GET /mcp/discover`, and stdio, and that the well-known card shares fields with discover from a single `McpServerIdentity` source.
+- **744 tests passing** (JDK 21); CI green on JDK 21/23/25.
+
+### All PRs
+
+| PR | Title |
+|----|-------|
+| [#185](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/185) | release: v1.3.0 — bump version, changelog, README What's New |
+| [#184](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/184) | fix(#161): honor token-endpoint.enabled=false for all oauth beans |
+| [#183](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/183) | [mcp-005] Cross-surface consistency tests + docs for server/discover (#179) |
+| [#182](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/182) | [mcp-005] server/discover stdio backward-compatibility probe |
+| [#181](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/181) | feat(#177): deterministic tool catalogue summary + grouping on server/discover |
+| [#180](https://github.com/thepragmatik/mcp-server-jvm-build-tools/pull/180) | [mcp-005] Route server/discover through the MCP JSON-RPC endpoint (POST /mcp) |
+
+---
+
 ## v1.2.0 — CI/CD Flow Interpreter, Build Plan Authoring, OAuth 2.1, Observability
 
 *2026-07-26*
