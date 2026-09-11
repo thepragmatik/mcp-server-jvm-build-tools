@@ -141,14 +141,23 @@ public class OAuthResourceServerFilter implements Filter {
         // token. Detect it from the JSON-RPC body (bounded buffering, replayed downstream);
         // an unparseable body is not exempt — the enforcement decision falls through to
         // the bearer challenge, keeping non-discover traffic fully authenticated.
-        McpHeaderValidationFilter.CachedBodyHttpServletRequest discoverCandidate = null;
+        HttpServletRequest effectiveReq = httpReq;
         if ("POST".equalsIgnoreCase(httpReq.getMethod())
                 && (MCP_PROTOCOL_PATH.equals(pathOf(httpReq)) || pathOf(httpReq).startsWith(MCP_PATH_PREFIX))) {
-            discoverCandidate = bufferForMethodCheck(httpReq);
-            if (discoverCandidate != null) {
-                chain.doFilter(discoverCandidate, response);
+            McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered =
+                    new McpHeaderValidationFilter.CachedBodyHttpServletRequest(httpReq, maxValidationBodyBytes);
+            if (!buffered.exceedsLimit() && isServerDiscoverBody(buffered)) {
+                // server/discover: pre-auth (SEP-2575) — a client must negotiate protocol
+                // versions before it can obtain a token. Forwarded without a challenge,
+                // with the replayable buffered body.
+                chain.doFilter(buffered, response);
                 return;
             }
+            // The inspection consumed the original body stream, so downstream (after a
+            // valid token) must receive the replayable buffered wrapper, never the drained
+            // original. An oversized body fails closed: it falls through to the bearer
+            // challenge rather than being served.
+            effectiveReq = buffered;
         }
 
         String token = bearerToken(httpReq.getHeader("Authorization"));
@@ -165,7 +174,7 @@ public class OAuthResourceServerFilter implements Filter {
             return;
         }
 
-        chain.doFilter(request, response);
+        chain.doFilter(effectiveReq, response);
     }
 
     /**
@@ -189,32 +198,27 @@ public class OAuthResourceServerFilter implements Filter {
     }
 
     /**
-     * Buffers a POST body (bounded, replayable) and returns the wrapped request when its
-     * JSON-RPC {@code method} is {@code server/discover} — the pre-auth surface (SEP-2575):
-     * a client must negotiate protocol versions before it can obtain a token. A body that
-     * exceeds the cap or fails to parse is NOT exempt (fail closed to the bearer challenge),
-     * in which case {@code null} is returned and the original request is untouched.
+     * @return {@code true} when the buffered request's JSON-RPC {@code method} is
+     *     {@code server/discover} — the pre-auth surface (SEP-2575): a client must negotiate
+     *     protocol versions before it can obtain a token. A body that fails to parse is NOT
+     *     exempt (fail closed to the bearer challenge); the buffered wrapper stays replayable
+     *     for downstream regardless of the outcome.
      */
-    private McpHeaderValidationFilter.CachedBodyHttpServletRequest bufferForMethodCheck(HttpServletRequest req)
-            throws IOException {
-        McpHeaderValidationFilter.CachedBodyHttpServletRequest cached =
-                new McpHeaderValidationFilter.CachedBodyHttpServletRequest(req, maxValidationBodyBytes);
-        if (cached.exceedsLimit() || cached.isBodyEmpty()) {
-            return null;
+    private boolean isServerDiscoverBody(McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered) {
+        if (buffered.isBodyEmpty()) {
+            return false;
         }
         try {
-            JsonNode root = objectMapper.readTree(cached.getInputStream());
+            JsonNode root = objectMapper.readTree(buffered.getInputStream());
             if (root != null && root.isObject()) {
                 JsonNode methodNode = root.get("method");
-                if (methodNode != null && methodNode.isTextual() && DISCOVER_METHOD.equals(methodNode.asText())) {
-                    return cached;
-                }
+                return methodNode != null && methodNode.isTextual() && DISCOVER_METHOD.equals(methodNode.asText());
             }
         } catch (JacksonException parseFailure) {
             // Unparseable body: not exempt. The challenge response does not need the body.
-            return null;
+            return false;
         }
-        return null;
+        return false;
     }
 
     /** Resolves the request path ({@code servletPath}, falling back to {@code requestURI}). */

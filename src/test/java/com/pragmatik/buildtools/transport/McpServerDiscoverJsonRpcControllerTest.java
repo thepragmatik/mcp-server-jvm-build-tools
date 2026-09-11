@@ -172,6 +172,28 @@ class McpServerDiscoverJsonRpcControllerTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.error").value("unauthorized"));
         }
+
+        @Test
+        @DisplayName("a valid-token non-discover POST /mcp still reaches the handler with its body intact")
+        void validTokenNonDiscoverBodyReachesHandler() throws Exception {
+            OAuthResourceServerFilter oauthFilter = new OAuthResourceServerFilter(
+                    new OAuthResourceServerConfig(true, "", List.of()), new ToolAuthorizationService());
+
+            MockMvc chained = MockMvcBuilders.standaloneSetup(jsonRpcController)
+                    .addFilters(oauthFilter, headerFilter)
+                    .build();
+
+            // The exemption check buffers the body for method inspection; the authenticated
+            // request must still carry a replayable body downstream (the -32601 envelope
+            // proves the handler parsed the real method, not an empty body).
+            chained.perform(post("/mcp")
+                            .header("Authorization", "Bearer dev-key-unsafe-do-not-use-in-production")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(9))
+                    .andExpect(jsonPath("$.error.code").value(-32601));
+        }
     }
 
     @Nested
