@@ -220,7 +220,7 @@ tools = mcp_spec.to_tool_list()
 ./scripts/launcher.sh --http --port 8080
 
 # Via JAR
-java -jar target/mcp-server-jvm-build-tools.jar -Dspring.profiles.active=http -Dserver.port=8080
+java -jar target/mcp-server-jvm-build-tools.jar --spring.profiles.active=http -Dserver.port=8080
 ```
 
 **Available HTTP Endpoints:**

@@ -130,7 +130,7 @@ By default the server uses stdio only. The HTTP transport is enabled by activati
 Spring profile (the launcher's `--http` flag does this for you):
 
 ```bash
-java -Dspring.profiles.active=http -Dserver.port=8080 \
+java --spring.profiles.active=http -Dserver.port=8080 \
   -jar target/mcp-server-jvm-build-tools.jar
 ```
 
