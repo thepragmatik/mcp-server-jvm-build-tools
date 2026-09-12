@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **#199 — `http` profile binds loopback by default**: `application-http.properties` now sets `server.address=127.0.0.1`, so the Streamable HTTP transport is no longer reachable from other machines out of the box (previously it bound `0.0.0.0:8080` with tool authorization disabled). Override with `--server.address=0.0.0.0` for deliberate network deployments and enable `buildtools.auth.enabled=true` / the OAuth resource-server. A new `HttpBindAdvisory` logs a prominent startup warning when tool authorization is disabled while the servlet transport binds a non-loopback address (silent in stdio mode and on loopback binds; never fires when auth is enabled).
+
 ## [1.3.1] - 2026-09-11
 
 ### Fixed

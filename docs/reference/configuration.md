@@ -92,6 +92,7 @@ java -Dspring.profiles.active=http -Dserver.port=8080 \
 
 | Property | Default | Description |
 |----------|---------|-------------|
+| `server.address` | `127.0.0.1` (http profile, since #199) | Bind address. Loopback by default so the unauthenticated MCP endpoint is not reachable from other machines. Override explicitly for network deployments (`--server.address=0.0.0.0`) and enable tool authorization — a startup warning (`HttpBindAdvisory`) fires when auth is disabled on a non-loopback bind. |
 | `server.port` | `8080` | HTTP port (effective only with the `http` profile). |
 | `mcp.transport.cors.allowed-origins` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated CORS origins permitted to call `/mcp/**`. Restricted to local origins by default (no wildcard). List specific origins to widen for development; `*` is honoured for local testing only and must never be used in production. |
 | `mcp.transport.sse.timeout-ms` | `1800000` | SSE stream timeout in milliseconds (30 minutes). |

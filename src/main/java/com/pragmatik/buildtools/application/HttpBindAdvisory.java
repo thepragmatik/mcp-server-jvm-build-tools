@@ -21,6 +21,7 @@ import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -31,12 +32,16 @@ import org.springframework.stereotype.Component;
  * disabled — the unauthenticated-network-exposure posture flagged in the
  * security review of issue #199.
  *
- * <p>Loopback detection resolves {@code server.address} (when set) and
- * compares it against the loopback addresses; an unset
- * {@code server.address} means the server binds all interfaces
- * ({@code 0.0.0.0} on IPv4), which is treated as non-loopback.
+ * <p>The bean is conditional on a live servlet web application, so stdio-mode
+ * launches (no HTTP surface) never see the warning. Loopback detection
+ * resolves {@code server.address} (when set) and compares it against the
+ * loopback addresses; an unset {@code server.address} means the server binds
+ * all interfaces ({@code 0.0.0.0} on IPv4), which is treated as non-loopback.
+ * A hostname value is resolved via {@link InetAddress#getByName(String)},
+ * which may perform a DNS lookup — literal IPs avoid that cost.
  */
 @Component
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class HttpBindAdvisory {
 
     private static final Logger log = LoggerFactory.getLogger(HttpBindAdvisory.class);
@@ -44,7 +49,7 @@ public class HttpBindAdvisory {
     private final String serverAddress;
     private final boolean authEnabled;
 
-    public HttpBindAdvisory(
+    HttpBindAdvisory(
             @Value("${server.address:}") String serverAddress,
             @Value("${buildtools.auth.enabled:false}") boolean authEnabled) {
         this.serverAddress = serverAddress;
@@ -52,8 +57,8 @@ public class HttpBindAdvisory {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void advise() {
-        if (isWebServerActive() && !authEnabled && !isLoopbackBind()) {
+    void advise() {
+        if (!authEnabled && !isLoopbackBind()) {
             log.warn("[security] HTTP transport is bound beyond loopback with tool authorization "
                     + "DISABLED — MCP endpoints are reachable from the network unauthenticated. "
                     + "Set server.address=127.0.0.1 (the safe default), or enable "
@@ -72,11 +77,5 @@ public class HttpBindAdvisory {
             log.warn("[security] could not resolve server.address='{}'; treating bind as non-loopback", serverAddress);
             return false;
         }
-    }
-
-    private boolean isWebServerActive() {
-        // This bean is only meaningfully consulted when the servlet container exists;
-        // in stdio (web-application-type=none) there is no HTTP surface to warn about.
-        return true;
     }
 }
