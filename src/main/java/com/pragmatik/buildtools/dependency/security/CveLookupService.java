@@ -188,7 +188,8 @@ public class CveLookupService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                logger.warn("[CveLookupService] OSV batch query returned HTTP {}; falling back to sequential lookups",
+                logger.warn(
+                        "[CveLookupService] OSV batch query returned HTTP {}; falling back to sequential lookups",
                         response.statusCode());
                 fallbackSequential(batch, results);
                 return;
@@ -218,7 +219,9 @@ public class CveLookupService {
             }
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            logger.warn("[CveLookupService] OSV batch query failed: {}; falling back to sequential lookups", e.getMessage());
+            logger.warn(
+                    "[CveLookupService] OSV batch query failed: {}; falling back to sequential lookups",
+                    e.getMessage());
             fallbackSequential(batch, results);
         }
     }
