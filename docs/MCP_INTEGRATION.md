@@ -320,8 +320,11 @@ opaque-token threat model, and the recommended fronting-gateway topology.
 # stdio mode
 docker run -i --rm -v /path/to/projects:/projects -v /opt/maven:/opt/maven -e MAVEN_HOME=/opt/maven mcp-server-jvm-build-tools
 
-# HTTP mode
-docker run -d --rm -p 8080:8080 -v /path/to/projects:/projects -v /opt/maven:/opt/maven -e MAVEN_HOME=/opt/maven -e SPRING_PROFILES_ACTIVE=http mcp-server-jvm-build-tools
+# HTTP mode — note: since issue #199 the server binds loopback (127.0.0.1) inside the
+# container by default, which port publishing cannot reach from the host. Bind all
+# interfaces explicitly (the container network namespace already isolates it; consider
+# Docker network policies / auth for real exposure):
+docker run -d --rm -p 8080:8080 -e SERVER_ADDRESS=0.0.0.0 -v /path/to/projects:/projects -v /opt/maven:/opt/maven -e MAVEN_HOME=/opt/maven -e SPRING_PROFILES_ACTIVE=http mcp-server-jvm-build-tools
 ```
 
 ---
