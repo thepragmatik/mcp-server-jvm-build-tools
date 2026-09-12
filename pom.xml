@@ -40,6 +40,8 @@
     </scm>
 
     <properties>
+        <!-- CVE fix for GHSA-9xv2-5v5q-p794 / GCX9 / H3X4 (tomcat 11.0.24 auth bypass) - issue #208 -->
+        <tomcat.version>11.0.25</tomcat.version>
         <maven.compiler.release>21</maven.compiler.release>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
