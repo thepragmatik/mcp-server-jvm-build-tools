@@ -147,7 +147,7 @@ also offers an opt-in **Streamable HTTP** transport.
     Activate the `http` Spring profile (or pass `--http` to the launcher) and choose a port:
 
     ```bash
-    java -Dspring.profiles.active=http -Dserver.port=8080 \
+    java --spring.profiles.active=http -Dserver.port=8080 \
       -jar target/mcp-server-jvm-build-tools.jar
     ```
 

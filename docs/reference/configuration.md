@@ -77,7 +77,7 @@ The HTTP transport is opt-in. Activate it with the `http` Spring profile (the la
 flag does this) and set the port with `server.port`:
 
 ```bash
-java -Dspring.profiles.active=http -Dserver.port=8080 \
+java --spring.profiles.active=http -Dserver.port=8080 \
   -jar target/mcp-server-jvm-build-tools.jar
 ```
 
