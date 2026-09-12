@@ -133,26 +133,6 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!--
-                Pin the fasterxml Jackson 2.x patch line and gson to the
-                CVE-hygiene patch releases tracked in issue #202. These override
-                the (older) 2.x versions managed by the Spring Boot parent.
-            -->
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>2.22.2</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>2.22.2</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.code.gson</groupId>
-                <artifactId>gson</artifactId>
-                <version>2.14.0</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
