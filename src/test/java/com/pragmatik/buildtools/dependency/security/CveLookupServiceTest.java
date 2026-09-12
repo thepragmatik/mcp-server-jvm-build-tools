@@ -217,4 +217,17 @@ class CveLookupServiceTest {
             assertThat(map).doesNotContainKey("cvssScore");
         }
     }
+
+    // ── OSV batch chunking ──────────────────────────────────────────
+
+    @Nested
+    @DisplayName("OSV batch chunking")
+    class BatchChunking {
+
+        @Test
+        @DisplayName("batch size constant respects OSV documented limit")
+        void batchSize() {
+            assertThat(CveLookupService.OSV_BATCH_SIZE).isEqualTo(100);
+        }
+    }
 }
