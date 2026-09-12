@@ -323,6 +323,95 @@ Auto-detect which build tool a project uses by scanning for build files in the p
 
 **Detection order:** Checks for `pom.xml` first (Maven), then `build.gradle`/`build.gradle.kts` (Gradle), then `build.sbt` (SBT).
 
+### `create_build_plan`
+
+Create a build plan from a natural language description. Returns a JSON plan with ordered steps. The plan is stored and can be executed later with execute_build_plan.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `description` | string | Yes | Natural language description of the build workflow |
+
+**Example:**
+```
+create_build_plan(...) → JSON response (see tool description)
+```
+
+
+### `execute_build_plan`
+
+Execute a build plan. The plan must have been created with create_build_plan first. Returns execution results with per-step status, timing, and a summary.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `planId` | string | Yes | Plan ID returned by create_build_plan |
+
+**Example:**
+```
+execute_build_plan(...) → JSON response (see tool description)
+```
+
+
+### `analyze_pom_dependencies`
+
+Analyze all dependencies declared in a Maven project's pom.xml. Walks the parent POM chain, resolves dependencyManagement (including BOM imports), interpolates properties, and classifies each dependency as EXPLICIT, MANAGED or omitted.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the Maven project directory containing pom.xml |
+| `resolveTransitive` | string | No | Whether to resolve transitive dependencies (reserved for future use; default false) |
+
+**Example:**
+```
+analyze_pom_dependencies(...) → JSON response (see tool description)
+```
+
+
+### `scan_dependency_cves`
+
+Scan a project's direct dependencies for known vulnerabilities (CVEs) using OSV.dev. Parses pom.xml or build.gradle to extract dependencies, queries OSV.dev for each, and returns a prioritized vulnerability report.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `projectDir` | string | Yes | Path to the project directory containing build files |
+
+**Example:**
+```
+scan_dependency_cves(...) → JSON response (see tool description)
+```
+
+
+### `validate_ci_flow`
+
+Validate a GitHub Actions workflow YAML for syntax correctness and required field presence. Checks that the YAML has valid structure with name, trigger (on), runs-on, and steps. Returns JSON with valid flag and error details.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `yaml` | string | Yes | GitHub Actions workflow YAML content to validate. Must be valid YAML with required fields: name, on, jobs with runs-on and steps. |
+
+**Example:**
+```
+validate_ci_flow(...) → JSON response (see tool description)
+```
+
+
+### `interpret_ci_flow`
+
+Interpret a natural-language CI/CD pipeline description and generate a GitHub Actions workflow YAML. Detects the build tool (Maven, Gradle, SBT) from the project directory. Returns JSON with the generated YAML, validation status, detected build tool, and pipeline summary.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `description` | string | Yes | Natural language description of the CI/CD pipeline. Examples: 'Run tests on every push to main', 'Build on PR, |
+| `projectDir` | string | No | Project directory path for build-tool auto-detection. Scans for pom.xml (Maven), build.gradle/build.gradle.kts |
+| `target` | string | No | CI/CD target platform. Currently only 'github-actions' is supported. Default: 'github-actions'. |
+| `buildToolName` | string | No | Build tool name override. One of: 'maven', 'gradle', 'sbt'. When set, skips auto-detection from projectDir. |
+| `pipelineShape` | string | No | Pipeline shape hint. One of: 'ci-push', 'ci-pr', 'ci-release', 'ci-full', 'custom'. When set, overrides automa |
+| `javaVersions` | string | No | JDK versions to test against, comma-separated. Examples: '21', '21,23', '17,21,23'. Default: '21'. |
+
+**Example:**
+```
+interpret_ci_flow(...) → JSON response (see tool description)
+```
+
 ### `check_dependency_version`
 Look up the latest version of a Maven Central dependency.
 
