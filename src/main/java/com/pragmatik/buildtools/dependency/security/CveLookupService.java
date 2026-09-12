@@ -49,6 +49,7 @@ public class CveLookupService {
     private static final Logger logger = LoggerFactory.getLogger(CveLookupService.class);
 
     private static final String OSV_QUERY_URL = "https://api.osv.dev/v1/query";
+    private static final String OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch";
     private static final int CACHE_MAX_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofHours(1);
 
@@ -126,9 +127,16 @@ public class CveLookupService {
         }
     }
 
+    static final int OSV_BATCH_SIZE = 100;
+
     /**
-     * Bulk-lookup vulnerabilities for multiple dependencies, batching requests
-     * to respect OSV.dev rate limits.
+     * Bulk-lookup vulnerabilities for multiple dependencies using the OSV.dev
+     * {@code /v1/querybatch} endpoint: packages are sent in chunks of
+     * {@value #OSV_BATCH_SIZE} (OSV.dev's documented batch limit) so a scan of
+     * N dependencies costs ceil(N/100) HTTP round-trips instead of N sequential
+     * ones. Packages whose batch result is missing or malformed fall back to
+     * the single-query {@link #lookup} path to preserve correctness. The LRU
+     * cache is checked and populated exactly as in {@link #lookup}.
      *
      * @param packages list of packages to scan
      * @return map of package key to vulnerability entries
@@ -136,7 +144,90 @@ public class CveLookupService {
     public Map<String, List<VulnerabilityEntry>> bulkLookup(List<PackageRef> packages) {
         Map<String, List<VulnerabilityEntry>> results = new LinkedHashMap<>();
 
+        // Serve cache hits first; collect the rest for batching
+        List<PackageRef> pending = new ArrayList<>();
         for (PackageRef pkg : packages) {
+            String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
+            CacheEntry cached = cache.get(key);
+            if (cached != null && !cached.isExpired()) {
+                results.put(key, cached.entries);
+            } else {
+                pending.add(pkg);
+            }
+        }
+
+        // Batch pending packages in chunks of OSV_BATCH_SIZE
+        for (int i = 0; i < pending.size(); i += OSV_BATCH_SIZE) {
+            List<PackageRef> batch = pending.subList(i, Math.min(i + OSV_BATCH_SIZE, pending.size()));
+            flushBatch(batch, results);
+        }
+        return results;
+    }
+
+    private void flushBatch(List<PackageRef> batch, Map<String, List<VulnerabilityEntry>> results) {
+        if (batch.isEmpty()) return;
+
+        StringBuilder queries = new StringBuilder("[");
+        for (int i = 0; i < batch.size(); i++) {
+            PackageRef pkg = batch.get(i);
+            if (i > 0) queries.append(',');
+            queries.append(String.format(
+                    "{\"package\":{\"name\":\"%s:%s\",\"ecosystem\":\"Maven\"},\"version\":\"%s\"}",
+                    pkg.groupId(), pkg.artifactId(), pkg.version()));
+        }
+        queries.append("]");
+        String payload = String.format("{\"queries\":%s}", queries);
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(OSV_BATCH_URL))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                logger.warn(
+                        "[CveLookupService] OSV batch query returned HTTP {}; falling back to sequential lookups",
+                        response.statusCode());
+                fallbackSequential(batch, results);
+                return;
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode resArr = root.get("results");
+            if (resArr == null || !resArr.isArray() || resArr.size() != batch.size()) {
+                logger.warn("[CveLookupService] OSV batch response shape mismatch; falling back to sequential lookups");
+                fallbackSequential(batch, results);
+                return;
+            }
+
+            for (int i = 0; i < batch.size(); i++) {
+                PackageRef pkg = batch.get(i);
+                String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
+                JsonNode node = resArr.get(i);
+                JsonNode vulns = node == null ? null : node.get("vulns");
+                List<VulnerabilityEntry> entries;
+                if (node == null || node.isNull()) {
+                    entries = List.of();
+                } else {
+                    entries = parseVulnsArray(vulns);
+                }
+                putCache(key, entries);
+                results.put(key, entries);
+            }
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            logger.warn(
+                    "[CveLookupService] OSV batch query failed: {}; falling back to sequential lookups",
+                    e.getMessage());
+            fallbackSequential(batch, results);
+        }
+    }
+
+    private void fallbackSequential(List<PackageRef> batch, Map<String, List<VulnerabilityEntry>> results) {
+        for (PackageRef pkg : batch) {
             String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
             try {
                 List<VulnerabilityEntry> vulns = lookup(pkg.groupId(), pkg.artifactId(), pkg.version());
@@ -147,8 +238,6 @@ public class CveLookupService {
                 logger.warn("[CveLookupService] Could not scan {}: {}", key, e.getMessage());
             }
         }
-
-        return results;
     }
 
     // ── Cache management ────────────────────────────────────────────
@@ -186,22 +275,26 @@ public class CveLookupService {
         List<VulnerabilityEntry> entries = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(json);
-            JsonNode vulns = root.get("vulns");
-            if (vulns == null || !vulns.isArray()) return entries;
-
-            for (JsonNode vuln : vulns) {
-                String id = vuln.has("id") ? vuln.get("id").asText() : null;
-                String summary = vuln.has("summary") ? vuln.get("summary").asText() : null;
-                if (id == null) continue;
-
-                String severity = classifySeverity(vuln);
-                String fixedIn = extractFirstFixed(vuln);
-                double cvssScore = extractCvssScore(vuln);
-
-                entries.add(new VulnerabilityEntry(id, summary, severity, fixedIn, cvssScore));
-            }
+            entries = parseVulnsArray(root.get("vulns"));
         } catch (Exception e) {
             // JSON parse error — return empty
+        }
+        return entries;
+    }
+
+    private List<VulnerabilityEntry> parseVulnsArray(JsonNode vulns) {
+        List<VulnerabilityEntry> entries = new ArrayList<>();
+        if (vulns == null || !vulns.isArray()) return entries;
+        for (JsonNode vuln : vulns) {
+            String id = vuln.has("id") ? vuln.get("id").asText() : null;
+            String summary = vuln.has("summary") ? vuln.get("summary").asText() : null;
+            if (id == null) continue;
+
+            String severity = classifySeverity(vuln);
+            String fixedIn = extractFirstFixed(vuln);
+            double cvssScore = extractCvssScore(vuln);
+
+            entries.add(new VulnerabilityEntry(id, summary, severity, fixedIn, cvssScore));
         }
         return entries;
     }
