@@ -65,6 +65,13 @@ leave it out.
 
    a) If the PR is a draft, mark it ready: `gh pr ready <PR_NUMBER>`
    b) Merge: `gh pr merge --squash --delete-branch <PR_NUMBER>`
+   c) **Close the linked issue manually.** `Closes #N` auto-close only fires when a PR
+      merges into the **default branch (`main`)**. PRs in this repo target `staging`,
+      so the keyword does nothing and the issue silently stays open. After a staging
+      merge, always run:
+      `gh issue close <ISSUE_NUMBER> --comment "Fixed by PR #<PR_NUMBER> (merged to staging <date>)"`
+      When a later staging→main integration PR lands, GitHub will auto-close anything
+      still open, but do not rely on that — close at merge time.
 
    > **Note on auto-merge:** If the repo setting "Allow auto-merge" is enabled (Settings → General → Pull Requests), replace step (b) with:
    > `gh pr merge --squash --auto <PR_NUMBER>`
