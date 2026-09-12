@@ -7,8 +7,8 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 [![AI](https://img.shields.io/badge/built_by-AI_%2B_human_review-8A2BE2)]()
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05%2B-green)](https://spec.modelcontextprotocol.io)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.14-brightgreen)](https://spring.io/projects/spring-boot)
-[![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.0--RC2-blue)](https://spring.io/projects/spring-ai)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.1-blue)](https://spring.io/projects/spring-ai)
 [![Transport](https://img.shields.io/badge/transport-stdio%20%7C%20HTTP-lightgrey)]()
 [![Smithery](https://smithery.ai/badge/mcp-server-jvm-build-tools)](https://smithery.ai/server/mcp-server-jvm-build-tools)
 
@@ -902,6 +902,6 @@ Apache License 2.0. See [LICENSE](LICENSE).
 ---
 
 **Repository:** [github.com/thepragmatik/mcp-server-jvm-build-tools](https://github.com/thepragmatik/mcp-server-jvm-build-tools)
-**Built with:** Spring Boot 3.5.14, Spring AI 2.0.0-RC2, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.16
+**Built with:** Spring Boot 4.1.1, Spring AI 2.0.1, MCP SDK 2.0.0-RC1 (bundled), Maven Embedder 3.9.16
 ---
 > **CI/CD:** This repository uses automated swarm workflows. Pull requests are auto-merged after AI-driven code review (ADVERSARIAL + CODE-QUALITY) once all CI checks pass.
