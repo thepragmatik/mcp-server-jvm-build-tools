@@ -1,7 +1,8 @@
 # Server Startup & Tool-Registration Baseline
 
 Measured: 2026-09-12, packaged jar (`target/mcp-server-jvm-build-tools.jar`,
-1.3.1 + PR #196 resource packaging fix), laptop-class hardware
+1.3.1 + resource packaging fix shipped in PR #198), at commit bcff7b6 of
+branch `fix/197-package-profile-resources`, laptop-class hardware
 (Apple Silicon, 16 GB, JDK 25 / temurin, local disk, no container).
 
 ## Method
@@ -39,4 +40,9 @@ they hit the jar-packaging bug below and never bound a port).
   `application.properties`, silently excluding `application-http.properties`,
   `application-metrics.properties` and `logback-spring.xml` from the jar. With
   those files missing, the http profile never activated a servlet web server
-  and the process sat idle forever with nothing listening. Tracked as PR #196.
+  and the process sat idle forever with nothing listening. Diagnosed under
+  PR #196 (closed unmerged after a branch rename); fixed and shipped by
+  PR #198, with a regression test in
+  `ProfileResourcesPackagingTest`.
+- Version note: the jar reports `1.3.1` (pom not yet bumped). Re-measure at
+  the next release version before treating these numbers as release SLA data.
