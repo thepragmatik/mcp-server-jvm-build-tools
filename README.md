@@ -15,6 +15,13 @@
 > **Transparency note:** This project is built with AI assistance — every line is reviewed, tested, and approved by a human. Think of it as pair-programming with a very caffeinated robot that never sleeps. If that's not your thing, we totally get it. If it is — welcome aboard. 🤖 + 🧠
 
 
+## What's New in v1.3.3 (September 2026)
+
+- **6 more tools documented** — README now covers `create_build_plan`, `execute_build_plan`, `analyze_pom_dependencies`, `scan_dependency_cves`, `validate_ci_flow`, and `interpret_ci_flow`, with descriptions and parameter tables extracted from the tool annotations (#194)
+- **Faster CVE scans** — `scan_dependency_cves` now uses the OSV.dev `querybatch` endpoint: a scan of N dependencies costs ceil(N/100) HTTP round-trips instead of N sequential ones, with automatic sequential fallback to preserve correctness (#195)
+
+See the [full changelog](CHANGELOG.md) and [protocol evidence](docs/EVIDENCE.md).
+
 ## What's New in v1.3.1 (September 2026)
 
 - **HTTP transport fixed** — `--spring.profiles.active=http` (and `scripts/launcher.sh --http`) now actually binds a servlet web server and serves `GET /health` (#187)
