@@ -37,12 +37,17 @@ leave it out.
    ```sh
    git fetch origin pull/<PR_NUMBER>/head:pr-review && git checkout pr-review
    mvn -B verify --no-transfer-progress
-   # After full review, post verdict via GitHub:
+   # Reviewers draft their verdict text and return it to the orchestrator, who
+   # posts it via GitHub (see "Orchestrator-central gating" below — in parallel
+   # mode reviewers/subagents never run `gh` themselves):
    gh pr review <PR_NUMBER> --repo thepragmatik/mcp-server-jvm-build-tools \
      --request-changes --body "ADVERSARIAL — VERDICT: REQUEST_CHANGES
 
    <specific findings with file paths and line numbers>"
    ```
+   **In parallel mode (see "Parallel increment mode" below), GATE 2 posting is
+   done by the orchestrator: reviewer subagents return verdict text only, and
+   the orchestrator posts it through `gh`.**
 
    **Review roles:**
    - **ADVERSARIAL** — correctness, edge cases, concurrency, security, regressions,
@@ -77,6 +82,7 @@ leave it out.
    > `gh pr merge --squash --auto <PR_NUMBER>`
    > Then delete the branch after merge completes:
    > `gh api repos/:owner/:repo/git/refs/heads/<branch> -X DELETE`
+   > Step (c) (manual issue close) still applies to auto-merged PRs.
 
    If any condition is not met, block and notify. Never force-push,
    never modify branch protection, and never merge on red/unknown CI.
@@ -90,6 +96,7 @@ leave it out.
 - Evidence over assertion: verify with real tool output; never fabricate results,
   metrics, or test outcomes. If unknown, say so.
 - Flag schema, architecture, or strategy changes for explicit human approval.
+
 ## Parallel increment mode
 
 Multiple increments may run in parallel against this repository when each
@@ -98,9 +105,12 @@ follows the 4-gate state machine independently. Rules:
 1. **Private per-agent clones.** Each increment works in its own fresh clone
    (e.g. `/tmp/mcp-jvm-incX`). Never share one checkout between increments, and
    never commit from a shared working tree.
-2. **Disjoint file scopes.** Parallel increments must touch disjoint files (or
-   at minimum disjoint areas of a file). If two increments must edit the same
-   file, serialize them instead of merging blind.
+2. **Disjoint file scopes.** Parallel increments must touch disjoint files.
+   If two increments must edit the same file, serialize them instead of
+   merging blind: after the first increment's PR squash-merges, the second
+   rebases onto the updated `staging`, re-runs `mvn -B verify`, and re-requests
+   review before merging. This applies to docs-only vs code-only increments
+   too (a docs PR and a code PR touching `docs/` must still be disjoint).
 3. **Orchestrator-central gating.** Reviewer subagents return review text only;
    the orchestrator posts all GitHub artifacts (issues, reviews, gate-3
    responses, merges, issue closes) through the `gh` CLI. Subagents never
@@ -108,4 +118,8 @@ follows the 4-gate state machine independently. Rules:
 4. **Manual issue close.** PRs target `staging`, so `Closes #N` never fires on
    merge (see GATE 4). After each staging squash-merge, the orchestrator closes
    the linked issue manually with a comment linking the PR and merge date.
-
+5. **Work claims.** The orchestrator assigns each issue to exactly one increment
+   before branch-out; the issue number appears in the branch name
+   (`docs/<issue>-<slug>`) and the PR body, so no two increments pick the same
+   work. Merges to `staging` are serialized: merge PR A, close issue A, then
+   merge PR B.
