@@ -90,3 +90,22 @@ leave it out.
 - Evidence over assertion: verify with real tool output; never fabricate results,
   metrics, or test outcomes. If unknown, say so.
 - Flag schema, architecture, or strategy changes for explicit human approval.
+## Parallel increment mode
+
+Multiple increments may run in parallel against this repository when each
+follows the 4-gate state machine independently. Rules:
+
+1. **Private per-agent clones.** Each increment works in its own fresh clone
+   (e.g. `/tmp/mcp-jvm-incX`). Never share one checkout between increments, and
+   never commit from a shared working tree.
+2. **Disjoint file scopes.** Parallel increments must touch disjoint files (or
+   at minimum disjoint areas of a file). If two increments must edit the same
+   file, serialize them instead of merging blind.
+3. **Orchestrator-central gating.** Reviewer subagents return review text only;
+   the orchestrator posts all GitHub artifacts (issues, reviews, gate-3
+   responses, merges, issue closes) through the `gh` CLI. Subagents never
+   write to GitHub.
+4. **Manual issue close.** PRs target `staging`, so `Closes #N` never fires on
+   merge (see GATE 4). After each staging squash-merge, the orchestrator closes
+   the linked issue manually with a comment linking the PR and merge date.
+
