@@ -431,39 +431,31 @@ public class CveLookupService {
     // ── Severity classification ─────────────────────────────────────
 
     static String classifySeverity(JsonNode vuln) {
-        double score = extractCvssScore(vuln);
-        return score > 0.0 ? cvssToSeverity(score) : "UNKNOWN";
+        var score = extractCvssBaseScore(vuln);
+        return score.isPresent() ? cvssToSeverity(score.getAsDouble()) : "UNKNOWN";
     }
 
     static double extractCvssScore(JsonNode vuln) {
+        return extractCvssBaseScore(vuln).orElse(0.0);
+    }
+
+    private static java.util.OptionalDouble extractCvssBaseScore(JsonNode vuln) {
         JsonNode severity = vuln.get("severity");
-        if (severity == null || !severity.isArray()) return 0.0;
+        if (severity == null || !severity.isArray()) return java.util.OptionalDouble.empty();
 
-        // Prefer CVSS_V3 scores
+        // The OSV schema stores a CVSS vector in score. Numeric scores and other
+        // schemes are unsupported; accepting them would invent a severity.
+        double highest = -1;
         for (JsonNode sev : severity) {
-            if (sev.has("type") && sev.has("score") && sev.get("type").asText().contains("CVSS_V3")) {
-                try {
-                    double score = Double.parseDouble(sev.get("score").asText());
-                    if (Double.isFinite(score) && score >= 0.0 && score <= 10.0) return score;
-                } catch (NumberFormatException e) {
-                    // fall through
-                }
+            if (sev.isObject()
+                    && sev.path("type").isTextual()
+                    && "CVSS_V3".equals(sev.path("type").asText())
+                    && sev.path("score").isTextual()) {
+                var score = CvssV31.baseScore(sev.path("score").asText());
+                if (score.isPresent()) highest = Math.max(highest, score.getAsDouble());
             }
         }
-
-        // Fallback: any score field
-        for (JsonNode sev : severity) {
-            if (sev.has("score")) {
-                try {
-                    double score = Double.parseDouble(sev.get("score").asText());
-                    if (Double.isFinite(score) && score >= 0.0 && score <= 10.0) return score;
-                } catch (NumberFormatException e) {
-                    // fall through
-                }
-            }
-        }
-
-        return 0.0;
+        return highest < 0 ? java.util.OptionalDouble.empty() : java.util.OptionalDouble.of(highest);
     }
 
     static String extractFirstFixed(JsonNode vuln) {
