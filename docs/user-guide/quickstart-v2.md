@@ -60,10 +60,10 @@ Results contain aggregate counts and up to 12 structured diagnostics, with error
 
 If Gradle or sbt reports failed-test totals without a surviving test detail, the result includes a generic `test` diagnostic such as `Test assertion failed`. Use it to identify the failure category, then inspect the local test report for the specific assertion. The server does not send test names or assertion values to the agent in this fallback.
 
-Starting with `v2.0.0-rc.2`, `analyze_build_output` and `execute_build_command`
+In builds after `v2.0.0-rc.1`, `analyze_build_output` and `execute_build_command`
 clients can read their safe results directly from MCP
 `structuredContent` and validate it with the advertised `outputSchema`. Text-only
-clients receive JSON in `content[0].text`. See the
+clients, including RC1, receive JSON in `content[0].text`. See the
 [structured-result reference](../reference/structured-build-results.md) for the
 exact fields and a synthetic example.
 

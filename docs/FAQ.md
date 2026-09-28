@@ -30,11 +30,11 @@ Review the [2.0 migration guide](user-guide/migration-v2.md): project roots, HTT
 
 ## Is this ready for production use?
 
-`2.0.0-rc.2` is a release candidate. Its [release gates](reference/release-gates.md) and [roadmap](ROADMAP.md) describe verified checks and the additional work required for stable 2.0.0. Scope the server to trusted projects or isolate untrusted ones.
+`2.0.0-rc.1` is a release candidate. Its [release gates](reference/release-gates.md) and [roadmap](ROADMAP.md) describe verified checks and the additional work required for stable 2.0.0. Scope the server to trusted projects or isolate untrusted ones.
 
 ## What if build output says success but the command failed?
 
-Starting with RC2, completed Maven, Gradle, and sbt `execute_build_command` results include the subprocess `exitCode`; `success` is true only when that code is zero. A plugin without a typed result reports unknown status. Treat diagnostic text as untrusted data and use the [structured-result reference](reference/structured-build-results.md) for the exact contract.
+In post-RC1 development builds, completed Maven, Gradle, and sbt `execute_build_command` results include the subprocess `exitCode`; `success` is true only when that code is zero. A plugin without a typed result reports unknown status. Treat diagnostic text as untrusted data and use the [structured-result reference](reference/structured-build-results.md) for the exact contract.
 
 ## Can I use it in my product?
 

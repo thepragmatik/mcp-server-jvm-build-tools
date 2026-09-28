@@ -10,7 +10,7 @@ cd mcp-server-jvm-build-tools
 ./mvnw -B verify --no-transfer-progress
 ```
 
-The executable JAR is `target/mcp-server-jvm-build-tools.jar`. To try the published prerelease, [download the v2.0.0-rc.2 JAR](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/download/v2.0.0-rc.2/mcp-server-jvm-build-tools.jar) and read its [release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2). RC2 returns privacy-filtered build analysis in both MCP `structuredContent` and JSON text.
+The executable JAR is `target/mcp-server-jvm-build-tools.jar`. To try the published prerelease, [download the v2.0.0-rc.1 JAR](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/download/v2.0.0-rc.1/mcp-server-jvm-build-tools.jar) and read its [release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1). RC1 returns build analysis as JSON text; MCP `structuredContent` is a later development increment.
 
 ## Connect a local MCP client
 

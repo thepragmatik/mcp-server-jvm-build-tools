@@ -2,7 +2,7 @@
 
 Run and inspect Maven, Gradle, and sbt builds through one Model Context Protocol server. The 2.0 release candidate exposes **24 public tools** over local stdio or optional Streamable HTTP.
 
-[Download the published v2.0.0-rc.2 JAR](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/download/v2.0.0-rc.2/mcp-server-jvm-build-tools.jar) or read its [release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2). This prerelease includes the [structured build-result contract](reference/structured-build-results.md), bounded Maven metadata checks, and privacy-safe aggregate dependency security results.
+[Download the published v2.0.0-rc.1 JAR](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/download/v2.0.0-rc.1/mcp-server-jvm-build-tools.jar) or read its [release notes](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1). The structured-result feature described in the [post-RC1 reference](reference/structured-build-results.md) is a later development increment and is not part of the RC1 download.
 
 <div class="grid cards" markdown>
 

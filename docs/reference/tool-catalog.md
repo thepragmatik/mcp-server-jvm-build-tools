@@ -40,7 +40,7 @@ and [2.0 security design](design-v2.md) before granting execution access.
 
 For exact input parameters and JSON schemas, ask the running server for
 `tools/list`; that response is authoritative for the version you installed.
-Starting with `v2.0.0-rc.2`, both `analyze_build_output` and `execute_build_command` advertise an
+In builds after `v2.0.0-rc.1`, both `analyze_build_output` and `execute_build_command` advertise an
 `outputSchema` and return the same safe JSON object in `structuredContent`
 and legacy text; see
 [structured build results](structured-build-results.md).

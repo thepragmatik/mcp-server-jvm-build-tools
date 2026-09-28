@@ -2,9 +2,9 @@
 
 This is the active 2.0 roadmap. The 1.x research history remains in Git history and release notes; its tool counts and protocol claims are not the current contract.
 
-## Current published prerelease: 2.0.0-rc.2
+## Current development line: 2.0.0-rc.2 (unreleased)
 
-The latest published 2.0 prerelease is [v2.0.0-rc.2](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2). Its tag identifies the immutable tested artifact; compare later `main` commits with that tag before assuming a feature is in the download.
+The latest published 2.0 prerelease is [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1). Builds from `main` report the next candidate version so they cannot be confused with that immutable release artifact.
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.
@@ -17,9 +17,9 @@ The latest published 2.0 prerelease is [v2.0.0-rc.2](https://github.com/thepragm
 - Nonroot Docker image with verified Gradle/sbt downloads and reusable Maven build cache.
 - Bounded, offline Maven POM structural validation with model-visible fixed configuration diagnostics and packaged HTTP/stdio privacy probes.
 
-## Release candidate gate: rc.1 and later
+## Release candidate gate: v2.0.0-rc.1
 
-The checks below apply to each candidate, including rc.2, on its final tag commit.
+Completed for the published prerelease tag. The checks below remain the release gate for subsequent tags.
 
 1. Finish full Java 21/23/25 verification, packaged stdio and HTTP protocol smoke, and strict MkDocs build.
 2. Red-team prompt injection, path races, scope bypass, malformed and oversized JSON-RPC, and synthetic privacy canaries through both transports.
