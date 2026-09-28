@@ -17,6 +17,8 @@
 package com.pragmatik.buildtools.dependency;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.pragmatik.buildtools.build.BuildToolProvider;
 import com.pragmatik.buildtools.dependency.security.CveLookupService;
@@ -24,6 +26,7 @@ import com.pragmatik.buildtools.security.ProjectAccessPolicy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,6 +125,31 @@ class DependencyServiceSecurityTest {
     @Nested
     @DisplayName("scanDependencyCves")
     class ScanDependencyCves {
+
+        @Test
+        void namedPipeBuildMarkerFailsBeforeNetworkWithoutBlocking() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("pipe-project"));
+            Path marker = project.resolve("pom.xml");
+            Process command;
+            try {
+                command = new ProcessBuilder("mkfifo", marker.toString()).start();
+            } catch (IOException unavailable) {
+                assumeTrue(false, "mkfifo is unavailable");
+                return;
+            }
+            assumeTrue(command.waitFor() == 0, "mkfifo is unavailable");
+            CountingLookup lookup = new CountingLookup();
+
+            String result = assertTimeoutPreemptively(
+                    Duration.ofSeconds(2),
+                    () -> new DependencyService(new BuildToolProvider(), lookup)
+                            .scanDependencyCves(project.toString(), "HIGH"));
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result)
+                    .contains("Cannot safely read build configuration")
+                    .doesNotContain(project.toString());
+        }
 
         @Test
         @DisplayName("returns error for missing projectDir")

@@ -156,6 +156,9 @@ public final class AnchoredProjectFileReader {
                     || filename.contains("\\")) {
                 throw new IOException("Invalid project file request");
             }
+            // A FIFO/device can block a read-only open before the byte limit applies.
+            // Inspect the final entry through the held directory before opening it.
+            requireSafeMarker(filename);
             try (var channel = directory.newByteChannel(
                             Path.of(filename), Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
                     var input = Channels.newInputStream(channel)) {

@@ -317,6 +317,18 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void oversizedOrMalformedCveScanCannotLookComplete() {
+        String oversized = "x".repeat(256_001)
+                + "{\"scanStatus\":\"complete\",\"scanSummary\":{\"totalDeps\":1,\"vulnerableDeps\":0}}";
+        for (String raw : new String[] {oversized, "{malformed", "{}"}) {
+            String safe = policy.protect("scan_dependency_cves", raw);
+            assertTrue(safe.contains("\"scanStatus\":\"incomplete\""));
+            assertTrue(safe.contains("\"isError\":true"));
+            assertFalse(safe.contains("\"vulnerableDeps\""));
+        }
+    }
+
+    @Test
     void boundsLargeResultsAndKeepsFinalDiagnostic() {
         String output = "x".repeat(300_000) + "\nERROR /home/private-user/File.java";
         String safe = policy.protect("execute_build_command", output);

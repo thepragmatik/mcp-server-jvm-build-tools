@@ -39,6 +39,13 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
@@ -67,6 +74,15 @@ public class DependencyService {
 
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
     private static final int MAX_SCAN_BUILD_FILE_BYTES = 1024 * 1024;
+    private static final int SCAN_READ_TIMEOUT_SECONDS = 5;
+    // Zero queue and one daemon keep a blocked native file-open race from creating
+    // an unbounded number of threads or stalling request threads indefinitely.
+    private static final ThreadPoolExecutor SCAN_FILE_READER =
+            new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<>(), task -> {
+                Thread worker = new Thread(task, "dependency-scan-file-reader");
+                worker.setDaemon(true);
+                return worker;
+            });
 
     private final HttpClient httpClient;
     private final BuildToolProvider buildToolProvider;
@@ -582,8 +598,8 @@ public class DependencyService {
         Map<String, Object> result = new LinkedHashMap<>();
 
         try {
-            BuildFileSnapshot buildFile =
-                    readScanBuildFile(Path.of(projectDir).toAbsolutePath().normalize());
+            BuildFileSnapshot buildFile = readScanBuildFileWithDeadline(
+                    Path.of(projectDir).toAbsolutePath().normalize());
             if (buildFile == null) {
                 return JsonUtils.errorJson(
                         "No build files found (pom.xml, build.gradle, build.gradle.kts). Cannot scan dependencies.");
@@ -680,6 +696,29 @@ public class DependencyService {
     private record BuildFileSnapshot(String tool, String content) {}
 
     private static final class BuildFileTooLargeException extends IOException {}
+
+    private static BuildFileSnapshot readScanBuildFileWithDeadline(Path project) throws IOException {
+        Future<BuildFileSnapshot> pending;
+        try {
+            pending = SCAN_FILE_READER.submit(() -> readScanBuildFile(project));
+        } catch (RejectedExecutionException unavailable) {
+            throw new IOException("Dependency scan file reader unavailable");
+        }
+        try {
+            return pending.get(SCAN_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new IOException("Dependency scan file read timed out");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Dependency scan file read interrupted");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) throw io;
+            throw new IOException("Dependency scan file read failed");
+        } finally {
+            pending.cancel(true);
+        }
+    }
 
     private static BuildFileSnapshot readScanBuildFile(Path project) throws IOException {
         try (AnchoredProjectFileReader.ProjectDirectory directory = AnchoredProjectFileReader.open(project)) {
