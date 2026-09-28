@@ -1,6 +1,6 @@
 # Design review for 2.0
 
-This page records the architecture decision for the 2.0 development line. The first prerelease candidate is `v2.0.0-rc.1`: the new required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. The Maven project version is `2.0.0-rc.1`; the tag is created only after release gates pass.
+This page records the architecture decision for the 2.0 development line. The published first prerelease is `v2.0.0-rc.1`; `main` now builds the unreleased `2.0.0-rc.2` development candidate. Required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. A later release tag requires all gates to pass on its exact commit.
 
 ## Trust boundaries
 
@@ -53,14 +53,14 @@ Build execution and output analysis return `diagnostics` as structured objects: 
 | Schema parse failure became an empty schema | Abort startup; validate tool inputs | Schema compatibility needs client conformance tests |
 | Arbitrary build output and exceptions could reach the model | Project recognized failures to bounded redacted diagnostics; return generic errors for unknown text | Pattern redaction cannot prove every private identifier was removed |
 | A stored build plan could be executed by ID without a path on the call | Withhold `create_build_plan` and `execute_build_plan` from MCP | Plan ownership and cancellation need a later design |
-| Tool metadata, docs, and registry disagreed | Registry and quickstart describe the 24 exposed tools | Generate public catalog docs from code before stable release |
+| Tool metadata, docs, and registry disagreed | Generate the 24-tool public catalog from runtime metadata and fail CI on drift | Keep prose and historical pages clearly scoped to their release |
 | Project detection could silently fall back to Maven | Treat markerless or ambiguous directories as an explicit error | Hybrid projects must specify a tool name |
 
 A configured root is a filesystem boundary, not a sandbox. The canonical path check prevents common traversal and symlink escape, but a build script can execute programs, reach the network, and mutate files accessible to its process. A hostile workspace therefore needs OS or container isolation. Likewise, client prompts and tool arguments travel through the client/model provider before reaching this server. Relative aliases avoid sending an absolute home path; the server cannot guarantee that a client or user never sends private prompt text.
 
 ## Protocol contract
 
-The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/java-sdk/blob/main/VERSIONING.md), whose documented spec line is `2025-11-25`. The SDK BOM aligns all resolved MCP modules to 2.0.1. The HTTP profile registers the SDK's stateless servlet on `/mcp`; its packaged-jar smoke and automated integration tests exercise `initialize`, `tools/list`, and `tools/call`. Discovery advertises that revision only. The 2026 draft `server/discover` handler is an inactive compatibility experiment; `/mcp/discover` remains an informational probe. A servlet filter validates `Origin` on every MCP request before SDK dispatch and rejects untrusted loopback `Host` values, including when bearer authentication is disabled. It caches the configured Origin policy at startup. The official 2025-11-25 DNS rebinding scenario is a release gate; other conformance scenarios and both transports need client coverage before stable release.
+The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/java-sdk/blob/main/VERSIONING.md), whose documented spec line is `2025-11-25`. The SDK BOM aligns all resolved MCP modules to 2.0.1. The HTTP profile registers the SDK's stateless servlet on `/mcp`; its packaged-jar smoke and automated integration tests exercise `initialize`, `tools/list`, and `tools/call`. Discovery advertises that revision only. The published 2026-07-28 revision is not yet supported by this Java SDK; an inactive `server/discover` handler remains a compatibility experiment, and `/mcp/discover` is only an informational probe. A servlet filter validates `Origin` on every MCP request before SDK dispatch and rejects untrusted loopback `Host` values, including when bearer authentication is disabled. It caches the configured Origin policy at startup. The official 2025-11-25 DNS rebinding scenario is a release gate; other conformance scenarios and both transports need client coverage before stable release.
 
 ## Performance budget
 

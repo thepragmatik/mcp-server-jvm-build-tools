@@ -141,7 +141,7 @@ nav:
       - Historical Build Plan Authoring: specs/build-plan-authoring.md
       - Historical OAuth 2.1 Credentials: specs/oauth-client-credentials.md
       - Historical Observability: specs/observability.md
-      - Protocol Evidence: EVIDENCE.md
+      - Historical Protocol Evidence (1.x): EVIDENCE.md
   - Testing:
       - Historical Test Results (1.x): reference/test-results.md
       - Historical Test Plan (1.x): reference/test-plan.md
