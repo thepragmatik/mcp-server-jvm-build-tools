@@ -38,6 +38,8 @@ public class MavenOutputParser implements BuildOutputParser {
     // Test summary: "Tests run: 42, Failures: 1, Errors: 0, Skipped: 0"
     private static final Pattern TEST_SUMMARY_PATTERN = Pattern.compile(
             "Tests run:\\s*(\\d+),\\s*Failures:\\s*(\\d+),\\s*Errors:\\s*(\\d+),\\s*Skipped:\\s*(\\d+)");
+    private static final Pattern TEST_CLASS_SUFFIX_PATTERN = Pattern.compile("\\s-+\\s+in\\s+\\S+");
+    private static final Pattern PLUGIN_BOUNDARY_PATTERN = Pattern.compile("^\\[INFO]\\s+---\\s+.+\\s+---\\s*$");
 
     // Error line with file:line: "[ERROR] /path/to/File.java:[45,12] message"
     private static final Pattern ERROR_FILE_LINE_PATTERN =
@@ -79,24 +81,35 @@ public class MavenOutputParser implements BuildOutputParser {
         String[] lines = rawOutput.split("\\r?\\n");
 
         boolean success = exitCode == 0;
-        Map<String, Object> testSummary = null;
         List<Map<String, Object>> errors = new ArrayList<>();
         List<Map<String, Object>> warnings = new ArrayList<>();
         String duration = null;
 
-        // For aggregating multiple test module results
-        int aggTotal = 0, aggFailures = 0, aggErrors = 0, aggSkipped = 0;
+        TestCounts completedTests = new TestCounts();
+        TestCounts perClassFallback = new TestCounts();
 
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
 
-            // Parse test summary — aggregate across multiple modules
+            // A plugin boundary closes an execution that emitted class results
+            // but no final Results total (for example, interrupted output).
+            if (PLUGIN_BOUNDARY_PATTERN.matcher(line).matches()) {
+                completedTests.add(perClassFallback);
+                perClassFallback.clear();
+            }
+
+            // Surefire/Failsafe print each class and then a final total. Use the
+            // final total once; retain class counts only when it is absent.
             Matcher testMatcher = TEST_SUMMARY_PATTERN.matcher(line);
             if (testMatcher.find()) {
-                aggTotal += Integer.parseInt(testMatcher.group(1));
-                aggFailures += Integer.parseInt(testMatcher.group(2));
-                aggErrors += Integer.parseInt(testMatcher.group(3));
-                aggSkipped += Integer.parseInt(testMatcher.group(4));
+                if (TEST_CLASS_SUFFIX_PATTERN
+                        .matcher(line.substring(testMatcher.end()))
+                        .find()) {
+                    perClassFallback.add(testMatcher);
+                } else {
+                    completedTests.add(testMatcher);
+                    perClassFallback.clear();
+                }
             }
 
             // Parse BUILD SUCCESS / BUILD FAILURE
@@ -139,16 +152,10 @@ public class MavenOutputParser implements BuildOutputParser {
             }
         }
 
-        // Build test summary from aggregated values
-        testSummary = new LinkedHashMap<>();
-        testSummary.put("total", aggTotal);
-        testSummary.put("passed", aggTotal - aggFailures - aggErrors - aggSkipped);
-        testSummary.put("failed", aggFailures);
-        testSummary.put("errors", aggErrors);
-        testSummary.put("skipped", aggSkipped);
+        completedTests.add(perClassFallback);
 
         result.put("success", success);
-        result.put("testSummary", testSummary);
+        result.put("testSummary", completedTests.toSummary());
         result.put("errors", errors);
         result.put("warnings", warnings);
         result.put("duration", duration != null ? duration : "0s");
@@ -167,5 +174,43 @@ public class MavenOutputParser implements BuildOutputParser {
         summary.put("errors", 0);
         summary.put("skipped", 0);
         return summary;
+    }
+
+    private static final class TestCounts {
+        private int total;
+        private int failures;
+        private int errors;
+        private int skipped;
+
+        void add(Matcher matcher) {
+            total += Integer.parseInt(matcher.group(1));
+            failures += Integer.parseInt(matcher.group(2));
+            errors += Integer.parseInt(matcher.group(3));
+            skipped += Integer.parseInt(matcher.group(4));
+        }
+
+        void add(TestCounts other) {
+            total += other.total;
+            failures += other.failures;
+            errors += other.errors;
+            skipped += other.skipped;
+        }
+
+        void clear() {
+            total = 0;
+            failures = 0;
+            errors = 0;
+            skipped = 0;
+        }
+
+        Map<String, Object> toSummary() {
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("total", total);
+            summary.put("passed", total - failures - errors - skipped);
+            summary.put("failed", failures);
+            summary.put("errors", errors);
+            summary.put("skipped", skipped);
+            return summary;
+        }
     }
 }

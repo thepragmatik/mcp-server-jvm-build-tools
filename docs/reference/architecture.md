@@ -154,6 +154,11 @@ Full per-tool inputs and outputs are in the [Tools / MCP API reference](tools.md
 | `GradleOutputParser` | `BUILD SUCCESSFUL`/`FAILED`, test summaries, error references, warnings |
 | `SbtOutputParser` | ScalaTest/JUnit pass/fail, `file:line` errors, structured results |
 
+The Maven parser holds per-class Surefire/Failsafe counts as a fallback within
+each plugin execution. A final `Tests run` total replaces that fallback;
+plugin boundaries flush a fallback only when no final total arrived. This
+prevents a normal test run from appearing twice in `testSummary`.
+
 All produce a common JSON shape:
 `{ success, tool, command, testSummary, errors, warnings, errorCount, warningCount, duration }`.
 

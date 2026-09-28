@@ -195,6 +195,61 @@ class BuildOutputParserTest {
             assertThat(testSummary.get("failed")).isEqualTo(1);
             assertThat(testSummary.get("skipped")).isEqualTo(2);
         }
+
+        @Test
+        @DisplayName("uses Surefire Results total instead of adding per-class counts twice")
+        void prefersSurefireAggregateOverPerClassLines() {
+            String output = """
+                    [INFO] --- maven-surefire-plugin:3.5.2:test (default-test) @ synthetic-module ---
+                    [INFO] Tests run: 4, Failures: 1, Errors: 0, Skipped: 1, Time elapsed: 0.1 s -- in example.FirstTest
+                    [INFO] Tests run: 3, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.1 s -- in example.SecondTest
+                    [INFO] Results:
+                    [INFO] Tests run: 7, Failures: 1, Errors: 1, Skipped: 1
+                    [INFO] BUILD FAILURE
+                    """;
+
+            Map<String, Object> result = mavenParser.parse(output, 1, "test");
+
+            assertThat(result.get("success")).isEqualTo(false);
+            assertThat(result.get("testSummary"))
+                    .isEqualTo(Map.of("total", 7, "passed", 4, "failed", 1, "errors", 1, "skipped", 1));
+        }
+
+        @Test
+        @DisplayName("sums class lines when a test execution has no final total")
+        void fallsBackToPerClassLinesWithoutAggregate() {
+            String output = """
+                    [INFO] --- maven-surefire-plugin:3.5.2:test (default-test) @ synthetic-module ---
+                    [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.1 s -- in example.FirstTest
+                    [INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s -- in example.SecondTest
+                    [INFO] BUILD FAILURE
+                    """;
+
+            Map<String, Object> result = mavenParser.parse(output, 1, "test");
+
+            assertThat(result.get("testSummary"))
+                    .isEqualTo(Map.of("total", 5, "passed", 3, "failed", 1, "errors", 0, "skipped", 1));
+        }
+
+        @Test
+        @DisplayName("combines completed and class-only executions without duplicate totals")
+        void combinesCompletedAndIncompleteExecutions() {
+            String output = """
+                    [INFO] --- maven-surefire-plugin:3.5.2:test (default-test) @ first-module ---
+                    [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.1 s -- in example.FirstTest
+                    [INFO] Results:
+                    [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+                    [INFO] --- maven-surefire-plugin:3.5.2:test (default-test) @ second-module ---
+                    [INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s -- in example.SecondTest
+                    [INFO] --- maven-jar-plugin:3.4.2:jar (default-jar) @ second-module ---
+                    [INFO] BUILD FAILURE
+                    """;
+
+            Map<String, Object> result = mavenParser.parse(output, 1, "test");
+
+            assertThat(result.get("testSummary"))
+                    .isEqualTo(Map.of("total", 7, "passed", 6, "failed", 1, "errors", 0, "skipped", 0));
+        }
     }
 
     // ──────────────────────────────────────────────
