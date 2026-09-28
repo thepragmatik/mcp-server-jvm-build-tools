@@ -1,8 +1,8 @@
 # Changelog
 
-## [2.0.0-SNAPSHOT] - Unreleased
+## [2.0.0-rc.1] - Release candidate
 
-This line is a breaking redesign; the first proposed prerelease is v2.0.0-rc.1 after review and conformance gates.
+This breaking prerelease is tagged only after review, conformance, dependency, and performance gates pass.
 
 ### Changed
 

@@ -2,7 +2,7 @@
 
 This is the active 2.0 roadmap. The 1.x research history remains in Git history and release notes; its tool counts and 2026 draft claims are not the current contract.
 
-## Current development slice: 2.0.0-SNAPSHOT
+## Current candidate: 2.0.0-rc.1
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.
