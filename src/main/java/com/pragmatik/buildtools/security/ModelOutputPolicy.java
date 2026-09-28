@@ -80,7 +80,9 @@ public final class ModelOutputPolicy {
     private static final Pattern VERSION = Pattern.compile("\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?\\b");
 
     private static final Pattern DIAGNOSTIC_LINE =
-            Pattern.compile("(?i).*(?:\\berror\\b|\\bfailed\\b|\\bwarning\\b|\\bexception\\b).*");
+            Pattern.compile("(?i).*(?:\\berror\\b|\\bfailed\\b|\\bwarn(?:ing)?\\b|\\bexception\\b).*");
+    private static final Pattern WARNING_PREFIX =
+            Pattern.compile("(?i)^\\s*(?:\\[(?:warn|warning)]|(?:warn|warning)\\b).*");
     private static final Pattern FILE_LOCATION = Pattern.compile(
             "(?i)(?:^|[\\s(])(?:[^\\s:()]+[/\\\\])?[^\\s:()]+\\.(java|kt|scala|xml|gradle|kts|sbt):(?:\\[)?([1-9][0-9]{0,6})");
     private static final List<Replacement> REDACTIONS = List.of(
@@ -208,8 +210,12 @@ public final class ModelOutputPolicy {
                         }
                     }
                     List<Map<String, Object>> diagnostics = new ArrayList<>();
-                    boolean diagnosticsTruncated = copyDiagnostics(root.get("errors"), "error", diagnostics);
-                    diagnosticsTruncated |= copyDiagnostics(root.get("warnings"), "warning", diagnostics);
+                    Map<String, String> fileRefs = new LinkedHashMap<>();
+                    Set<String> seen = new java.util.HashSet<>();
+                    boolean diagnosticsTruncated =
+                            copyDiagnostics(root.get("errors"), "error", diagnostics, fileRefs, seen);
+                    diagnosticsTruncated |=
+                            copyDiagnostics(root.get("warnings"), "warning", diagnostics, fileRefs, seen);
                     putDiagnostics(safe, diagnostics, diagnosticsTruncated);
                 } else {
                     copyPlainDiagnostics(output, safe);
@@ -352,7 +358,12 @@ public final class ModelOutputPolicy {
         }
     }
 
-    private static boolean copyDiagnostics(JsonNode source, String severity, List<Map<String, Object>> target) {
+    private static boolean copyDiagnostics(
+            JsonNode source,
+            String severity,
+            List<Map<String, Object>> target,
+            Map<String, String> fileRefs,
+            Set<String> seen) {
         if (source == null || !source.isArray()) {
             return false;
         }
@@ -360,13 +371,17 @@ public final class ModelOutputPolicy {
         for (JsonNode item : source) {
             JsonNode message = item.isObject() ? item.get("message") : item;
             if (message != null && message.isTextual()) {
-                Map<String, Object> diagnostic = diagnostic(severity, message.asText(), item);
-                if (!target.contains(diagnostic)) {
+                String file =
+                        item.isObject() && item.has("file") ? item.get("file").asText() : "";
+                String line =
+                        item.isObject() && item.has("line") ? item.get("line").asText() : "";
+                String occurrence = severity + "\u0000" + file + "\u0000" + line + "\u0000" + message.asText();
+                if (seen.add(occurrence)) {
                     if (target.size() == MAX_DIAGNOSTICS) {
                         truncated = true;
                         break;
                     }
-                    target.add(diagnostic);
+                    target.add(diagnostic(severity, message.asText(), item, fileRefs));
                 }
             }
         }
@@ -375,21 +390,21 @@ public final class ModelOutputPolicy {
 
     private static void copyPlainDiagnostics(String output, Map<String, Object> safe) {
         List<Map<String, Object>> diagnostics = new ArrayList<>();
+        Set<String> seen = new java.util.HashSet<>();
         boolean truncated = false;
         String[] lines = output.split("\\R");
         for (String severity : List.of("error", "warning")) {
             for (String line : lines) {
                 if (!DIAGNOSTIC_LINE.matcher(line).matches()
-                        || line.toLowerCase(java.util.Locale.ROOT).contains("warn") != "warning".equals(severity)) {
+                        || WARNING_PREFIX.matcher(line).matches() != "warning".equals(severity)) {
                     continue;
                 }
-                Map<String, Object> diagnostic = diagnostic(severity, line, null);
-                if (!diagnostics.contains(diagnostic)) {
+                if (seen.add(severity + "\u0000" + line)) {
                     if (diagnostics.size() == MAX_DIAGNOSTICS) {
                         truncated = true;
                         break;
                     }
-                    diagnostics.add(diagnostic);
+                    diagnostics.add(diagnostic(severity, line, null, new LinkedHashMap<>()));
                 }
             }
         }
@@ -399,6 +414,9 @@ public final class ModelOutputPolicy {
     private static void putDiagnostics(
             Map<String, Object> safe, List<Map<String, Object>> diagnostics, boolean truncated) {
         if (!diagnostics.isEmpty()) {
+            for (int i = 0; i < diagnostics.size(); i++) {
+                diagnostics.get(i).put("diagnosticRef", "d" + (i + 1));
+            }
             safe.put("diagnostics", diagnostics);
         }
         if (truncated) {
@@ -406,7 +424,8 @@ public final class ModelOutputPolicy {
         }
     }
 
-    private static Map<String, Object> diagnostic(String severity, String text, JsonNode item) {
+    private static Map<String, Object> diagnostic(
+            String severity, String text, JsonNode item, Map<String, String> fileRefs) {
         String lower = text.toLowerCase(java.util.Locale.ROOT);
         String fileType = fileType(item, text);
         String category;
@@ -494,12 +513,88 @@ public final class ModelOutputPolicy {
         if (fileType != null) {
             safe.put("fileType", fileType);
         }
+        if (item != null && item.isObject()) {
+            JsonNode file = item.get("file");
+            if (file != null && file.isTextual() && !file.asText().isBlank()) {
+                safe.put("fileRef", fileRefs.computeIfAbsent(file.asText(), ignored -> "f" + (fileRefs.size() + 1)));
+            }
+        }
         Integer line = line(item, text);
         if (line != null) {
             safe.put("line", line);
         }
-        safe.put("message", redact(message));
+        safe.put("message", safeDiagnosticMessage(text, category, message));
         return safe;
+    }
+
+    private static String safeDiagnosticMessage(String original, String category, String fallback) {
+        String lower = original.toLowerCase(java.util.Locale.ROOT);
+        if ("other".equals(category)
+                || original.contains("\n")
+                || original.contains("\r")
+                || containsAny(
+                        lower,
+                        "ignore previous",
+                        "system prompt",
+                        "developer instruction",
+                        "send to ",
+                        "<script",
+                        "curl ",
+                        "wget ",
+                        "http://",
+                        "https://",
+                        "public class ",
+                        "private ",
+                        "protected ",
+                        "package ",
+                        "import ",
+                        "return ")) {
+            return fallback;
+        }
+        // Preserve the failure phrase, never an arbitrary identifier or value:
+        // a source symbol can itself contain a person's or customer's name.
+        if (lower.contains("cannot find symbol")) {
+            String kind = containsAny(lower, "symbol: class ", "class ")
+                    ? "class "
+                    : containsAny(lower, "symbol: variable ", "variable ")
+                            ? "variable "
+                            : containsAny(lower, "symbol: method ", "method ") ? "method " : "";
+            return "cannot find symbol: " + kind + "[redacted-symbol]";
+        }
+        if (lower.contains("not found: value")) {
+            return "not found: value [redacted-symbol]";
+        }
+        if (lower.contains("unresolved reference")) {
+            return "unresolved reference: [redacted-symbol]";
+        }
+        if (containsAny(lower, "type mismatch", "incompatible types")) {
+            return "type mismatch: involved types withheld";
+        }
+        if (lower.contains("';' expected")) {
+            return "';' expected";
+        }
+        if (containsAny(lower, "expected", "illegal start", "not a statement")) {
+            return "compiler syntax error: token or expression withheld";
+        }
+        if (containsAny(lower, "assertionerror", "assertion failed")) {
+            return "test assertion failed: values withheld";
+        }
+        if (containsAny(lower, "test failed", "tests failed")) {
+            return "test failed: inspect local test report";
+        }
+        if (containsAny(lower, "could not resolve", "failed to resolve", "could not find artifact")) {
+            return "dependency resolution failed: identity withheld";
+        }
+        if (containsAny(lower, "non-parseable pom", "malformed pom")) {
+            return "POM parsing failed: inspect local build file";
+        }
+        if (containsAny(lower, "unknown lifecycle phase", "task not found")) {
+            return "build phase or task not found: identity withheld";
+        }
+        if (containsAny(lower, "execution failed", "build failed", "compilation failed")) {
+            return "build execution failed: inspect local build output";
+        }
+        return fallback;
     }
 
     private static boolean containsAny(String text, String... fragments) {

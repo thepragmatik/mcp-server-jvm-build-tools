@@ -17,7 +17,7 @@ environment variables for keys and generic placeholders otherwise. When in doubt
 leave it out.
 
 For build-result changes, keep raw logs and commands out of model-visible JSON.
-Diagnostics must remain bounded structured objects with server-authored messages;
+Diagnostics must remain bounded structured objects with redacted messages and safe fallback text;
 test them with synthetic path, email, secret, and prompt-injection canaries.
 
 ## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
