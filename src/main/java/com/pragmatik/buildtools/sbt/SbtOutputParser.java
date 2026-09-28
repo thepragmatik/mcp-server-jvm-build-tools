@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.sbt;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -228,7 +229,8 @@ public class SbtOutputParser implements BuildOutputParser {
             }
         }
 
-        if ((failedTests > 0 || errorTests > 0) && !hasUsefulTestDiagnostic(errors)) {
+        int firstTestDiagnosticIndex = firstUsefulTestDiagnosticIndex(errors);
+        if ((failedTests > 0 || errorTests > 0) && firstTestDiagnosticIndex < 0) {
             List<Map<String, Object>> testErrors = new ArrayList<>(2 + errors.size());
             if (failedTests > 0) {
                 testErrors.add(testDiagnostic("Test assertion failed"));
@@ -238,6 +240,10 @@ public class SbtOutputParser implements BuildOutputParser {
             }
             testErrors.addAll(errors);
             errors = testErrors;
+        } else if ((failedTests > 0 || errorTests > 0)
+                && firstTestDiagnosticIndex >= BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+            // Keep a real test failure visible when earlier diagnostics fill the model cap.
+            errors.addFirst(errors.remove(firstTestDiagnosticIndex));
         }
         result.put("success", success);
         result.put("testSummary", buildTestSummary(totalTests, passedTests, failedTests, errorTests, skippedTests));
@@ -251,8 +257,9 @@ public class SbtOutputParser implements BuildOutputParser {
         return result;
     }
 
-    private static boolean hasUsefulTestDiagnostic(List<Map<String, Object>> errors) {
-        for (Map<String, Object> error : errors) {
+    private static int firstUsefulTestDiagnosticIndex(List<Map<String, Object>> errors) {
+        for (int i = 0; i < errors.size(); i++) {
+            Map<String, Object> error = errors.get(i);
             Object message = error.get("message");
             if (message instanceof String text) {
                 String lower = text.toLowerCase(java.util.Locale.ROOT);
@@ -261,11 +268,11 @@ public class SbtOutputParser implements BuildOutputParser {
                         || lower.contains("test failed")
                         || lower.contains("tests failed")
                         || lower.contains("() in ")) {
-                    return true;
+                    return i;
                 }
             }
         }
-        return false;
+        return -1;
     }
 
     private static Map<String, Object> testDiagnostic(String message) {

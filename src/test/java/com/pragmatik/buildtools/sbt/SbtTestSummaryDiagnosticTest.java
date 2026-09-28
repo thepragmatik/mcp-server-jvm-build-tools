@@ -18,12 +18,15 @@ package com.pragmatik.buildtools.sbt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.pragmatik.buildtools.security.ModelOutputPolicy;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 class SbtTestSummaryDiagnosticTest {
     private final SbtOutputParser parser = new SbtOutputParser();
+    private final JsonMapper json = new JsonMapper();
 
     @Test
     void scalaTestSummaryWithoutDetailsGetsGenericAssertionDiagnostic() {
@@ -62,6 +65,25 @@ class SbtTestSummaryDiagnosticTest {
         assertThat(summary(result).get("failed")).isEqualTo(1);
         assertThat(result.get("errorCount")).isEqualTo(13);
         assertThat(errors(result).getFirst().get("message")).isEqualTo("Test assertion failed");
+    }
+
+    @Test
+    void detailedAssertionSurvivesTwelveEarlierErrors() {
+        StringBuilder output = new StringBuilder();
+        for (int i = 0; i < 12; i++) {
+            output.append("[error] unrelated execution detail ").append(i).append('\n');
+        }
+        output.append("[error] AssertionError: expected SYNTHETIC_SECRET\n")
+                .append("[info] Passed: Total 1, Failed 1, Errors 0, Passed 0\n");
+
+        Map<String, Object> parsed = parser.parse(output.toString(), 1, "test");
+        var visible =
+                json.readTree(new ModelOutputPolicy().protect("analyze_build_output", json.writeValueAsString(parsed)));
+
+        assertThat(parsed.get("errorCount")).isEqualTo(13);
+        assertThat(visible.get("diagnostics").size()).isEqualTo(12);
+        assertThat(visible.get("diagnostics").get(0).get("category").asText()).isEqualTo("test");
+        assertThat(visible.toString()).doesNotContain("SYNTHETIC_SECRET");
     }
 
     @SuppressWarnings("unchecked")

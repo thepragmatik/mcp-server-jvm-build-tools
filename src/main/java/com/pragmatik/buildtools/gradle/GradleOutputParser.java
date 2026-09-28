@@ -95,7 +95,7 @@ public class GradleOutputParser implements BuildOutputParser {
 
         int totalTests = 0;
         int failedTests = 0;
-        boolean hasTestDiagnostic = false;
+        int firstTestDiagnosticIndex = -1;
 
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
@@ -117,7 +117,6 @@ public class GradleOutputParser implements BuildOutputParser {
             // Parse individual test failures
             Matcher testFailMatcher = TEST_FAILURE_PATTERN.matcher(line);
             if (testFailMatcher.find()) {
-                hasTestDiagnostic = true;
                 Map<String, Object> testErr = new LinkedHashMap<>();
                 testErr.put("class", testFailMatcher.group(1));
                 testErr.put("test", testFailMatcher.group(2));
@@ -142,6 +141,7 @@ public class GradleOutputParser implements BuildOutputParser {
                     if (nextLine.isEmpty()) break;
                 }
 
+                if (firstTestDiagnosticIndex < 0) firstTestDiagnosticIndex = errors.size();
                 errors.add(testErr);
                 continue;
             }
@@ -150,9 +150,7 @@ public class GradleOutputParser implements BuildOutputParser {
             Matcher taskFailMatcher = TASK_FAILED_PATTERN.matcher(line);
             if (taskFailMatcher.find()) {
                 String failedTask = taskFailMatcher.group(1);
-                if (isTestTask(failedTask)) {
-                    hasTestDiagnostic = true;
-                }
+                if (isTestTask(failedTask) && firstTestDiagnosticIndex < 0) firstTestDiagnosticIndex = errors.size();
                 Map<String, Object> taskErr = new LinkedHashMap<>();
                 taskErr.put("task", failedTask);
                 taskErr.put("severity", "ERROR");
@@ -193,7 +191,7 @@ public class GradleOutputParser implements BuildOutputParser {
                     // currently classify as execution, so keep the generic test
                     // diagnostic for those summaries.
                     if (failedTask.find() && ":test".equals(failedTask.group(1))) {
-                        hasTestDiagnostic = true;
+                        if (firstTestDiagnosticIndex < 0) firstTestDiagnosticIndex = errors.size() - 1;
                     }
                 }
             }
@@ -229,7 +227,7 @@ public class GradleOutputParser implements BuildOutputParser {
             testSummary.put("skipped", 0);
         }
 
-        if (failedTests > 0 && !hasTestDiagnostic) {
+        if (failedTests > 0 && firstTestDiagnosticIndex < 0) {
             Map<String, Object> testError = new LinkedHashMap<>();
             testError.put("severity", "ERROR");
             testError.put("message", "Test assertion failed");
@@ -238,6 +236,9 @@ public class GradleOutputParser implements BuildOutputParser {
             } else {
                 errors.add(testError);
             }
+        } else if (failedTests > 0 && firstTestDiagnosticIndex >= BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+            // Keep a real test failure visible when earlier diagnostics fill the model cap.
+            errors.addFirst(errors.remove(firstTestDiagnosticIndex));
         }
 
         result.put("success", success);
