@@ -100,6 +100,17 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void redactsUnquotedSecretAndExtensionlessPathWithSpaces() {
+        String output =
+                "ERROR password = SYNTHETIC SECRET WITH SPACES\n" + "ERROR /tmp/SYNTHETIC PRIVATE NAME/cache/output";
+        String safe = policy.protect("execute_build_command", output);
+        assertFalse(safe.contains("SECRET WITH SPACES"));
+        assertFalse(safe.contains("PRIVATE NAME"));
+        assertTrue(safe.contains("[redacted-secret]"));
+        assertTrue(safe.contains("[redacted-path]"));
+    }
+
+    @Test
     void preservesServerAuthoredPromptWithoutEchoingUserInput() {
         String raw = new PromptService()
                 .promptBuildDiagnosis("/tmp/SYNTHETIC PRIVATE NAME/project", "SECRET SYNTHETIC COMMAND");
@@ -130,6 +141,23 @@ class ModelOutputPolicyTest {
                 "{\"success\":false,\"error\":\"failed at /tmp/SYNTHETIC PRIVATE NAME/project\"}");
         assertTrue(safe.contains("\"isError\":true"));
         assertFalse(safe.contains("PRIVATE NAME"));
+    }
+
+    @Test
+    void projectsDependencyAndPerformanceResultsToUsefulCounts() {
+        String dependencies = policy.protect(
+                "analyze_pom_dependencies",
+                "{\"project\":{\"artifactId\":\"SYNTHETIC PRIVATE NAME\"},\"dependencies\":[{},{}],\"managedDependencies\":[{}]}");
+        assertTrue(dependencies.contains("\"dependencyCount\":2"));
+        assertTrue(dependencies.contains("\"managedDependencyCount\":1"));
+        assertFalse(dependencies.contains("PRIVATE NAME"));
+
+        String profile = policy.protect(
+                "profile_build",
+                "{\"success\":true,\"durationSeconds\":1.25,\"phaseCount\":3,\"projectDir\":\"/tmp/SYNTHETIC PRIVATE NAME\"}");
+        assertTrue(profile.contains("\"durationSeconds\":1.25"));
+        assertTrue(profile.contains("\"phaseCount\":3"));
+        assertFalse(profile.contains("PRIVATE NAME"));
     }
 
     @Test

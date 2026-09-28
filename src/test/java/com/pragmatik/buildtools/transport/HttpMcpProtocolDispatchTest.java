@@ -81,6 +81,20 @@ class HttpMcpProtocolDispatchTest {
                 .doesNotContain("SYNTHETIC SECRET COMMAND", System.getProperty("user.home"));
     }
 
+    @Test
+    void resourceListingReturnsSafeActionableSummary() {
+        String result = new RestTemplate()
+                .postForObject(
+                        "http://127.0.0.1:" + port + "/mcp",
+                        rpc(
+                                "tools/call",
+                                "{\"name\":\"list_dependency_resources\",\"arguments\":{\"projectDir\":\".\"}}"),
+                        String.class);
+        assertThat(result)
+                .contains("availableBuildTools", "maven", "resourceCount")
+                .doesNotContain(System.getProperty("user.home"));
+    }
+
     private static HttpEntity<String> rpc(String method, String params) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

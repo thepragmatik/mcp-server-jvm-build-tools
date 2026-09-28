@@ -69,6 +69,8 @@ class GuardedToolCallbackProviderTest {
                     fake("create_build_plan", new AtomicReference<>()),
                     fake("future_unreviewed_tool", new AtomicReference<>()),
                     fake("read_build_resource", new AtomicReference<>()),
+                    fake("resolve_resource_template", new AtomicReference<>()),
+                    fake("interpret_ci_flow", new AtomicReference<>()),
                     fake("detect_build_tool", new AtomicReference<>())
                 },
                 new ProjectAccessPolicy(root.toString()),

@@ -6,7 +6,7 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.
-- HTTP bearer enforcement by default, no built-in key, explicit per-tool scopes, and a scope-coverage test for the 27 exposed tools.
+- HTTP bearer enforcement by default, no built-in key, explicit per-tool scopes, and a scope-coverage test for the 24 exposed tools.
 - Shared output policy with bounded, redacted diagnostics and generic tool errors.
 - Credential, audit, and stored-plan execution tools removed from the MCP catalog pending redesign.
 - SDK input validation and fail-closed schema setup.

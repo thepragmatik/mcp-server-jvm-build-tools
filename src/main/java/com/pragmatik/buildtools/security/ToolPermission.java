@@ -51,8 +51,7 @@ public enum ToolPermission {
     SBT_READ("sbt:read", Set.of("detect_sbt_modules", "detect_sbt_test_frameworks", "analyze_sbt_build")),
     PROMPT_READ("prompt:read", Set.of("prompt_build_and_test", "prompt_dependency_audit", "prompt_build_diagnosis")),
     RESOURCE_READ("resource:read", Set.of("list_build_resources", "list_dependency_resources")),
-    RESOURCE_TEMPLATE("resource:template", Set.of("list_resource_templates", "resolve_resource_template")),
-    CI_READ("ci:read", Set.of("interpret_ci_flow", "validate_ci_flow")),
+    CI_READ("ci:read", Set.of("validate_ci_flow")),
     SECURITY_READ("security:read", Set.of("check_tool_authorization", "list_available_scopes"));
 
     private final String scope;

@@ -22,7 +22,7 @@
     }
   ],
   "tools": {
-    "total": 27,
+    "total": 24,
     "names": [
       "analyze_build_output",
       "analyze_build_performance",
@@ -37,17 +37,14 @@
       "detect_sbt_test_frameworks",
       "execute_build_command",
       "get_build_tool_version",
-      "interpret_ci_flow",
       "list_available_scopes",
       "list_build_resources",
       "list_build_tools",
       "list_dependency_resources",
-      "list_resource_templates",
       "profile_build",
       "prompt_build_and_test",
       "prompt_build_diagnosis",
       "prompt_dependency_audit",
-      "resolve_resource_template",
       "scan_dependency_cves",
       "validate_build_configuration",
       "validate_ci_flow"

@@ -49,9 +49,29 @@ public final class ModelOutputPolicy {
             "resourceCount",
             "templateCount",
             "paramCount",
+            "moduleCount",
+            "frameworkCount",
+            "phaseCount",
+            "totalTrackedBuilds",
+            "suggestionCount",
+            "conflictCount",
+            "filesAnalyzed",
+            "issueCount",
+            "versionCount",
+            "totalVersions",
             "toolCount");
-    private static final Set<String> BOOLEANS =
-            Set.of("success", "valid", "detected", "authorized", "hasErrors", "hasWarnings", "allParamsResolved");
+    private static final Set<String> BOOLEANS = Set.of(
+            "success",
+            "valid",
+            "detected",
+            "authorized",
+            "hasErrors",
+            "hasWarnings",
+            "allParamsResolved",
+            "multiModule",
+            "hasRootProject",
+            "hasExplicitTestConfig",
+            "upgradeAvailable");
     private static final List<String> BUILD_TOOLS = List.of("maven", "gradle", "sbt");
     private static final Set<String> PROMPTS =
             Set.of("prompt_build_and_test", "prompt_dependency_audit", "prompt_build_diagnosis");
@@ -64,7 +84,7 @@ public final class ModelOutputPolicy {
     private static final List<Replacement> REDACTIONS = List.of(
             new Replacement("(?i)\\b(?:authorization\\s*:\\s*bearer|bearer)\\s+[^\\s,;]+", "[redacted-secret]"),
             new Replacement(
-                    "(?i)\\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\\s*[:=]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
+                    "(?i)\\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\\s*[:=]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\r\\n]+)",
                     "[redacted-secret]"),
             new Replacement("(?i)\\b(?:https?|file)://[^\\s<>()]+", "[redacted-url]"),
             new Replacement("(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", "[redacted-email]"),
@@ -73,7 +93,9 @@ public final class ModelOutputPolicy {
             new Replacement(
                     "(?i)(?:[A-Z]:\\\\|/)[^\\r\\n:;,'\"()<>]*?\\.(?:java|xml|gradle|kts|kt|scala|sbt|properties|txt|log|class|jar)",
                     "[redacted-path]"),
-            new Replacement("(?i)(?:[A-Z]:\\\\|/)(?:[^\\s:;,'\"()<>]+[/\\\\])*[^\\s:;,'\"()<>]*", "[redacted-path]"),
+            new Replacement(
+                    "(?i)(?<![A-Za-z0-9])(?:[A-Z]:\\\\|/)[^\\r\\n]*?(?=\\s+(?:user|email|token|password|phone|secret)\\s*=|\\r?\\n|$)",
+                    "[redacted-path]"),
             new Replacement("(?<!\\d)\\+?\\d[\\d .()-]{8,}\\d(?!\\d)", "[redacted-phone]"),
             new Replacement(
                     "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
@@ -118,6 +140,40 @@ public final class ModelOutputPolicy {
                     copySafeField(root, "detectedTool", Set.of("maven", "gradle", "sbt", "mixed", "unknown"), safe);
                     copyVersion(root, "latestVersion", safe);
                     copyVersion(root, "currentVersion", safe);
+                    copyVersion(root, "latestStable", safe);
+                    copyVersion(root, "scalaVersion", safe);
+                    copyVersion(root, "sbtVersion", safe);
+                    if ("analyze_pom_dependencies".equals(toolName)) {
+                        copyArrayCount(root, "dependencies", "dependencyCount", safe);
+                        copyArrayCount(root, "managedDependencies", "managedDependencyCount", safe);
+                        copyArrayCount(root, "importedBoms", "importedBomCount", safe);
+                    }
+                    if ("scan_dependency_cves".equals(toolName)) {
+                        copyCounts(
+                                root.get("scanSummary"),
+                                Set.of("totalDeps", "vulnerableDeps", "criticalCount", "highCount"),
+                                safe);
+                    }
+                    if ("profile_build".equals(toolName)) {
+                        copyDuration(root, "durationSeconds", safe);
+                        copyDuration(root, "toolReportedSeconds", safe);
+                        copyDuration(root, "overheadSeconds", safe);
+                    }
+                    if ("analyze_build_performance".equals(toolName)) {
+                        JsonNode potential = root.get("optimizationPotential");
+                        if (potential != null && potential.isObject()) {
+                            copySafeField(potential, "level", Set.of("LOW", "MEDIUM", "HIGH"), safe);
+                        }
+                    }
+                    if ("check_java_compatibility".equals(toolName)) {
+                        JsonNode verdict = root.get("verdict");
+                        if (verdict != null && verdict.isObject()) {
+                            JsonNode compatible = verdict.get("compatible");
+                            if (compatible != null && compatible.isBoolean()) {
+                                safe.put("compatible", compatible.booleanValue());
+                            }
+                        }
+                    }
                     if ("list_dependency_resources".equals(toolName)) {
                         copyAvailableBuildTools(root.get("resources"), safe);
                     }
@@ -176,6 +232,9 @@ public final class ModelOutputPolicy {
                 }
             }
             safe.put("tools", names);
+        }
+        if ("list_available_scopes".equals(toolName)) {
+            safe.put("scopes", ToolPermission.allScopes());
         }
         if ("execute_build_command".equals(toolName) && output != null) {
             if (output.contains("BUILD SUCCESS")) {
@@ -260,6 +319,32 @@ public final class ModelOutputPolicy {
         target.put("resourceKinds", kinds);
     }
 
+    private static void copyArrayCount(JsonNode source, String key, String resultKey, Map<String, Object> target) {
+        JsonNode value = source.get(key);
+        if (value != null && value.isArray()) {
+            target.put(resultKey, value.size());
+        }
+    }
+
+    private static void copyCounts(JsonNode source, Set<String> keys, Map<String, Object> target) {
+        if (source == null || !source.isObject()) {
+            return;
+        }
+        for (String key : keys) {
+            copyCounter(source, key, target);
+        }
+    }
+
+    private static void copyDuration(JsonNode source, String key, Map<String, Object> target) {
+        JsonNode value = source.get(key);
+        if (value != null && value.isNumber()) {
+            double seconds = value.doubleValue();
+            if (Double.isFinite(seconds) && seconds >= 0 && seconds <= 86_400) {
+                target.put(key, seconds);
+            }
+        }
+    }
+
     private static void copyCounter(JsonNode source, String key, Map<String, Object> target) {
         JsonNode value = source.get(key);
         if (value != null && value.isIntegralNumber() && value.longValue() >= 0 && value.longValue() <= 1_000_000) {
@@ -298,7 +383,8 @@ public final class ModelOutputPolicy {
     }
 
     private static String redact(String value, int maxLength) {
-        String safe = value.replaceAll("[\\p{Cntrl}&&[^\\t]]", " ");
+        String bounded = value.length() > maxLength * 4 ? value.substring(0, maxLength * 4) : value;
+        String safe = bounded.replaceAll("[\\p{Cntrl}&&[^\\t]]", " ");
         for (Replacement replacement : REDACTIONS) {
             safe = replacement.pattern().matcher(safe).replaceAll(replacement.replacement());
         }

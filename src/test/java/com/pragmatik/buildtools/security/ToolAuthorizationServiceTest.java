@@ -46,7 +46,7 @@ class ToolAuthorizationServiceTest {
     @Test
     void testAllScopesHaveToolCoverage() {
         List<String> allScopes = ToolPermission.allScopes();
-        assertEquals(10, allScopes.size(), "Should cover the live catalog");
+        assertEquals(9, allScopes.size(), "Should cover the live catalog");
         assertTrue(allScopes.contains("build:read"));
         assertTrue(allScopes.contains("build:execute"));
         assertTrue(allScopes.contains("ci:read"));

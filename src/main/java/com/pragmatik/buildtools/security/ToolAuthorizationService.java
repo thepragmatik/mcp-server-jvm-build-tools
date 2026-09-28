@@ -37,7 +37,7 @@ import org.springframework.stereotype.Service;
  * <p>
  * Permission model:
  * <ul>
- *   <li>12 fine-grained scopes (build:read, build:execute, dependency:read, etc.)</li>
+ *   <li>Explicit scopes for the public catalogue (build:read, build:execute, dependency:read, etc.)</li>
  *   <li>Wildcard {@code *} grants full access</li>
  *   <li>API keys map to one or more scopes</li>
  *   <li>Audit logging records every tool invocation</li>
