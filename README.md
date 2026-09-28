@@ -55,6 +55,6 @@ HTTP requests to `/mcp` validate the `Origin` header when present and reject inv
 
 Build diagnostics retain recognized failure phrases while withholding arbitrary identifiers and values; unknown or unsafe text gets a server-authored fallback. A file reference only links diagnostics within one result; use local build output to find the file and symbol before editing. Other model-visible text still uses pattern redaction, which cannot prove arbitrary text contains no personal data. Review results before sharing them outside your trusted MCP client. For stronger isolation, run the server and builds in a container with a dedicated project mount and restricted network.
 
-Read the [basic quickstart](docs/user-guide/quickstart-v2.md), [architecture and design review](docs/reference/design-v2.md), [security model](docs/reference/security.md), and [agent contribution workflow](docs/AGENTS.md). The [release plan](docs/ROADMAP.md) tracks what remains before a stable 2.0 release.
+Read the [basic quickstart](docs/user-guide/quickstart-v2.md), [current tool catalog](docs/reference/tool-catalog.md), [2.0 configuration](docs/reference/configuration-v2.md), [migration guide](docs/user-guide/migration-v2.md), [architecture and design review](docs/reference/design-v2.md), [security model](docs/reference/security.md), and [agent contribution workflow](docs/AGENTS.md). The [release plan](docs/ROADMAP.md) tracks what remains before a stable 2.0 release.
 
 Licensed under Apache 2.0.

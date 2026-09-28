@@ -1,5 +1,8 @@
 # Test Plan — JVM Build Tools MCP Server (Docker)
 
+> **Historical 1.x planning artifact.** Its 28-tool targets, SSE instructions, known-gap states, and fixture proposals are not current release gates. Use the [current tool catalog](tool-catalog.md), [2.0 design review](design-v2.md), and [roadmap](../ROADMAP.md). Do not run its sample commands against a 2.0 server.
+
+
 > **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](../user-guide/quickstart-v2.md) and [2.0 design review](design-v2.md) for the current public contract.
 
 > **Document:** ARCH-2 usability and performance test plan  

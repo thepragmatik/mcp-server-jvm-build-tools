@@ -1,6 +1,7 @@
 # Quickstart for 2.0
 
 Build with Java 21+ and `./mvnw -B verify --no-transfer-progress`.
+The server exposes [24 public tools](../reference/tool-catalog.md); use `tools/list` for the exact input schema of your installed version.
 
 ## Stdio in three steps
 
