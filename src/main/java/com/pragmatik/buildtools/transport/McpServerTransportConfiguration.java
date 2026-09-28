@@ -123,6 +123,7 @@ public class McpServerTransportConfiguration {
             McpJsonMapper jsonMapper,
             McpServerIdentity identity,
             ToolCallbackProvider toolCallbackProvider,
+            NativePromptCatalog nativePrompts,
             @Value("${spring.ai.mcp.server.name:@project.name@}") String serverName,
             @Value("${spring.ai.mcp.server.version:@project.version@}") String serverVersion) {
 
@@ -132,7 +133,6 @@ public class McpServerTransportConfiguration {
         // Build capabilities
         ServerCapabilities capabilities = ServerCapabilities.builder()
                 .tools(Boolean.FALSE)
-                .resources(Boolean.FALSE, Boolean.FALSE)
                 .prompts(Boolean.FALSE)
                 .build();
 
@@ -152,6 +152,10 @@ public class McpServerTransportConfiguration {
                 .serverInfo(serverInfo)
                 .capabilities(capabilities)
                 .tools(toolSpecs)
+                .prompts(nativePrompts.prompts().stream()
+                        .map(prompt -> new io.modelcontextprotocol.server.McpServerFeatures.SyncPromptSpecification(
+                                prompt, (exchange, request) -> nativePrompts.getPrompt(request)))
+                        .toList())
                 .jsonMapper(jsonMapper)
                 .validateToolInputs(true)
                 .build();

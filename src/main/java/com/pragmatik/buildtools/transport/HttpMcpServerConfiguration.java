@@ -76,6 +76,7 @@ public class HttpMcpServerConfiguration {
             HttpServletStatelessServerTransport transport,
             McpJsonMapper mapper,
             ToolCallbackProvider callbacks,
+            NativePromptCatalog nativePrompts,
             @Value("${spring.ai.mcp.server.name:@project.name@}") String name,
             @Value("${spring.ai.mcp.server.version:@project.version@}") String version) {
         List<SyncToolSpecification> specifications = new ArrayList<>();
@@ -86,7 +87,6 @@ public class HttpMcpServerConfiguration {
         }
         ServerCapabilities capabilities = ServerCapabilities.builder()
                 .tools(Boolean.FALSE)
-                .resources(Boolean.FALSE, Boolean.FALSE)
                 .prompts(Boolean.FALSE)
                 .build();
         log.info("Registered {} MCP tools via HTTP transport", specifications.size());
@@ -94,6 +94,10 @@ public class HttpMcpServerConfiguration {
                 .serverInfo(new Implementation(name, version))
                 .capabilities(capabilities)
                 .tools(specifications)
+                .prompts(nativePrompts.prompts().stream()
+                        .map(prompt -> new io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncPromptSpecification(
+                                prompt, (context, request) -> nativePrompts.getPrompt(request)))
+                        .toList())
                 .jsonMapper(mapper)
                 .validateToolInputs(true)
                 .build();

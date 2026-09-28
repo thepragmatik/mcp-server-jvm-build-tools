@@ -174,11 +174,14 @@ public class OAuthResourceServerFilter implements Filter {
 
         if (effectiveReq instanceof McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered) {
             String toolName = toolCallName(buffered);
-            if (toolName != null && !authorizationService.isToolAuthorizedForToken(token, toolName)) {
+            boolean denied = "__prompt_scope__".equals(toolName)
+                    ? !authorizationService.isScopeAuthorizedForToken(token, "prompt:read")
+                    : toolName != null && !authorizationService.isToolAuthorizedForToken(token, toolName);
+            if (denied) {
                 httpRes.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 httpRes.setHeader(
                         "WWW-Authenticate",
-                        buildChallenge("insufficient_scope", "Tool scope required", metadataUrlIfConfigured(httpReq)));
+                        buildChallenge("insufficient_scope", "Required MCP scope missing", metadataUrlIfConfigured(httpReq)));
                 httpRes.setContentType("application/json");
                 httpRes.getWriter().write("{\"error\":\"insufficient_scope\"}");
                 return;
@@ -204,6 +207,9 @@ public class OAuthResourceServerFilter implements Filter {
             JsonNode method = root.get("method");
             if (method == null || !method.isTextual()) {
                 return "";
+            }
+            if ("prompts/list".equals(method.asText()) || "prompts/get".equals(method.asText())) {
+                return "__prompt_scope__";
             }
             if (!"tools/call".equals(method.asText())) {
                 return null;
