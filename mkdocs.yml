@@ -128,6 +128,7 @@ nav:
   - Reference:
       - Architecture: reference/architecture.md
       - Design 2.0: reference/design-v2.md
+      - Release Gates 2.0: reference/release-gates.md
       - Current Tool Catalog: reference/tool-catalog.md
       - Configuration Validation: reference/configuration-validation.md
       - Native Prompts: reference/native-prompts.md

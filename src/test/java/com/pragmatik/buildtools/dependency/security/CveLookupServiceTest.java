@@ -209,6 +209,25 @@ class CveLookupServiceTest {
             assertThat(entries.get(0).severity()).isEqualTo("CRITICAL");
             assertThat(entries.get(0).cvssScore()).isEqualTo(9.8);
         }
+
+        @Test
+        void rejectsNumericAndUnsupportedVectorsWithoutInventingSeverity() {
+            var entries = service.parseOsvResponse("""
+                    {"vulns":[{"id":"OSV-NUM","severity":[{"type":"CVSS_V3","score":"9.8"}]},{"id":"OSV-V3","severity":[{"type":"CVSS_V3","score":"CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]},{"id":"OSV-OTHER","severity":[{"type":"CVSS_V4","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}""");
+            assertThat(entries)
+                    .extracting(CveLookupService.VulnerabilityEntry::severity)
+                    .containsExactly("UNKNOWN", "UNKNOWN", "UNKNOWN");
+        }
+
+        @Test
+        void treatsValidZeroImpactAsNoneAndUsesHighestValidVector() {
+            var entries = service.parseOsvResponse("""
+                    {"vulns":[{"id":"OSV-ZERO","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}]},{"id":"OSV-MULTI","severity":[{"type":"CVSS_V3","score":"9.9"},{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"},{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"}]}]}""");
+            assertThat(entries)
+                    .extracting(CveLookupService.VulnerabilityEntry::severity)
+                    .containsExactly("NONE", "CRITICAL");
+            assertThat(entries.get(1).cvssScore()).isEqualTo(10.0);
+        }
     }
 
     // ── VulnerabilityEntry ──────────────────────────────────────────
