@@ -1,6 +1,6 @@
 # Release gates for the 2.0 line
 
-The [CI workflow](https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/main/.github/workflows/release-gates.yml) packages the server
+The `.github/workflows/release-gates.yml` workflow packages the server
 and runs `python3 scripts/release-gate.py` against loopback-only processes. The
 script starts the packaged jar, tests Streamable HTTP with the pinned official
 `@modelcontextprotocol/conformance@0.2.0-alpha.11` runner at the `2025-11-25`
@@ -34,8 +34,8 @@ prompt-injection suppression, authorization, and allowed-root/symlink handling.
 These checks do not prove that an arbitrary build script is safe. A filesystem
 symlink can change after Java validates its path and before a child process uses
 it; run untrusted workspaces in a container or equivalent OS sandbox without
-network and with minimal mounts. The isolated [Docker verification
-script](https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/main/scripts/docker-verify.sh) checks a clean build but does not turn
+network and with minimal mounts. The isolated `scripts/docker-verify.sh`
+checks a clean build but does not turn
 the server itself into a sandbox.
 
 The normal CI `Privacy and docs` job scans changed lines without printing
