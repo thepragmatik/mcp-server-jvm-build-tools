@@ -18,6 +18,8 @@ package com.pragmatik.buildtools.transport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
@@ -39,15 +41,82 @@ class McpToolAdapterStructuredTest {
     private final JacksonMcpJsonMapper mapper = new JacksonMcpJsonMapper(json);
 
     @Test
-    void advertisesSchemaOnlyForAnalysisTool() {
+    void advertisesSchemaForBothBuildResultTools() {
         var schema = McpToolAdapter.tool(callback("analyze_build_output", "{}"), mapper)
                 .outputSchema();
         assertThat(schema).containsEntry("type", "object");
         assertThat(schema).containsEntry("additionalProperties", false);
         assertThat(schema.get("required")).isEqualTo(java.util.List.of("completed"));
+        assertThat(McpToolAdapter.tool(callback("execute_build_command", "{}"), mapper)
+                        .outputSchema())
+                .isEqualTo(schema);
         assertThat(McpToolAdapter.tool(callback("detect_build_tool", "{}"), mapper)
                         .outputSchema())
                 .isNull();
+    }
+
+    @Test
+    void executionHasOneCallAndEquivalentBoundedStructuredAndTextResults() {
+        String raw =
+                "[ERROR] /workspace/private/A.java:42: cannot find symbol alice@example.invalid SYNTHETIC_SECRET\nBUILD FAILURE";
+        String safe = new ModelOutputPolicy().protect("execute_build_command", raw);
+        ToolCallback callback = callback("execute_build_command", safe);
+        var result = McpToolAdapter.call(callback, mapper, new CallToolRequest("execute_build_command", Map.of()));
+        verify(callback, times(1)).call("{}");
+        assertThat(result.isError()).isTrue();
+        assertThat(BuildResultSchema.conforms((Map<String, Object>) result.structuredContent()))
+                .isTrue();
+        assertThat(json.readTree(((TextContent) result.content().getFirst()).text()))
+                .isEqualTo(json.valueToTree(result.structuredContent()));
+        assertThat(result.structuredContent().toString())
+                .doesNotContain("/workspace/private", "alice@example.invalid", "SYNTHETIC_SECRET");
+    }
+
+    @Test
+    void successfulMavenExecutionUsesOneCallbackAndKeepsTextParity() {
+        String safe = new ModelOutputPolicy().protect("execute_build_command", "[INFO] BUILD SUCCESS");
+        ToolCallback callback = callback("execute_build_command", safe);
+        var result = McpToolAdapter.call(callback, mapper, new CallToolRequest("execute_build_command", Map.of()));
+        verify(callback, times(1)).call("{}");
+        assertThat(result.isError()).isFalse();
+        assertThat(result.structuredContent()).isEqualTo(Map.of("completed", true, "success", true));
+        assertThat(json.readTree(((TextContent) result.content().getFirst()).text()))
+                .isEqualTo(json.valueToTree(result.structuredContent()));
+    }
+
+    @Test
+    void executionDiagnosticsStayWithinSchemaBounds() {
+        String raw = "[ERROR] /workspace/private/A.java:42: cannot find symbol alice@example.invalid SYNTHETIC_SECRET\n"
+                        .repeat(30)
+                + "BUILD FAILURE";
+        String safe = new ModelOutputPolicy().protect("execute_build_command", raw);
+        var result = McpToolAdapter.call(
+                callback("execute_build_command", safe),
+                mapper,
+                new CallToolRequest("execute_build_command", Map.of()));
+        assertThat(BuildResultSchema.conforms((Map<String, Object>) result.structuredContent()))
+                .isTrue();
+        assertThat(((java.util.List<?>) ((Map<?, ?>) result.structuredContent()).get("diagnostics")))
+                .hasSizeLessThanOrEqualTo(12);
+        assertThat(result.structuredContent().toString())
+                .doesNotContain("/workspace/private", "alice@example.invalid", "SYNTHETIC_SECRET");
+    }
+
+    @Test
+    void executionTimeoutExceptionReturnsSafeSchemaConformingObject() {
+        ToolCallback callback = callback("execute_build_command", "{}");
+        when(callback.call("{}"))
+                .thenThrow(
+                        new IllegalStateException("timeout /workspace/private/alice@example.invalid SYNTHETIC_SECRET"));
+        var result = McpToolAdapter.call(callback, mapper, new CallToolRequest("execute_build_command", Map.of()));
+        verify(callback, times(1)).call("{}");
+        assertThat(result.isError()).isTrue();
+        assertThat(BuildResultSchema.conforms((Map<String, Object>) result.structuredContent()))
+                .isTrue();
+        assertThat(json.readTree(((TextContent) result.content().getFirst()).text()))
+                .isEqualTo(json.valueToTree(result.structuredContent()));
+        assertThat(result.structuredContent().toString())
+                .doesNotContain("/workspace/private", "alice@example.invalid", "SYNTHETIC_SECRET");
     }
 
     @Test
@@ -60,7 +129,7 @@ class McpToolAdapterStructuredTest {
         var result = McpToolAdapter.call(
                 callback("analyze_build_output", safe), mapper, new CallToolRequest("analyze_build_output", Map.of()));
         assertThat(result.isError()).isTrue();
-        assertThat(AnalyzeBuildOutputSchema.conforms((Map<String, Object>) result.structuredContent()))
+        assertThat(BuildResultSchema.conforms((Map<String, Object>) result.structuredContent()))
                 .isTrue();
         assertThat(json.readTree(((TextContent) result.content().getFirst()).text()))
                 .isEqualTo(json.valueToTree(result.structuredContent()));
@@ -88,7 +157,7 @@ class McpToolAdapterStructuredTest {
                         "completed", true,
                         "isError", true,
                         "details", "Tool execution failed; details withheld by privacy policy"));
-        assertThat(AnalyzeBuildOutputSchema.conforms((Map<String, Object>) result.structuredContent()))
+        assertThat(BuildResultSchema.conforms((Map<String, Object>) result.structuredContent()))
                 .isTrue();
         assertThat(((TextContent) result.content().getFirst()).text())
                 .doesNotContain("/workspace/private", "alice@example.invalid", "SYNTHETIC_SECRET");
@@ -113,7 +182,7 @@ class McpToolAdapterStructuredTest {
                     "BUILD FAILURE\n[ERROR] /workspace/private/A.java:42: cannot find symbol JaneDoe", 1, "test");
             var safe =
                     json.readValue(policy.protect("analyze_build_output", json.writeValueAsString(parsed)), Map.class);
-            assertThat(AnalyzeBuildOutputSchema.conforms(safe))
+            assertThat(BuildResultSchema.conforms(safe))
                     .as(parser.getToolName())
                     .isTrue();
             assertThat(((Map<?, ?>) safe.get("testSummary"))
@@ -133,7 +202,7 @@ class McpToolAdapterStructuredTest {
                             "message":"AssertionError: SYNTHETIC_SECRET mismatch JaneDoe"}]}
                 """;
         var safe = json.readValue(policy.protect("analyze_build_output", raw), Map.class);
-        assertThat(AnalyzeBuildOutputSchema.conforms(safe)).isTrue();
+        assertThat(BuildResultSchema.conforms(safe)).isTrue();
         assertThat(((Map<?, ?>) ((java.util.List<?>) safe.get("diagnostics")).getFirst()).get("category"))
                 .isEqualTo("test");
         assertThat(safe.toString()).doesNotContain("/workspace/private", "JaneDoe", "SYNTHETIC_SECRET");
@@ -145,7 +214,7 @@ class McpToolAdapterStructuredTest {
                 .parse("[INFO] Tests run: 9999999999999999999999, Failures: 0, Errors: 0, Skipped: 0", 0, "test");
         var safe = json.readValue(
                 new ModelOutputPolicy().protect("analyze_build_output", json.writeValueAsString(parsed)), Map.class);
-        assertThat(AnalyzeBuildOutputSchema.conforms(safe)).isTrue();
+        assertThat(BuildResultSchema.conforms(safe)).isTrue();
         assertThat(((Map<?, ?>) safe.get("testSummary")).get("countsCapped")).isEqualTo(true);
     }
 
