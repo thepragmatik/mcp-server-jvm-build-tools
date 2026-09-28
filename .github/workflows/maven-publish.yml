@@ -25,6 +25,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 scripts/check-release-tag.py --tag "$RELEASE_TAG"
+          test -s ".github/release-bodies/${RELEASE_TAG}.md"
           git fetch --no-tags origin main:refs/remotes/origin/main
           git merge-base --is-ancestor HEAD origin/main
 
@@ -54,6 +55,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          body_path: .github/release-bodies/${{ github.ref_name }}.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-rc.') }}
           make_latest: ${{ contains(github.ref_name, '-rc.') && 'false' || 'true' }}

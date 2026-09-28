@@ -93,10 +93,13 @@ official runner version.
 
 The `.github/workflows/maven-publish.yml` workflow runs only after a tag
 push. It rejects tags whose version disagrees with both `pom.xml` and
-`mcp-registry.json`, and requires the tagged commit to be on `main`. The
+`mcp-registry.json`, requires a nonempty versioned release body in
+`.github/release-bodies/`, and requires the tagged commit to be on `main`. The
 workflow runs the full JDK 21 Maven verification, then the packaged
 Streamable HTTP and stdio protocol/adversarial gate, before publishing the
-exact runnable jar. An `-rc.N` tag is marked as a GitHub prerelease and
+exact runnable jar. The curated body puts breaking changes and migration
+links ahead of generated change notes on the GitHub Release page. An
+`-rc.N` tag is marked as a GitHub prerelease and
 cannot be the Latest release. The tag itself is created only after all
 release evidence and independent reviews are accepted; preparing this
 workflow does not publish a release.
