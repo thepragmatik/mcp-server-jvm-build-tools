@@ -1,6 +1,6 @@
 # Design review for 2.0
 
-This page records the architecture decision for the 2.0 development line. The published first prerelease is `v2.0.0-rc.1`; `main` now builds the unreleased `2.0.0-rc.2` development candidate. Required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. A later release tag requires all gates to pass on its exact commit.
+This page records the architecture decision for the 2.0 development line. The current published prerelease is `v2.0.0-rc.2`. Required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. The release gates were checked on the exact tag commit.
 
 ## Trust boundaries
 
