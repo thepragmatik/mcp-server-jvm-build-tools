@@ -6,6 +6,8 @@
 
 The result reports `completed: true` for a finished tool call. A recognized build failure sets `success: false` and `isError: true`; a failure before build execution returns `completed: true`, `isError: true`, and a fixed privacy-safe `details` message. Optional fields include `errorCount`, `warningCount`, `testSummary`, and up to 12 `diagnostics`. A diagnostic can carry a category, severity, stable reference, file type, line, and normalized message. `fileRef` distinguishes files within one result without revealing names or paths. `diagnosticsTruncated` and `testSummary.countsCapped` make incomplete aggregates explicit. `execute_build_command` preserves its existing lightweight output projection; use `analyze_build_output` when counts and parsed test summaries matter.
 
+`execute_build_command` currently infers success from build-output markers rather than a separately exposed process exit status. If both success and failure markers occur, failure wins. If no marker survives the bounded output capture, `success` may be absent; callers should treat that as unknown rather than successful.
+
 For example, a synthetic compilation failure can produce:
 
 ```json

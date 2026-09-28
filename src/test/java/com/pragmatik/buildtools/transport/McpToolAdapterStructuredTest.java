@@ -85,6 +85,18 @@ class McpToolAdapterStructuredTest {
     }
 
     @Test
+    void failedExecutionWinsOverEarlierSuccessMarker() {
+        String raw = "[INFO] A plugin printed BUILD SUCCESS\n[INFO] BUILD FAILURE";
+        String safe = new ModelOutputPolicy().protect("execute_build_command", raw);
+        var result = McpToolAdapter.call(
+                callback("execute_build_command", safe),
+                mapper,
+                new CallToolRequest("execute_build_command", Map.of()));
+        assertThat(result.isError()).isTrue();
+        assertThat(result.structuredContent()).isEqualTo(Map.of("completed", true, "success", false, "isError", true));
+    }
+
+    @Test
     void executionDiagnosticsStayWithinSchemaBounds() {
         String raw = "[ERROR] /workspace/private/A.java:42: cannot find symbol alice@example.invalid SYNTHETIC_SECRET\n"
                         .repeat(30)
