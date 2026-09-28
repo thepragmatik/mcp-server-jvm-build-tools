@@ -244,11 +244,11 @@ public final class ModelOutputPolicy {
             safe.put("scopes", ToolPermission.allScopes());
         }
         if ("execute_build_command".equals(toolName) && output != null) {
-            if (output.contains("BUILD SUCCESS")) {
-                safe.put("success", true);
-            } else if (output.contains("BUILD FAILURE") || output.contains("BUILD FAILED")) {
+            if (output.contains("BUILD FAILURE") || output.contains("BUILD FAILED")) {
                 safe.put("success", false);
                 safe.put("isError", true);
+            } else if (output.contains("BUILD SUCCESS")) {
+                safe.put("success", true);
             }
         }
         if (safe.size() == 1) {

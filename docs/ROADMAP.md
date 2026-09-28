@@ -55,6 +55,8 @@ Order the next slices by observed user friction, with a measured baseline or tes
 
 The first post-RC increment already added MCP `structuredContent` and a bounded
 `outputSchema` for `analyze_build_output` while preserving its JSON text result.
+The same bounded contract now covers `execute_build_command`, preserving its
+existing JSON text and one-build execution behavior.
 Both transports, schema conformance, privacy, and adapter overhead were checked;
 see the [result contract](reference/structured-build-results.md).
 The assertion-versus-compilation classification bug was also fixed and tested

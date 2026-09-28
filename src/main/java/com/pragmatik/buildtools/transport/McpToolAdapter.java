@@ -43,8 +43,8 @@ final class McpToolAdapter {
             var builder = Tool.builder(definition.name())
                     .description(definition.description())
                     .inputSchema(schema);
-            if (AnalyzeBuildOutputSchema.TOOL_NAME.equals(definition.name())) {
-                builder.outputSchema(AnalyzeBuildOutputSchema.schema());
+            if (BuildResultSchema.supports(definition.name())) {
+                builder.outputSchema(BuildResultSchema.schema());
             }
             return builder.build();
         } catch (IOException e) {
@@ -58,22 +58,21 @@ final class McpToolAdapter {
             String output = callback.call(input);
             Object decoded = mapper.readValue(output, Object.class);
             boolean isError = decoded instanceof Map<?, ?> values && Boolean.TRUE.equals(values.get("isError"));
-            if (AnalyzeBuildOutputSchema.TOOL_NAME.equals(
-                    callback.getToolDefinition().name())) {
+            if (BuildResultSchema.supports(callback.getToolDefinition().name())) {
                 if (!(decoded instanceof Map<?, ?> values) || !Boolean.TRUE.equals(values.get("completed"))) {
-                    throw new IllegalStateException("Analysis result violates the public result contract");
+                    throw new IllegalStateException("Build result violates the public result contract");
                 }
                 // The shared guarded callback already applied ModelOutputPolicy. Decode that
                 // exact serialized projection once; never pass the raw parser result here.
                 Map<String, Object> safe = new LinkedHashMap<>();
                 for (var entry : values.entrySet()) {
                     if (!(entry.getKey() instanceof String key)) {
-                        throw new IllegalStateException("Analysis result contains a non-string key");
+                        throw new IllegalStateException("Build result contains a non-string key");
                     }
                     safe.put(key, entry.getValue());
                 }
-                if (!AnalyzeBuildOutputSchema.conforms(safe)) {
-                    throw new IllegalStateException("Analysis result violates the declared output schema");
+                if (!BuildResultSchema.conforms(safe)) {
+                    throw new IllegalStateException("Build result violates the declared output schema");
                 }
                 return new CallToolResult(List.of(new TextContent(output)), isError, safe, null);
             }
@@ -83,8 +82,7 @@ final class McpToolAdapter {
                     "Tool '{}' execution failed; details withheld",
                     callback.getToolDefinition().name());
             String details = "Tool execution failed; details withheld by privacy policy";
-            if (AnalyzeBuildOutputSchema.TOOL_NAME.equals(
-                    callback.getToolDefinition().name())) {
+            if (BuildResultSchema.supports(callback.getToolDefinition().name())) {
                 Map<String, Object> safe = new LinkedHashMap<>();
                 safe.put("completed", true);
                 safe.put("isError", true);

@@ -25,13 +25,18 @@ import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.json.JsonMapper;
 
-/** MCP schema for the bounded {@code ModelOutputPolicy} projection of build analysis. */
-final class AnalyzeBuildOutputSchema {
+/** MCP schema for bounded {@code ModelOutputPolicy} build results. */
+final class BuildResultSchema {
     static final String TOOL_NAME = "analyze_build_output";
+    static final String EXECUTE_TOOL_NAME = "execute_build_command";
     private static final JsonMapper JSON = new JsonMapper();
     private static final Map<String, Object> SCHEMA = buildSchema();
 
-    private AnalyzeBuildOutputSchema() {}
+    private BuildResultSchema() {}
+
+    static boolean supports(String toolName) {
+        return TOOL_NAME.equals(toolName) || EXECUTE_TOOL_NAME.equals(toolName);
+    }
 
     static Map<String, Object> schema() {
         return SCHEMA;

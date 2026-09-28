@@ -6,6 +6,7 @@
 
 - Failed test assertions with `expected` values and source locations remain test diagnostics rather than compiler errors.
 - `analyze_build_output` now provides schema-checked MCP `structuredContent` alongside the existing redacted JSON text result for older clients.
+- `execute_build_command` now provides the same schema-checked structured result alongside its unchanged redacted JSON text, without a second build execution.
 - `list_build_tools` uses a typed public listing projection and reuses the bounded JSON parse; its MCP result shape and fixed tool order remain unchanged.
 
 ## [2.0.0-rc.1] - Release candidate

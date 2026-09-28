@@ -51,7 +51,8 @@ flowchart LR
 
 Results contain aggregate counts and up to 12 structured diagnostics, with errors before warnings. Each diagnostic has `severity`, `category`, a per-result `diagnosticRef`, optional per-result `fileRef`, file type and positive line number, and a bounded redacted message. For example, a compiler error can return `{"severity":"error","category":"compilation","fileRef":"f1","fileType":"java","line":42,"message":"cannot find symbol: [redacted-symbol]","diagnosticRef":"d1"}`. The references distinguish diagnostics and group messages from one file without revealing its path; inspect local build output to identify that file and symbol before editing. Unknown or unsafe text gets a generic local-inspection hint. Raw paths, source excerpts, commands, dependency identities, symbols, and logs are withheld. Build scripts can run other programs and make network calls, so use the [container workflow](../reference/design-v2.md#container-isolation) for untrusted projects.
 
-In builds after `v2.0.0-rc.1`, `analyze_build_output` clients can read this safe result directly from MCP
+In builds after `v2.0.0-rc.1`, `analyze_build_output` and `execute_build_command`
+clients can read their safe results directly from MCP
 `structuredContent` and validate it with the advertised `outputSchema`. Text-only
 clients, including RC1, receive JSON in `content[0].text`. See the
 [structured-result reference](../reference/structured-build-results.md) for the

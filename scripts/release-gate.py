@@ -160,6 +160,44 @@ def adversarial_checks(port):
         assert_safe_error(error_response, message["id"], canary, f"HTTP unknown {label}")
     print("PASS HTTP unknown identifiers: generic bounded errors")
 
+    listed_status, listed_response = request(port, json.dumps({
+        "jsonrpc": "2.0", "id": 25, "method": "tools/list",
+    }).encode())
+    listed = json_rpc_reply(listed_response, 25).get("result") if listed_status == 200 else None
+    execution = next((tool for tool in listed.get("tools", [])
+                      if tool.get("name") == "execute_build_command"), None) if listed else None
+    if not execution or execution.get("outputSchema", {}).get("required") != ["completed"]:
+        raise AssertionError("HTTP execution tool lacks its declared output schema")
+    denied_status, denied_response = request(port, json.dumps({
+        "jsonrpc": "2.0", "id": 26, "method": "tools/call",
+        "params": {"name": "execute_build_command", "arguments": {
+            "buildToolName": "maven", "projectDir": "/private/tmp/" + canary,
+            "command": "validate"}},
+    }).encode())
+    denied_result = json_rpc_reply(denied_response, 26).get("result") if denied_status == 200 else None
+    structured = denied_result.get("structuredContent") if denied_result else None
+    content = denied_result.get("content", []) if denied_result else []
+    if (not denied_result or not denied_result.get("isError")
+            or not isinstance(structured, dict) or structured.get("completed") is not True
+            or not content or json.loads(content[0].get("text", "")) != structured
+            or canary in json.dumps(denied_result)):
+        raise AssertionError("HTTP execution result lost structure, text parity, or privacy")
+    print("PASS packaged HTTP execution: schema, structured/text parity, safe denied path")
+    validated_status, validated_response = request(port, json.dumps({
+        "jsonrpc": "2.0", "id": 27, "method": "tools/call",
+        "params": {"name": "execute_build_command", "arguments": {
+            "buildToolName": "maven", "projectDir": ".", "command": "validate"}},
+    }).encode())
+    validated_reply = json_rpc_reply(validated_response, 27) if validated_status == 200 else None
+    validated = validated_reply.get("result") if validated_reply else None
+    structured = validated.get("structuredContent") if validated else None
+    content = validated.get("content", []) if validated else []
+    if (not validated or validated.get("isError") or not isinstance(structured, dict)
+            or structured.get("success") is not True or not content
+            or json.loads(content[0].get("text", "")) != structured):
+        raise AssertionError("Packaged HTTP Maven validate did not return a structured success")
+    print("PASS packaged HTTP execution: real Maven validate and structured/text parity")
+
     large = b"{" + b" " * 1_048_576 + b"}"
     status, _ = request(port, large)
     if status != 413:
@@ -244,7 +282,8 @@ def scope_check():
 def stdio_check():
     """Check the packaged jar's second transport without exposing protocol payloads."""
     process = subprocess.Popen(
-        ["java", "-jar", str(JAR)], stdin=subprocess.PIPE,
+        ["java", f"-Dbuildtools.projects.allowed-roots={JAR.parent.parent}", "-jar", str(JAR)],
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0,
     )
     pending = bytearray()
@@ -311,6 +350,40 @@ def stdio_check():
                 or canary in json.dumps(denied)):
             raise AssertionError("Stdio analysis result lost structure, text parity, or privacy")
         print("PASS packaged stdio analysis: schema, structured/text parity, safe denied path")
+        execution = next((tool for tool in listed["tools"]
+                          if tool.get("name") == "execute_build_command"), None)
+        if not execution or execution.get("outputSchema", {}).get("required") != ["completed"]:
+            raise AssertionError("Stdio execution tool lacks its declared output schema")
+        denied_execution = exchange({
+            "jsonrpc": "2.0", "id": 26, "method": "tools/call",
+            "params": {"name": "execute_build_command", "arguments": {
+                "buildToolName": "maven", "projectDir": "/private/tmp/" + canary,
+                "command": "validate"}},
+        }, 26)
+        structured = denied_execution.get("structuredContent")
+        content = denied_execution.get("content", [])
+        if (not denied_execution.get("isError") or not isinstance(structured, dict)
+                or structured.get("completed") is not True
+                or not content or json.loads(content[0].get("text", "")) != structured
+                or canary in json.dumps(denied_execution)):
+            raise AssertionError("Stdio execution result lost structure, text parity, or privacy")
+        print("PASS packaged stdio execution: schema, structured/text parity, safe denied path")
+        validated = exchange({
+            "jsonrpc": "2.0", "id": 27, "method": "tools/call",
+            "params": {"name": "execute_build_command", "arguments": {
+                "buildToolName": "maven", "projectDir": ".", "command": "validate"}},
+        }, 27)
+        validated_content = validated.get("content", [])
+        validated_structured = validated.get("structuredContent")
+        if (validated.get("isError") or not isinstance(validated_structured, dict)
+                or validated_structured.get("success") is not True
+                or not validated_content
+                or json.loads(validated_content[0].get("text", "")) != validated_structured):
+            keys = sorted(validated_structured) if isinstance(validated_structured, dict) else []
+            raise AssertionError(
+                f"Packaged Maven validate did not return a structured success: "
+                f"isError={validated.get('isError')}, fields={keys}")
+        print("PASS packaged stdio execution: real Maven validate and structured/text parity")
         for label, message in (
             ("method", {"jsonrpc": "2.0", "id": 21, "method": canary}),
             ("tool", {"jsonrpc": "2.0", "id": 22, "method": "tools/call",
@@ -353,7 +426,8 @@ def main():
     port = free_port()
     command = [
         "java", "-Dspring.profiles.active=http", "-Dserver.address=127.0.0.1",
-        f"-Dserver.port={port}", "-Dbuildtools.oauth.resource-server.enabled=false", "-jar", str(JAR),
+        f"-Dserver.port={port}", f"-Dbuildtools.projects.allowed-roots={JAR.parent.parent}",
+        "-Dbuildtools.oauth.resource-server.enabled=false", "-jar", str(JAR),
     ]
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
