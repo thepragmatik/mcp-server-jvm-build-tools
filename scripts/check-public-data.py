@@ -113,7 +113,7 @@ def local_file_lines(file: pathlib.Path):
         if file.is_symlink():
             yield 1, os.readlink(file)
         elif file.is_file():
-            for number, line in enumerate(file.read_text().splitlines(), 1):
+            for number, line in enumerate(file.read_text(errors="replace").splitlines(), 1):
                 yield number, line
     except (UnicodeDecodeError, OSError):
         return
@@ -132,7 +132,7 @@ def tracked_lines():
             yield str(file), number, line
 
 
-def main() -> int:
+def scan() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="HEAD")
     parser.add_argument("--tracked", action="store_true", help="scan all tracked text files")
@@ -165,6 +165,14 @@ def main() -> int:
         print(f"file:{file_ref(str(path))}:{number}: possible {kind}; value and filename withheld")
     print(f"Privacy scan: {len(findings)} finding(s)")
     return 1 if findings else 0
+
+
+def main() -> int:
+    try:
+        return scan()
+    except (OSError, subprocess.CalledProcessError, UnicodeError):
+        print("Privacy scan could not complete; inspect local Git state", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

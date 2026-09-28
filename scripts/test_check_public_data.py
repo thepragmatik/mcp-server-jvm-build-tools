@@ -5,6 +5,8 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -115,14 +117,14 @@ class PublicDataScannerTest(unittest.TestCase):
             filename = "person@" + "private.example.net\n::error::flag"
             subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
             subprocess.run(
-                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid",
+                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@" + "example.invalid",
                  "commit", "-q", "--allow-empty", "-m", "baseline"],
                 cwd=repo, check=True,
             )
             (repo / filename).write_text("password=" + "syntheticcredential123456\n")
             subprocess.run(["git", "add", "--", filename], cwd=repo, check=True)
             subprocess.run(
-                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid",
+                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@" + "example.invalid",
                  "commit", "-q", "-m", "synthetic finding"],
                 cwd=repo, check=True,
             )
@@ -137,6 +139,46 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertNotIn("person@", scan.stdout)
             self.assertNotIn("::error::", scan.stdout)
             self.assertNotIn("syntheticcredential123456", scan.stdout)
+
+            git_shim = repo / "git-shim"
+            git_shim.mkdir()
+            (git_shim / "git").write_text(
+                "#!/bin/sh\n"
+                "for argument do\n"
+                "  if [ \"$argument\" = \"--unified=0\" ]; then exit 42; fi\n"
+                "done\n"
+                "exec " + shlex.quote(shutil.which("git")) + " \"$@\"\n"
+            )
+            (git_shim / "git").chmod(0o755)
+            failed_scan = subprocess.run(
+                ["python3", str(Path(__file__).resolve().with_name("check-public-data.py")),
+                 "--base", "HEAD~1"],
+                cwd=repo, capture_output=True, text=True,
+                env={**os.environ, "PATH": str(git_shim) + os.pathsep + os.environ["PATH"]},
+            )
+            self.assertEqual(2, failed_scan.returncode)
+            self.assertEqual("", failed_scan.stdout)
+            self.assertIn("Privacy scan could not complete", failed_scan.stderr)
+            self.assertNotIn("person@", failed_scan.stderr)
+            self.assertNotIn("::error::", failed_scan.stderr)
+            self.assertNotIn("Traceback", failed_scan.stderr)
+
+    def test_tracked_scan_keeps_valid_lines_in_mixed_encoding_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / "settings.properties").write_bytes(
+                b"password=" + b"syntheticcredential123456\n" + bytes([0xff]) + b"\n"
+            )
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "--", "settings.properties"], cwd=repo, check=True)
+            scan = subprocess.run(
+                ["python3", str(Path(__file__).resolve().with_name("check-public-data.py")), "--tracked"],
+                cwd=repo, capture_output=True, text=True,
+            )
+            self.assertEqual(1, scan.returncode)
+            self.assertIn("possible secret assignment", scan.stdout)
+            self.assertNotIn("syntheticcredential123456", scan.stdout)
+            self.assertEqual("", scan.stderr)
 
     def test_reference_resolution_requires_human_terminal(self):
         class TerminalOutput(io.StringIO):
