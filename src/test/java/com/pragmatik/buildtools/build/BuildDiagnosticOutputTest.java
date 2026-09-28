@@ -47,6 +47,7 @@ class BuildDiagnosticOutputTest {
         assertThat(output.diagnosticsTruncated()).isTrue();
     }
 
+    @Test
     void uniqueLimitAndOversizedLineSignalOmissions() throws Exception {
         BuildDiagnosticOutput output = new BuildDiagnosticOutput(new BoundedProcessOutput(), "gradle");
         for (int i = 1; i <= 13; i++) {
