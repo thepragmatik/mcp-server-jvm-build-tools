@@ -2,7 +2,7 @@
 set -eu
 
 # Build the image once; repeatable verifies reuse the host artifact cache read-only.
-# Stream only the committed source snapshot, never ignored worktrees or local files.
+# Stage only the committed source snapshot, never ignored worktrees or local files.
 image="${DOCKER_VERIFY_IMAGE:-jvm-build-tools:2.0-local}"
 repo="${MAVEN_REPOSITORY:-$HOME/.m2/repository}"
 source_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
@@ -13,7 +13,13 @@ if [ ! -d "$repo" ]; then
 fi
 repo=$(CDPATH= cd "$repo" && pwd -P)
 
-git -C "$source_root" archive --format=tar HEAD | docker run --rm -i \
+# POSIX sh reports only the final command's status in a pipeline. Stage the
+# small archive first so a failed git archive cannot be hidden by Docker.
+snapshot=$(mktemp "${TMPDIR:-/tmp}/mcp-docker-verify.XXXXXX")
+trap 'rm -f "$snapshot"' 0
+git -C "$source_root" archive --format=tar HEAD > "$snapshot"
+
+docker run --rm -i \
   --network none \
   --memory 4g --cpus 3 --pids-limit 512 \
   --cap-drop ALL --security-opt no-new-privileges \
@@ -23,7 +29,8 @@ git -C "$source_root" archive --format=tar HEAD | docker run --rm -i \
   --tmpfs /home/buildtools:rw,exec,size=512m,uid=100,gid=101 \
   --mount "type=bind,src=$repo,dst=/m2,readonly" \
   --entrypoint sh "$image" -c '
+    set -eu
     tar -C /work -xf -
     cd /work
     mvn -o -B verify -Dmaven.repo.local=/m2 --no-transfer-progress
-  '
+  ' < "$snapshot"
