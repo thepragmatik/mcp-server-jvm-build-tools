@@ -28,9 +28,9 @@ The release evidence matrix is a living gate, not a list of assumed passes. Atta
 | --- | --- | --- | --- |
 | JDK 21/23/25, packaged stdio/HTTP, strict docs | CI checks, packaged protocol smoke, `mkdocs build --strict` | Recheck on final release head | Release engineer |
 | MCP protocol | Pinned official runner, advertised-capability scenarios and DNS-rebinding case on final jar | Recheck on final release head | Protocol engineer |
-| Privacy and adversarial cases | Synthetic canary matrix on both transports; counts/status only | In progress | Security reviewer |
-| Public contract | Generated runtime catalog and docs drift check | In progress | Docs engineer |
-| Performance | `scripts/benchmark-release-gate.py` aggregates for Maven, Gradle, sbt, callback and bounded-output stress, with warm-cache/offline provenance | In progress; no threshold yet | Performance engineer |
+| Privacy and adversarial cases | Synthetic canary matrix on both transports; counts/status only | Implemented; recheck on final release head | Security reviewer |
+| Public contract | Generated runtime catalog and docs drift check | Implemented in CI; recheck on final release head | Docs engineer |
+| Performance | `scripts/benchmark-release-gate.py` aggregates for Maven, Gradle, sbt, callback and bounded-output stress, with warm-cache/offline provenance | Exploratory baseline recorded; final release-head rerun and runner budget pending | Performance engineer |
 | Dependencies | OWASP dependency scan with an NVD API key, or a recorded human decision on its release scope | **Blocked: key unavailable; not green** | Release engineer |
 | PR review | Two fresh-checkout role-tagged reviews on final SHA; all inline threads answered | Pending final SHA | Quality and adversarial reviewers |
 

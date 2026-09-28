@@ -55,17 +55,17 @@ BENCHMARK_CACHE_STATE=warm sh scripts/benchmark-docker.sh offline --runs 5 --war
 
 The script runs as a nonroot UID with a read-only root filesystem, a tmpfs for generated projects, CPU/memory limits, no host secrets, and no Docker socket. To reuse an existing host `.m2` repository, set `BENCHMARK_OFFLINE_MAVEN_REPOSITORY` to that artifact directory **only for the offline command**; it is mounted read-only and is never visible to a networked bootstrap. Otherwise the dedicated Maven volume avoids repeated downloads. Gradle/sbt runtime caches remain writable. If an offline case needs a missing public artifact, repeat the bootstrap and record that cache change. Never label the network-bootstrap result an offline baseline. The `/tmp` JSON files contain aggregate metrics only; inspect them before publishing. On an existing warmed volume, mark the bootstrap cache state `warm` rather than `cold`.
 
-An exploratory offline run on the server source at `0072560` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, warm dedicated public-artifact volumes, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. Each Maven/Gradle/sbt sample recompiled a changed Java class, verified by a changed class hash; each stress sample verified its emitted byte count. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
+An exploratory offline run on the merged server source at `eb14e06` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, warm dedicated public-artifact volumes, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. Each Maven/Gradle/sbt sample recompiled a changed Java class, verified by a changed class hash; each stress sample verified its emitted byte count. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
 
 | Synthetic case | p50 latency (ms) | p95 latency (ms) | p95 sampled RSS (MiB) | Max MCP response (bytes) |
 | --- | ---: | ---: | ---: | ---: |
-| `list_build_tools` callback | 1.83 | 1.99 | 195.37 | 123 |
-| Maven `compile` | 882.14 | 896.56 | 347.23 | 304 |
-| Gradle `compileJava` | 2272.21 | 2288.94 | 682.34 | 128 |
-| sbt `compile` | 7442.23 | 7484.50 | 548.35 | 152 |
-| Synthetic 1 MiB output | 25.83 | 25.93 | 199.27 | 152 |
-| Synthetic 24 MiB output | 33.90 | 34.55 | 199.25 | 152 |
+| `list_build_tools` callback | 1.73 | 2.22 | 195.81 | 123 |
+| Maven `compile` | 834.04 | 834.26 | 356.88 | 304 |
+| Gradle `compileJava` | 2115.85 | 2140.55 | 681.17 | 128 |
+| sbt `compile` | 7053.01 | 7073.97 | 513.83 | 152 |
+| Synthetic 1 MiB output | 25.11 | 25.12 | 200.21 | 152 |
+| Synthetic 24 MiB output | 32.83 | 33.03 | 200.20 | 152 |
 
-The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.02 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
+The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.01 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
 
 The [2.0 release gates](reference/release-gates.md) record the exact packaged-server protocol checks, adversarial probes, and remaining security-scan prerequisite.
