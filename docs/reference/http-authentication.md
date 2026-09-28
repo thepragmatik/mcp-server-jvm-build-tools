@@ -5,8 +5,8 @@ The HTTP profile binds to loopback and requires a configured, scoped **opaque AP
 ```mermaid
 flowchart LR
   C["MCP client<br/>Bearer API key"] --> F["HTTP auth filter<br/>validates local key"]
-  F --> S["Tool scope check"]
-  S --> T["MCP tool"]
+  F --> S["Tool or prompt scope check"]
+  S --> T["MCP tool or native prompt"]
   F -. "401: Bearer<br/>no OAuth discovery" .-> C
   S -. "403: insufficient_scope" .-> C
   classDef client fill:#e8f1ff,stroke:#3467ad,color:#102642
@@ -17,7 +17,7 @@ flowchart LR
   class T tool
 ```
 
-Set `BUILDTOOLS_API_KEY_<NAME>` and `BUILDTOOLS_API_KEY_<NAME>_SCOPES` before starting the HTTP server. An empty scope list grants no public tool calls. The server compares locally configured key digests and checks each tool's scope. The 401 response never echoes a submitted key.
+Set `BUILDTOOLS_API_KEY_<NAME>` and `BUILDTOOLS_API_KEY_<NAME>_SCOPES` before starting the HTTP server. An empty scope list grants no public tool calls or native prompt requests. The server compares locally configured key digests and checks each tool's scope; `prompts/list` and `prompts/get` require `prompt:read`. The 401 response never echoes a submitted key.
 
 ## Optional OAuth discovery
 

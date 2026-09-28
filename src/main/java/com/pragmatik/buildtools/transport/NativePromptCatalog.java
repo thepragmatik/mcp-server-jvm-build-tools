@@ -29,16 +29,30 @@ public final class NativePromptCatalog {
             "Plan a JVM test strategy. Identify the relevant module and test layer, run the narrowest safe tests first, and expand only when evidence warrants it. Summarize failures from redacted diagnostics and report the exact verification scope without copying raw test output or local paths.");
 
     private static final List<Prompt> PROMPTS = List.of(
-            new Prompt("diagnose_build_failure", "Diagnose build failure", "A privacy-safe workflow for fixing a Maven, Gradle, or sbt build failure.", List.of()),
-            new Prompt("review_dependency_updates", "Review dependency updates", "A bounded workflow for assessing JVM dependency changes.", List.of()),
-            new Prompt("plan_test_strategy", "Plan test strategy", "A focused workflow for choosing and verifying JVM tests.", List.of()));
+            new Prompt(
+                    "diagnose_build_failure",
+                    "Diagnose build failure",
+                    "A privacy-safe workflow for fixing a Maven, Gradle, or sbt build failure.",
+                    List.of()),
+            new Prompt(
+                    "review_dependency_updates",
+                    "Review dependency updates",
+                    "A bounded workflow for assessing JVM dependency changes.",
+                    List.of()),
+            new Prompt(
+                    "plan_test_strategy",
+                    "Plan test strategy",
+                    "A focused workflow for choosing and verifying JVM tests.",
+                    List.of()));
 
     public List<Prompt> prompts() {
         return PROMPTS;
     }
 
     public GetPromptResult getPrompt(GetPromptRequest request) {
-        if (request == null || request.name() == null || !MESSAGES.containsKey(request.name())
+        if (request == null
+                || request.name() == null
+                || !MESSAGES.containsKey(request.name())
                 || (request.arguments() != null && !request.arguments().isEmpty())) {
             throw McpError.builder(-32602).message("Invalid prompt request").build();
         }

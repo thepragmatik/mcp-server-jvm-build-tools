@@ -200,6 +200,29 @@ class OAuthResourceServerFilterTest {
         }
 
         @Test
+        void nativePromptGetRequiresPromptReadScope() throws Exception {
+            MockHttpServletRequest denied = mcpPost(VALID_TOKEN);
+            denied.setContent(
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"prompts/get\",\"params\":{\"name\":\"diagnose_build_failure\"}}"
+                            .getBytes());
+            MockHttpServletResponse deniedResponse = new MockHttpServletResponse();
+            MockFilterChain deniedChain = new MockFilterChain();
+            filter(true).doFilter(denied, deniedResponse, deniedChain);
+            assertThat(deniedResponse.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
+            assertThat(deniedChain.getRequest()).isNull();
+
+            System.setProperty("buildtools.api.key.integration.scopes", "prompt:read");
+            authService = new ToolAuthorizationService();
+            MockHttpServletRequest allowed = mcpPost(VALID_TOKEN);
+            allowed.setContent(
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"prompts/get\",\"params\":{\"name\":\"diagnose_build_failure\"}}"
+                            .getBytes());
+            MockFilterChain allowedChain = new MockFilterChain();
+            filter(true).doFilter(allowed, new MockHttpServletResponse(), allowedChain);
+            assertThat(allowedChain.getRequest()).isNotNull();
+        }
+
+        @Test
         @DisplayName("non-/mcp paths are never challenged")
         void nonMcpPathPassesThrough() throws Exception {
             MockHttpServletRequest req = new MockHttpServletRequest("GET", "/health");

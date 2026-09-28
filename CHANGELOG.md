@@ -2,6 +2,8 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- Three static native MCP build-workflow prompts are available over stdio and HTTP; HTTP retrieval requires `prompt:read`. The legacy `prompt_*` tools remain.
+
 - Failed test assertions with `expected` values and source locations remain test diagnostics rather than compiler errors.
 - `analyze_build_output` now provides schema-checked MCP `structuredContent` alongside the existing redacted JSON text result for older clients.
 

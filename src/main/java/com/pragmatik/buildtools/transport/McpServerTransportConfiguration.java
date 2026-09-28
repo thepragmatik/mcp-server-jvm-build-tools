@@ -133,6 +133,7 @@ public class McpServerTransportConfiguration {
         // Build capabilities
         ServerCapabilities capabilities = ServerCapabilities.builder()
                 .tools(Boolean.FALSE)
+                .resources(Boolean.FALSE, Boolean.FALSE)
                 .prompts(Boolean.FALSE)
                 .build();
 

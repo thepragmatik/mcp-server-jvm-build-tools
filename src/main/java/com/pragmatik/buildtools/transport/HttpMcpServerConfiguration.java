@@ -87,6 +87,7 @@ public class HttpMcpServerConfiguration {
         }
         ServerCapabilities capabilities = ServerCapabilities.builder()
                 .tools(Boolean.FALSE)
+                .resources(Boolean.FALSE, Boolean.FALSE)
                 .prompts(Boolean.FALSE)
                 .build();
         log.info("Registered {} MCP tools via HTTP transport", specifications.size());
@@ -95,8 +96,9 @@ public class HttpMcpServerConfiguration {
                 .capabilities(capabilities)
                 .tools(specifications)
                 .prompts(nativePrompts.prompts().stream()
-                        .map(prompt -> new io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncPromptSpecification(
-                                prompt, (context, request) -> nativePrompts.getPrompt(request)))
+                        .map(prompt ->
+                                new io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncPromptSpecification(
+                                        prompt, (context, request) -> nativePrompts.getPrompt(request)))
                         .toList())
                 .jsonMapper(mapper)
                 .validateToolInputs(true)
