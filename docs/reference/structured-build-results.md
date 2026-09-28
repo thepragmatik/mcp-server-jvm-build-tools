@@ -1,6 +1,6 @@
 # Structured build results
 
-> **Post-RC1 development feature:** [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1) does not include this contract. In RC1, read `analyze_build_output` from JSON text content.
+> **Available in v2.0.0-rc.2:** [the published prerelease](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2) includes this contract. Text-only MCP clients can still read the same safe JSON from `content[0].text`.
 
 `analyze_build_output` and `execute_build_command` return a JSON object in MCP `structuredContent`. Their `tools/list` entries advertise an `outputSchema` that clients can use to validate the result. The existing `content[0].text` still contains the same serialized JSON for clients that only read text. Each call runs the build once; the adapter reuses the already-redacted result to form both MCP fields.
 

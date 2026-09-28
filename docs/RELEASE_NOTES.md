@@ -1,17 +1,23 @@
-# Release Notes — v2.0.0-rc.1
+# Release Notes — v2.0.0-rc.2
 
-> **Current 2.0 development line:** The `buildtools.cache.hit.rate` Micrometer
-> gauge has been removed because no comparable per-tool hit rate was populated;
-> the old gauge always reported `0.0`. sbt cache scoring can incorporate hits
-> and misses parsed from a local execution log, but that is not this gauge.
-> Remove `buildtools_cache_hit_rate` dashboard queries and alerts. The
-> `buildtools.cache.score` gauge remains available as the last cache
-> health score (0-100) per tool; it is not a hit-rate metric.
+RC2 is the current **breaking prerelease**. Existing 1.x clients must update their configuration and refresh `tools/list`. The public catalog remains 24 scoped tools, with three native build-workflow prompts. The server negotiates MCP `2025-11-25`; selected official scenarios pass, but this is not a full conformance certification.
+
+Compared with RC1, Maven, Gradle, and sbt build execution carries authoritative exit status and bounded, redacted diagnostics even when the useful error lies in the middle of large output. Build analysis and execution now provide matching privacy-filtered JSON in `structuredContent` and text, with an `outputSchema`.
+
+Maven configuration validation and dependency scanning gained bounded file reads and explicit incomplete states. Maven Central version metadata and OSV requests have fixed destinations, validation, deadlines, and response limits. The opt-in version security check reveals only aggregate status, vulnerability count, and known or unknown severity to the MCP client; it sends dependency coordinates to OSV.dev when enabled. Fully validated CVSS v3.1 base vectors can establish a severity for single-coordinate checks; unsupported vectors and sparse batch matches remain unknown. See the [security guide](https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/v2.0.0-rc.2/SECURITY.md) for egress and isolation limits.
+
+Monitoring change: the always-zero `buildtools.cache.hit.rate` gauge was removed. Remove `buildtools_cache_hit_rate` dashboard queries and alerts; `buildtools.cache.score` remains a cache-health score (0–100), not a comparable hit-rate metric.
+
+Read the [quickstart](user-guide/quickstart-v2.md), [migration guide](user-guide/migration-v2.md), and [release gates](reference/release-gates.md). Stable 2.0 still requires the remaining [roadmap gates](ROADMAP.md#stable-20-gate), including the portable file-access decision and published-image clean-mount test.
+
+---
+
+# Release Notes — v2.0.0-rc.1
 
 This is the first 2.0 release candidate. It is a breaking prerelease: existing
 1.x clients must update their configuration and refresh `tools/list` before
-using it. Publication is gated by the [release evidence
-matrix](ROADMAP.md#release-candidate-gate-v200-rc1), the packaged
+using it. Publication was gated by the [release evidence
+matrix](ROADMAP.md#release-candidate-gate-rc1-and-later), the packaged
 [protocol and adversarial checks](reference/release-gates.md), and two
 independent PR reviews.
 
