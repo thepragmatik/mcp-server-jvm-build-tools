@@ -167,6 +167,23 @@ public class McpHeaderValidationFilter implements Filter {
             return;
         }
 
+        String requestPath = httpReq.getServletPath();
+        if (requestPath == null || requestPath.isEmpty()) {
+            requestPath = httpReq.getRequestURI();
+        }
+        if (cached.isBodyEmpty()
+                && headerMethod == null
+                && headerName == null
+                && (MCP_PROTOCOL_PATH.equals(requestPath) || "/mcp/discover".equals(requestPath))) {
+            // Preserve the legacy empty discovery probes on both endpoints.
+            if (MCP_PROTOCOL_PATH.equals(requestPath)) {
+                cached.getRequestDispatcher("/mcp/discover").forward(cached, response);
+            } else {
+                chain.doFilter(cached, response);
+            }
+            return;
+        }
+
         String bodyMethod = null;
         Object bodyId = null;
         boolean parsed = false;
@@ -183,10 +200,6 @@ public class McpHeaderValidationFilter implements Filter {
                 return;
             }
             parsed = true;
-            String requestPath = httpReq.getServletPath();
-            if (requestPath == null || requestPath.isEmpty()) {
-                requestPath = httpReq.getRequestURI();
-            }
             boolean bareDiscoverProbe =
                     headerMethod == null && headerName == null && MCP_PROTOCOL_PATH.equals(requestPath);
             if (!validRequestShape(root, bareDiscoverProbe)) {

@@ -27,6 +27,10 @@ The black-box adversarial probes send only synthetic data. They require:
 - Invalid JSON-RPC method, identifier, and parameter shapes to return a small
   generic `-32600` error; the gate checks eight synthetic mutations, including
   scalar and list parameters and a malformed tool argument.
+- Unknown methods, tools, resources, and prompts to return bounded JSON-RPC
+  errors without echoing synthetic private identifiers on both HTTP and stdio.
+- Empty discovery probes on `/mcp` and `/mcp/discover` to remain available;
+  whitespace and real RPC calls still need authentication in HTTP mode.
 - A request larger than the 1 MiB MCP body cap to return HTTP 413.
 - A hostile Host and Origin pair to return HTTP 403.
 - A valid bearer limited to `build:read` to receive HTTP 403 for
@@ -41,6 +45,11 @@ dispatch to prevent malformed input reaching a verbose exception mapper. This
 adds one bounded parse on requests without optional MCP headers; the release
 performance baseline should include it. The server still buffers the request
 only once at this boundary.
+Both transports use one outbound JSON-RPC error policy: SDK error codes remain,
+while exception data and caller-derived error messages are replaced with fixed
+phrases. Successful tool responses, including projected diagnostics, keep their
+normal format. This is a wire-output policy; operators should still investigate
+server errors using local logs.
 These checks do not prove that an arbitrary build script is safe. A filesystem
 symlink can change after Java validates its path and before a child process uses
 it; run untrusted workspaces in a container or equivalent OS sandbox without

@@ -49,7 +49,7 @@ def wait_for_server(process, port):
     raise RuntimeError("Packaged server did not listen within 40 seconds")
 
 
-def request(port, body, *, host=None, origin=None, bearer=None):
+def request(port, body, *, host=None, origin=None, bearer=None, path="/mcp"):
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     headers = {
         "Content-Type": "application/json",
@@ -62,7 +62,7 @@ def request(port, body, *, host=None, origin=None, bearer=None):
     if bearer is not None:
         headers["Authorization"] = f"Bearer {bearer}"
     try:
-        connection.request("POST", "/mcp", body=body, headers=headers)
+        connection.request("POST", path, body=body, headers=headers)
         response = connection.getresponse()
         # Read the entire bounded error/result body. A prefix-only read can miss
         # a reflected canary that appears after a verbose JSON-RPC envelope.
@@ -85,6 +85,18 @@ def json_rpc_reply(body, identifier):
             if line.startswith(b"data:")
         ]
     return next((item for item in candidates if item.get("id") == identifier), None)
+
+
+def assert_safe_error(body, identifier, canary, label):
+    if len(body) > 4096 or canary.encode() in body:
+        raise AssertionError(f"{label} exposed caller data or an oversized error")
+    reply = json_rpc_reply(body, identifier)
+    if not isinstance(reply, dict) or set(reply) != {"jsonrpc", "id", "error"}:
+        raise AssertionError(f"{label} returned an unsafe JSON-RPC envelope")
+    error = reply.get("error")
+    allowed_messages = {"Parse error", "Invalid Request", "Method not found", "Invalid params", "Internal error", "Request failed"}
+    if not isinstance(error, dict) or set(error) != {"code", "message"} or error.get("message") not in allowed_messages:
+        raise AssertionError(f"{label} returned unbounded error fields")
 
 
 def adversarial_checks(port):
@@ -127,6 +139,26 @@ def adversarial_checks(port):
         if invalid_status != 400 or len(invalid_response) > 256 or not safe_invalid:
             raise AssertionError(f"Malformed request shape {index} exposed an unsafe response")
     print(f"PASS invalid JSON-RPC shapes: {len(invalid_shapes)} generic bounded errors")
+
+    for path in ("/mcp", "/mcp/discover"):
+        discover_status, discover_response = request(port, b"", path=path)
+        if discover_status != 200 or b'"result"' not in discover_response:
+            raise AssertionError(f"Empty discovery probe failed on {path}: HTTP {discover_status}")
+    print("PASS empty discovery probes: both HTTP endpoints")
+
+    unknown = (
+        ("method", {"jsonrpc": "2.0", "id": 21, "method": canary}),
+        ("tool", {"jsonrpc": "2.0", "id": 22, "method": "tools/call",
+                  "params": {"name": canary, "arguments": {}}}),
+        ("resource", {"jsonrpc": "2.0", "id": 23, "method": "resources/read",
+                      "params": {"uri": "file:///synthetic-private-canary.invalid"}}),
+        ("prompt", {"jsonrpc": "2.0", "id": 24, "method": "prompts/get",
+                    "params": {"name": canary}}),
+    )
+    for label, message in unknown:
+        _, error_response = request(port, json.dumps(message).encode())
+        assert_safe_error(error_response, message["id"], canary, f"HTTP unknown {label}")
+    print("PASS HTTP unknown identifiers: generic bounded errors")
 
     large = b"{" + b" " * 1_048_576 + b"}"
     status, _ = request(port, large)
@@ -172,6 +204,17 @@ def scope_check():
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         wait_for_server(process, port)
+        discover_status, discover_response = request(port, b"")
+        if discover_status != 200 or b'"result"' not in discover_response:
+            raise AssertionError(f"Unauthenticated empty discovery failed: HTTP {discover_status}")
+        for label, body in (
+            ("whitespace", b" "),
+            ("ping", b'{"jsonrpc":"2.0","id":1,"method":"ping"}'),
+        ):
+            protected_status, _ = request(port, body)
+            if protected_status != 401:
+                raise AssertionError(f"Unauthenticated {label} reached MCP: HTTP {protected_status}")
+        print("PASS empty discovery remains public; whitespace and RPC need authentication")
         call = json.dumps({
             "jsonrpc": "2.0", "id": 2, "method": "tools/call",
             "params": {"name": "execute_build_command", "arguments": {}},
@@ -206,7 +249,7 @@ def stdio_check():
     )
     pending = bytearray()
 
-    def exchange(message, identifier):
+    def exchange(message, identifier, *, expect_error=False):
         process.stdin.write(json.dumps(message).encode() + b"\n")
         process.stdin.flush()
         deadline = time.monotonic() + 20
@@ -219,6 +262,8 @@ def stdio_check():
                 except ValueError:
                     raise AssertionError("Stdio emitted a non-JSON protocol line") from None
                 if reply.get("id") == identifier:
+                    if expect_error:
+                        return reply
                     if "result" not in reply:
                         raise AssertionError(f"Stdio request {identifier} returned an error")
                     return reply["result"]
@@ -246,6 +291,23 @@ def stdio_check():
         if not listed.get("tools"):
             raise AssertionError("Stdio tools/list returned an empty catalog")
         print("PASS packaged stdio: initialize, ping, tools/list")
+        canary = "synthetic-private-canary.invalid"
+        for label, message in (
+            ("method", {"jsonrpc": "2.0", "id": 21, "method": canary}),
+            ("tool", {"jsonrpc": "2.0", "id": 22, "method": "tools/call",
+                      "params": {"name": canary, "arguments": {}}}),
+            ("resource", {"jsonrpc": "2.0", "id": 23, "method": "resources/read",
+                          "params": {"uri": "file:///synthetic-private-canary.invalid"}}),
+            ("prompt", {"jsonrpc": "2.0", "id": 24, "method": "prompts/get",
+                        "params": {"name": canary}}),
+        ):
+            reply = exchange(message, message["id"], expect_error=True)
+            assert_safe_error(json.dumps(reply).encode(), message["id"], canary, f"stdio unknown {label}")
+        print("PASS stdio unknown identifiers: generic bounded errors")
+        invalid_shape = {"jsonrpc": "2.0", "id": 25, "method": "tools/call", "params": canary}
+        reply = exchange(invalid_shape, 25, expect_error=True)
+        assert_safe_error(json.dumps(reply).encode(), 25, canary, "stdio malformed shape")
+        print("PASS stdio malformed shape: generic bounded error")
     finally:
         process.terminate()
         try:

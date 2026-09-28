@@ -77,7 +77,7 @@ public class McpServerTransportConfiguration {
      */
     @Bean
     public McpJsonMapper mcpJsonMapper(JsonMapper jsonMapper) {
-        return new JacksonMcpJsonMapper(jsonMapper);
+        return new PrivacySafeMcpJsonMapper(new JacksonMcpJsonMapper(jsonMapper));
     }
 
     /**

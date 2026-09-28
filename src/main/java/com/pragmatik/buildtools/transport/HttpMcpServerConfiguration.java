@@ -50,7 +50,7 @@ public class HttpMcpServerConfiguration {
 
     @Bean
     public McpJsonMapper httpMcpJsonMapper(JsonMapper mapper) {
-        return new JacksonMcpJsonMapper(mapper);
+        return new PrivacySafeMcpJsonMapper(new JacksonMcpJsonMapper(mapper));
     }
 
     @Bean
