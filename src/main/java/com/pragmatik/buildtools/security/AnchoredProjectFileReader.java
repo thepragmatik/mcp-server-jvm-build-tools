@@ -109,6 +109,8 @@ public final class AnchoredProjectFileReader {
         public void requireSafeNestedMarker(String parent, String filename) throws IOException {
             BasicFileAttributes parentAttributes = attributesIfPresent(directory, parent);
             if (parentAttributes == null) return;
+            // An unrelated regular file named "project" cannot contain the nested sbt marker.
+            if (parentAttributes.isRegularFile()) return;
             if (!parentAttributes.isDirectory()) throw new IOException("Unsafe build marker directory");
             try (SecureDirectoryStream<Path> nested =
                     directory.newDirectoryStream(Path.of(parent), LinkOption.NOFOLLOW_LINKS)) {
