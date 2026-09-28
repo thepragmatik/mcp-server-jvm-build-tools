@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.gradle;
 
+import com.pragmatik.buildtools.build.BuildExecutionResult;
 import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.maven.MavenInvoker;
@@ -130,6 +131,22 @@ public class GradleBuildTool implements BuildTool {
 
     @Override
     public String executeCommand(String buildToolHome, String projectDir, String command) {
+        SyncProcessRunner.Result result = runCommand(buildToolHome, projectDir, command);
+        if (result.exitCode() != 0) {
+            throw new RuntimeException("Gradle exited with code " + result.exitCode() + ": " + result.stderr());
+        }
+        return result.stdout();
+    }
+
+    @Override
+    public BuildExecutionResult executeForMcp(String buildToolHome, String projectDir, String command) {
+        SyncProcessRunner.Result result = runCommand(buildToolHome, projectDir, command);
+        String output = result.stderr().isEmpty() ? result.stdout() : result.stderr() + "\n" + result.stdout();
+        return new BuildExecutionResult(
+                output, result.exitCode(), result.stdoutTruncated() || result.stderrTruncated());
+    }
+
+    private SyncProcessRunner.Result runCommand(String buildToolHome, String projectDir, String command) {
         String executable = resolveGradleExecutable(buildToolHome, projectDir);
         String[] tokens = parseCommandTokens(command);
 
@@ -150,10 +167,7 @@ public class GradleBuildTool implements BuildTool {
             // to avoid the pipe-buffer deadlock that occurs when one stream is read
             // to EOF before the other is drained.
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "gradle");
-            if (result.exitCode() != 0) {
-                throw new RuntimeException("Gradle exited with code " + result.exitCode() + ": " + result.stderr());
-            }
-            return result.stdout();
+            return result;
         } catch (IOException e) {
             throw new RuntimeException("Unable to invoke Gradle command: " + e.getMessage(), e);
         } catch (InterruptedException e) {

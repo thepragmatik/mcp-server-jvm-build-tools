@@ -64,6 +64,13 @@ public class MavenBuildTool implements BuildTool {
         return MavenInvoker.executeCommand(home, MavenInvoker.getCommands(command), projectDir);
     }
 
+    @Override
+    public com.pragmatik.buildtools.build.BuildExecutionResult executeForMcp(
+            String buildToolHome, String projectDir, String command) {
+        String home = requireMavenHome(buildToolHome);
+        return MavenInvoker.executeForMcp(home, MavenInvoker.getCommands(command), projectDir);
+    }
+
     /** Run once and retain bounded compiler diagnostics that head/tail capture would discard. */
     public MavenInvoker.AnalysisResult analyzeCommand(String buildToolHome, String projectDir, String command) {
         String home = requireMavenHome(buildToolHome);

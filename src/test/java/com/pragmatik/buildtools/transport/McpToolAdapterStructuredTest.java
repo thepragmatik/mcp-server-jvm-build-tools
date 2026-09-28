@@ -58,7 +58,7 @@ class McpToolAdapterStructuredTest {
     @Test
     void executionHasOneCallAndEquivalentBoundedStructuredAndTextResults() {
         String raw =
-                "[ERROR] /workspace/private/A.java:42: cannot find symbol alice@example.invalid SYNTHETIC_SECRET\nBUILD FAILURE";
+                "{\"exitCode\":1,\"rawOutput\":\"[ERROR] /workspace/private/A.java:42: cannot find symbol alice@example.invalid SYNTHETIC_SECRET\\nBUILD FAILURE\"}";
         String safe = new ModelOutputPolicy().protect("execute_build_command", raw);
         ToolCallback callback = callback("execute_build_command", safe);
         var result = McpToolAdapter.call(callback, mapper, new CallToolRequest("execute_build_command", Map.of()));
@@ -74,26 +74,28 @@ class McpToolAdapterStructuredTest {
 
     @Test
     void successfulMavenExecutionUsesOneCallbackAndKeepsTextParity() {
-        String safe = new ModelOutputPolicy().protect("execute_build_command", "[INFO] BUILD SUCCESS");
+        String safe = new ModelOutputPolicy()
+                .protect("execute_build_command", "{\"exitCode\":0,\"rawOutput\":\"[INFO] BUILD SUCCESS\"}");
         ToolCallback callback = callback("execute_build_command", safe);
         var result = McpToolAdapter.call(callback, mapper, new CallToolRequest("execute_build_command", Map.of()));
         verify(callback, times(1)).call("{}");
         assertThat(result.isError()).isFalse();
-        assertThat(result.structuredContent()).isEqualTo(Map.of("completed", true, "success", true));
+        assertThat(result.structuredContent()).isEqualTo(Map.of("completed", true, "success", true, "exitCode", 0));
         assertThat(json.readTree(((TextContent) result.content().getFirst()).text()))
                 .isEqualTo(json.valueToTree(result.structuredContent()));
     }
 
     @Test
     void failedExecutionWinsOverEarlierSuccessMarker() {
-        String raw = "[INFO] A plugin printed BUILD SUCCESS\n[INFO] BUILD FAILURE";
+        String raw = "{\"exitCode\":1,\"rawOutput\":\"[INFO] A plugin printed BUILD SUCCESS\\n[INFO] BUILD FAILURE\"}";
         String safe = new ModelOutputPolicy().protect("execute_build_command", raw);
         var result = McpToolAdapter.call(
                 callback("execute_build_command", safe),
                 mapper,
                 new CallToolRequest("execute_build_command", Map.of()));
         assertThat(result.isError()).isTrue();
-        assertThat(result.structuredContent()).isEqualTo(Map.of("completed", true, "success", false, "isError", true));
+        assertThat(result.structuredContent())
+                .isEqualTo(Map.of("completed", true, "success", false, "isError", true, "exitCode", 1));
     }
 
     @Test

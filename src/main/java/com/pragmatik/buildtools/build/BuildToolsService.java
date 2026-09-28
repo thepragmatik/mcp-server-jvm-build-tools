@@ -21,6 +21,7 @@ import com.pragmatik.buildtools.gradle.GradleOutputParser;
 import com.pragmatik.buildtools.maven.MavenBuildTool;
 import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
+import com.pragmatik.buildtools.sbt.SbtBuildTool;
 import com.pragmatik.buildtools.sbt.SbtOutputParser;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tracing.BuildTracer;
@@ -102,7 +103,7 @@ public class BuildToolsService {
                     + "Maven supports: clean, compile, test, package, install, validate. "
                     + "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. "
                     + "SBT supports: compile, test, run, package, clean, assembly.")
-    public String executeBuildCommand(
+    public String executeBuildCommandForMcp(
             @Schema(allowableValues = {"maven", "gradle", "sbt"})
                     @ToolParam(
                             required = false,
@@ -121,6 +122,25 @@ public class BuildToolsService {
                             description =
                                     "Build command to execute (e.g., 'clean compile' for Maven, 'build' for Gradle, 'compile;test' for SBT)")
                     String command) {
+        ResolvedExecution resolved = resolveExecution(buildToolName, buildToolHome, projectDir, command);
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command")) {
+            return boundedMcpExecutionResult(
+                    resolved.tool().executeForMcp(resolved.buildToolHome(), resolved.projectDir(), resolved.command()));
+        }
+    }
+
+    /** Legacy Java contract used by plans and other local callers. */
+    public String executeBuildCommand(String buildToolName, String buildToolHome, String projectDir, String command) {
+        ResolvedExecution resolved = resolveExecution(buildToolName, buildToolHome, projectDir, command);
+        try (TraceScope span = BuildTracer.startSpan("execute_build_command")) {
+            return resolved.tool().executeCommand(resolved.buildToolHome(), resolved.projectDir(), resolved.command());
+        }
+    }
+
+    private record ResolvedExecution(BuildTool tool, String buildToolHome, String projectDir, String command) {}
+
+    private ResolvedExecution resolveExecution(
+            String buildToolName, String buildToolHome, String projectDir, String command) {
         // Validate command length and character content
         if (command == null || command.trim().isEmpty()) {
             throw new IllegalArgumentException("Command cannot be null or empty.");
@@ -157,12 +177,41 @@ public class BuildToolsService {
         }
 
         BuildTool tool = provider.resolve(buildToolName, validatedProject);
-        // Open a span around the build so the subprocess (and any downstream tooling it
-        // launches) is correlated under the inbound trace, if one was propagated via
-        // request _meta (SEP-414); otherwise this is a fresh root span (no regression).
-        try (TraceScope span = BuildTracer.startSpan("execute_build_command")) {
-            return tool.executeCommand(validatedHome, validatedProject.toString(), command);
+        return new ResolvedExecution(tool, validatedHome, validatedProject.toString(), command);
+    }
+
+    static String boundedMcpExecutionResult(BuildExecutionResult result) {
+        String output = result.output();
+        boolean truncated = result.outputTruncated();
+        if (output.length() > BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS) {
+            output = retainOutputEdges(output, BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS);
+            truncated = true;
         }
+        for (; ; ) {
+            Map<String, Object> privateResult = new LinkedHashMap<>();
+            privateResult.put("rawOutput", output);
+            if (result.exitCode() != null) {
+                privateResult.put("exitCode", result.exitCode());
+            }
+            if (truncated) {
+                privateResult.put("outputTruncated", true);
+            }
+            String json = JsonUtils.toJson(privateResult);
+            if (json.length() <= BuildResultLimits.MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS) {
+                return json;
+            }
+            output = retainOutputEdges(output, Math.max(3, output.length() / 2));
+            truncated = true;
+        }
+    }
+
+    private static String retainOutputEdges(String output, int limit) {
+        if (output.length() <= limit) {
+            return output;
+        }
+        int headLength = limit / 2;
+        int tailLength = limit - headLength - 1;
+        return output.substring(0, headLength) + "\n" + output.substring(output.length() - tailLength);
     }
 
     /**
@@ -388,6 +437,7 @@ public class BuildToolsService {
         // correlated under the inbound trace (SEP-414) when one is present.
         String rawOutput;
         int exitCode;
+        boolean authoritativeExitCode = false;
         boolean outputTruncated = false;
         boolean diagnosticsTruncated = false;
         try (TraceScope span = BuildTracer.startSpan("analyze_build_output")) {
@@ -396,8 +446,16 @@ public class BuildToolsService {
                         maven.analyzeCommand(validatedHome, validatedProject.toString(), command);
                 rawOutput = analysis.output();
                 exitCode = analysis.exitCode();
+                authoritativeExitCode = true;
                 outputTruncated = analysis.outputTruncated();
                 diagnosticsTruncated = analysis.diagnosticsTruncated();
+            } else if (tool instanceof GradleBuildTool || tool instanceof SbtBuildTool) {
+                BuildExecutionResult execution =
+                        tool.executeForMcp(validatedHome, validatedProject.toString(), command);
+                rawOutput = execution.output();
+                exitCode = execution.exitCode() == null ? 0 : execution.exitCode();
+                authoritativeExitCode = execution.exitCode() != null;
+                outputTruncated = execution.outputTruncated();
             } else {
                 rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
                 exitCode = 0;
@@ -410,6 +468,9 @@ public class BuildToolsService {
         // Parse output using the appropriate parser
         BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
         Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
+        if (authoritativeExitCode) {
+            result.put("success", exitCode == 0);
+        }
         if (outputTruncated) {
             result.put("outputTruncated", true);
         }

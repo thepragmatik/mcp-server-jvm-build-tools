@@ -51,6 +51,14 @@ public interface BuildTool {
     String executeCommand(String buildToolHome, String projectDir, String command);
 
     /**
+     * Execute once for the guarded MCP result. Third-party implementations retain
+     * their legacy String contract and report unknown exit status by default.
+     */
+    default BuildExecutionResult executeForMcp(String buildToolHome, String projectDir, String command) {
+        return BuildExecutionResult.unknown(executeCommand(buildToolHome, projectDir, command));
+    }
+
+    /**
      * Detect whether the given directory contains a project of this build tool.
      * Maven looks for pom.xml; Gradle looks for build.gradle or settings.gradle.
      *

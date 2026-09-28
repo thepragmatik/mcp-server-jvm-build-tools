@@ -1,5 +1,7 @@
 # MCP Test Tool Recommendations for JVM Build Tools Server
 
+> **Historical research (July 2026):** This page records candidate clients and transport ideas from that date. For current checks and supported transports, use the [release gates](release-gates.md).
+
 > **Context:** This document recommends open-source CLI-based MCP clients for testing the JVM Build Tools MCP server in Docker. The server exposes build tool automation via the Model Context Protocol (MCP) over stdio and/or HTTP transport.  
 > **Date:** 2026-07-23  
 > **Author:** RSRCH-2

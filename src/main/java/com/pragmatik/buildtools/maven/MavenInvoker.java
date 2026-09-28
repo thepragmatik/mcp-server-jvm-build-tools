@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.maven;
 
 import com.pragmatik.buildtools.build.BoundedProcessOutput;
+import com.pragmatik.buildtools.build.BuildExecutionResult;
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
 import java.io.*;
@@ -38,6 +39,13 @@ public class MavenInvoker {
                             : completed.stderr() + "\n" + completed.stdout()));
         }
         return completed.stdout();
+    }
+
+    static BuildExecutionResult executeForMcp(String mavenHome, String[] commands, String projectDir) {
+        CompletedExecution completed = executeCompleted(mavenHome, commands, projectDir, false);
+        String output =
+                completed.stderr().isEmpty() ? completed.stdout() : completed.stderr() + "\n" + completed.stdout();
+        return new BuildExecutionResult(output, completed.exitCode(), completed.outputTruncated());
     }
 
     public record AnalysisResult(String output, int exitCode, boolean outputTruncated, boolean diagnosticsTruncated) {}

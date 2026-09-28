@@ -121,6 +121,7 @@ not depend on the older `buildtools.auth.enabled` switch.
 |----------|---------------|--------|
 | MCP HTTP POST body | 1 MiB by default | Oversized requests receive 413 before SDK dispatch. |
 | Process stdout and stderr | 32 KiB head + 96 KiB tail **per stream** | Readers keep draining large or unterminated output without retaining whole logs. |
+| Completed built-in execution status | One signed process exit integer | MCP `execute_build_command` success follows the exit status after parsing; a custom plugin without a typed result reports unknown status. |
 | Maven analysis compiler candidates | At most 13 complete lines of 2 KiB per stream | Recognized middle-of-log compiler errors survive head/tail truncation; excessive or oversized candidates set `diagnosticsTruncated`. |
 | Tool-result projection input | final 256,000 characters | The projector never parses an unbounded returned string. |
 | Model-visible diagnostics | at most 12; messages at most 500 characters | Includes severity, category, and per-result references; raw logs, commands, file paths, and symbols remain local. |
