@@ -19,6 +19,9 @@ leave it out.
 For build-result changes, keep raw logs and commands out of model-visible JSON.
 Diagnostics must remain bounded structured objects with redacted messages and safe fallback text;
 test them with synthetic path, email, secret, and prompt-injection canaries.
+Privacy scanner findings use opaque file references. The local interactive
+`--resolve-ref` option is for a human maintainer; agents must not invoke it or
+copy resolved paths into model-visible output.
 
 ## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
 1. **Branch** off `main` (`fix/<issue>-<slug>` or `feat/<issue>-<slug>`). Never

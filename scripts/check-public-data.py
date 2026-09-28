@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -28,6 +29,10 @@ CONFIG_SUFFIXES = (".properties", ".yaml", ".yml", ".json", ".toml", ".xml", ".i
 def is_config_path(path: str) -> bool:
     filename = pathlib.Path(path).name
     return path.endswith(CONFIG_SUFFIXES) or filename == ".env" or filename.startswith(".env.")
+
+
+def file_ref(path: str) -> str:
+    return hashlib.sha256(path.encode("utf-8", "surrogateescape")).hexdigest()[:12]
 SAFE_EMAIL_SUFFIXES = (".invalid", ".example", "@example.com", "@example.org")
 SAFE_HOME_NAMES = {"private-user", "test-user", "user", "buildtools"}
 SAFE_VALUES = {"synthetic-value", "integration-test-only"}
@@ -121,15 +126,33 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="HEAD")
     parser.add_argument("--tracked", action="store_true", help="scan all tracked text files")
+    parser.add_argument("--resolve-ref", metavar="REF", help="identify one finding file in a human terminal only")
     args = parser.parse_args()
+    if args.resolve_ref is not None:
+        if not re.fullmatch(r"[0-9a-f]{12}", args.resolve_ref):
+            print("Invalid file reference", file=sys.stderr)
+            return 2
+        if os.environ.get("CI") or not sys.stdout.isatty():
+            print("File references can only be resolved in a local interactive terminal", file=sys.stderr)
+            return 2
+        files = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            check=True, capture_output=True,
+        ).stdout.split(b"\0")
+        candidates = (path.decode("utf-8", "surrogateescape") for path in files if path)
+        matches = [path for path in candidates if file_ref(path) == args.resolve_ref]
+        if len(matches) != 1:
+            print("No unique local file matches this reference", file=sys.stderr)
+            return 2
+        print(json.dumps(matches[0]))
+        return 0
     findings = []
     lines = tracked_lines() if args.tracked else added_lines(args.base)
     for path, number, line in lines:
         for kind in issues(line, path):
             findings.append((path, number, kind))
     for path, number, kind in findings:
-        file_ref = hashlib.sha256(str(path).encode("utf-8", "surrogateescape")).hexdigest()[:12]
-        print(f"file:{file_ref}:{number}: possible {kind}; value and filename withheld")
+        print(f"file:{file_ref(str(path))}:{number}: possible {kind}; value and filename withheld")
     print(f"Privacy scan: {len(findings)} finding(s)")
     return 1 if findings else 0
 

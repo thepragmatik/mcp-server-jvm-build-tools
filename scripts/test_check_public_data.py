@@ -1,11 +1,16 @@
 """Focused tests for the public-data scanner's narrow exceptions."""
 
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from unittest import mock
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -103,6 +108,42 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertNotIn("person@", scan.stdout)
             self.assertNotIn("::error::", scan.stdout)
             self.assertNotIn("syntheticcredential123456", scan.stdout)
+
+    def test_reference_resolution_requires_human_terminal(self):
+        class TerminalOutput(io.StringIO):
+            def isatty(self):
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            filename = "person@" + "private.example.net\n::error::flag"
+            (repo / filename).write_text("synthetic fixture\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "--", filename], cwd=repo, check=True)
+            ref = SCANNER.file_ref(filename)
+            original = Path.cwd()
+            try:
+                os.chdir(repo)
+                with mock.patch.object(sys, "argv", ["scanner", "--resolve-ref", ref]):
+                    with mock.patch.dict(os.environ, {"CI": ""}):
+                        human_output = TerminalOutput()
+                        with redirect_stdout(human_output):
+                            self.assertEqual(0, SCANNER.main())
+                        self.assertEqual(filename, json.loads(human_output.getvalue()))
+                        self.assertNotIn("\n::error::", human_output.getvalue())
+
+                        agent_output = io.StringIO()
+                        with redirect_stdout(agent_output), redirect_stderr(io.StringIO()):
+                            self.assertEqual(2, SCANNER.main())
+                        self.assertEqual("", agent_output.getvalue())
+
+                    with mock.patch.dict(os.environ, {"CI": "true"}):
+                        ci_output = TerminalOutput()
+                        with redirect_stdout(ci_output), redirect_stderr(io.StringIO()):
+                            self.assertEqual(2, SCANNER.main())
+                        self.assertEqual("", ci_output.getvalue())
+            finally:
+                os.chdir(original)
 
 
 if __name__ == "__main__":
