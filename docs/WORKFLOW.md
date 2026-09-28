@@ -30,4 +30,42 @@ Open a PR targeting `main` and wait for CI. Two independent reviewers each use a
 
 Never paste private user data, credentials, home paths, or raw build output into issues, PRs, CI logs, tests, or model prompts. Use synthetic `.invalid` examples and report counts/status rather than values.
 
+## Keep the review loop short without weakening its gates
+
+Work in one narrow, reviewable behavior slice per PR. Assign separate worktrees to independent engineers so feature changes do not collide. Start with a focused failing test or a measured baseline; run focused tests during implementation, then one full `./mvnw -B verify --no-transfer-progress` on the completed commit before push. Run strict docs and the privacy scanner when their inputs change. Repeat a full local or Docker verify only after a relevant code change or unresolved failure; CI provides its own independent run. The Docker clean-room verify reuses the host's **repository artifacts** read-only through `scripts/docker-verify.sh`, while the source is copied to a disposable writable volume. Do not mount the entire home directory, Maven settings, credentials, or the Docker socket.
+
+Open the draft PR as soon as the coherent slice is ready. CI can run while two reviewers inspect a **fixed commit SHA** in fresh checkouts. They each run full verify and post their role-tagged verdict to the PR. If a review finds a defect, fix it, answer the inline thread, let CI rerun, and have both reviewers reconfirm the new head; do not keep polling or restarting reviewers against a moving branch. Check the four gates in `AGENTS.md` once, then merge. This preserves the adversarial and code-quality review requirement without multiplying full builds on an unchanged commit.
+
+For protocol work, install a pinned conformance runner once and reuse its package cache; record the runner version and applicable scenarios. A broad optional-capability suite may report failures for capabilities this server does not advertise, so classify those separately from failures of applicable requirements. Neither a successful bespoke smoke test nor a green unit test replaces applicable official conformance.
+
+## Reproducible performance baseline
+
+Build the packaged jar, then run `python3 scripts/benchmark-release-gate.py --runs 5 --warmups 2 --output benchmark.json` on a host with Maven, Gradle, and sbt installed. The script creates dependency-free disposable projects, calls the packaged server over stdio, and measures end-to-end `list_build_tools` callback latency, **fresh source-compilation** latency, 100 ms sampled process-tree RSS, MCP response bytes, and a synthetic 1 MiB versus 24 MiB unterminated-output stress case. Before every build call, it changes a Java constant and removes the generated class; afterward it requires the compiled class hash to change. This keeps dependency caches warm while excluding up-to-date/no-op compilation samples. The output wrapper records the number of stdout bytes after flushing, and the harness verifies that count before reporting bounded-output evidence. It does not emit raw MCP responses, build logs, project paths, or process command lines. The output-stress case uses a disposable Gradle-named wrapper; its numbers test capture behavior, **not Gradle compilation**.
+
+Record OS, architecture, Java and build-tool versions, core/memory limits, warmup and sample counts, network mode, and whether each cache was cold or warm with the aggregate result. Compare measurements only within the same environment and cache state. A 100 ms RSS sample can miss short peaks; process-tree RSS sums resident pages across processes and is not a JVM heap measurement. Five runs are enough to expose obvious regressions, not to prove a universal p95 service-level objective. Set thresholds only after repeated baselines on the intended CI runner; investigate noise before treating a slower run as a regression.
+
+For a clean-room run, build the existing server image once. `scripts/benchmark-docker.sh` builds a small Python/procps layer and stages **only** the packaged jar and benchmark script read-only. Networked bootstrap sees only dedicated writable Docker volumes for public Maven, Gradle, and sbt artifacts; it never mounts the host Maven repository. Discard the bootstrap numbers. The second command is the measured, offline pass using those same warmed volumes:
+
+```sh
+./mvnw -B package -DskipTests --no-transfer-progress
+docker build -t jvm-build-tools:2.0-local .
+BENCHMARK_CACHE_STATE=cold sh scripts/benchmark-docker.sh bootstrap --runs 1 --warmups 0 > /tmp/benchmark-bootstrap.json
+BENCHMARK_CACHE_STATE=warm sh scripts/benchmark-docker.sh offline --runs 5 --warmups 2 > /tmp/benchmark-offline.json
+```
+
+The script runs as a nonroot UID with a read-only root filesystem, a tmpfs for generated projects, CPU/memory limits, no host secrets, and no Docker socket. To reuse an existing host `.m2` repository, set `BENCHMARK_OFFLINE_MAVEN_REPOSITORY` to that artifact directory **only for the offline command**; it is mounted read-only and is never visible to a networked bootstrap. Otherwise the dedicated Maven volume avoids repeated downloads. Gradle/sbt runtime caches remain writable. If an offline case needs a missing public artifact, repeat the bootstrap and record that cache change. Never label the network-bootstrap result an offline baseline. The `/tmp` JSON files contain aggregate metrics only; inspect them before publishing. On an existing warmed volume, mark the bootstrap cache state `warm` rather than `cold`.
+
+An exploratory offline run on the merged server source at `eb14e06` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, warm dedicated public-artifact volumes, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. Each Maven/Gradle/sbt sample recompiled a changed Java class, verified by a changed class hash; each stress sample verified its emitted byte count. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
+
+| Synthetic case | p50 latency (ms) | p95 latency (ms) | p95 sampled RSS (MiB) | Max MCP response (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| `list_build_tools` callback | 1.73 | 2.22 | 195.81 | 123 |
+| Maven `compile` | 834.04 | 834.26 | 356.88 | 304 |
+| Gradle `compileJava` | 2115.85 | 2140.55 | 681.17 | 128 |
+| sbt `compile` | 7053.01 | 7073.97 | 513.83 | 152 |
+| Synthetic 1 MiB output | 25.11 | 25.12 | 200.21 | 152 |
+| Synthetic 24 MiB output | 32.83 | 33.03 | 200.20 | 152 |
+
+The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.01 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
+
 The [2.0 release gates](reference/release-gates.md) record the exact packaged-server protocol checks, adversarial probes, and remaining security-scan prerequisite.
