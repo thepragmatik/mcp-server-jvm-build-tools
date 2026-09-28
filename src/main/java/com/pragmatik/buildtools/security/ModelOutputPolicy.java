@@ -224,6 +224,20 @@ public final class ModelOutputPolicy {
                     diagnosticsTruncated |=
                             copyDiagnostics(root.get("warnings"), "warning", diagnostics, fileRefs, seen);
                     diagnosticsTruncated |= root.path("diagnosticsTruncated").asBoolean(false);
+                    if (("analyze_build_output".equals(toolName) || "execute_build_command".equals(toolName))
+                            && hasFailedTests(tests)
+                            && diagnostics.stream().noneMatch(d -> "test".equals(d.get("category")))) {
+                        // A private assertion can match a compiler phrase first. Keep the
+                        // aggregate test failure visible without exposing that assertion.
+                        if (diagnostics.size() == MAX_DIAGNOSTICS) {
+                            diagnostics.remove(MAX_DIAGNOSTICS - 1);
+                            diagnosticsTruncated = true;
+                        }
+                        String message = positiveTestCount(tests, "failed")
+                                ? "Test assertion failed"
+                                : "Test failed during execution";
+                        diagnostics.add(0, diagnostic("error", message, null, fileRefs));
+                    }
                     if (root.path("outputTruncated").asBoolean(false)) {
                         safe.put("outputTruncated", true);
                     }
@@ -453,6 +467,21 @@ public final class ModelOutputPolicy {
         if (truncated) {
             safe.put("diagnosticsTruncated", true);
         }
+    }
+
+    private static boolean hasFailedTests(JsonNode tests) {
+        return positiveTestCount(tests, "failed") || positiveTestCount(tests, "errors");
+    }
+
+    private static boolean positiveTestCount(JsonNode tests, String key) {
+        if (tests == null || !tests.isObject()) {
+            return false;
+        }
+        JsonNode count = tests.get(key);
+        return count != null
+                && count.isIntegralNumber()
+                && count.longValue() > 0
+                && count.longValue() <= BuildResultLimits.MAX_VISIBLE_COUNTER;
     }
 
     private static Map<String, Object> diagnostic(

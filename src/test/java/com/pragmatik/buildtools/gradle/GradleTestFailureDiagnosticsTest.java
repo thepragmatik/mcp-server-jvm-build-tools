@@ -156,6 +156,23 @@ class GradleTestFailureDiagnosticsTest {
     }
 
     @Test
+    void compilationNamedTestTaskStillProjectsVisibleTestFailure() {
+        StringBuilder output = new StringBuilder();
+        for (int i = 0; i < 12; i++) {
+            output.append("error: cannot find symbol ").append(i).append('\n');
+        }
+        output.append("> Task :compileJava:test FAILED\n").append("1 test completed, 1 failed\nBUILD FAILED in 1s\n");
+
+        Map<String, Object> parsed = parser.parse(output.toString(), 1, "test");
+        var visible =
+                json.readTree(new ModelOutputPolicy().protect("analyze_build_output", json.writeValueAsString(parsed)));
+
+        assertThat(visible.get("diagnostics").size()).isEqualTo(12);
+        assertThat(visible.get("diagnostics").toString()).contains("\"category\":\"test\"");
+        assertThat(visible.get("diagnosticsTruncated").booleanValue()).isTrue();
+    }
+
+    @Test
     void passingSummaryDoesNotInventFailureDiagnostic() {
         Map<String, Object> parsed = parser.parse("1 test completed, 0 failed\nBUILD SUCCESSFUL in 1s", 0, "test");
         assertThat(parsed.get("errorCount")).isEqualTo(0);

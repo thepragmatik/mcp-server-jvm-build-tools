@@ -49,9 +49,10 @@ class BuildResultProjectionTest {
         assertFalse(forPolicy.contains("SYNTHETIC PRIVATE OUTPUT"));
         assertFalse(forPolicy.contains("SYNTHETIC PRIVATE COMMAND"));
         assertEquals(1, safe.get("testSummary").get("failed").intValue());
-        assertEquals(27, safe.get("diagnostics").get(0).get("line").intValue());
+        assertEquals("test", safe.get("diagnostics").get(0).get("category").asText());
+        assertEquals(27, safe.get("diagnostics").get(1).get("line").intValue());
         assertEquals(
-                "compilation", safe.get("diagnostics").get(0).get("category").asText());
+                "compilation", safe.get("diagnostics").get(1).get("category").asText());
         assertFalse(safe.toString().contains("SYNTHETIC_SOURCE_IDENTIFIER"));
         assertFalse(safe.toString().contains("/workspace/private"));
     }

@@ -86,6 +86,24 @@ class SbtTestSummaryDiagnosticTest {
         assertThat(visible.toString()).doesNotContain("SYNTHETIC_SECRET");
     }
 
+    @Test
+    void assertionContainingCompilerPhraseStillProjectsVisibleTestFailure() {
+        StringBuilder output = new StringBuilder();
+        for (int i = 0; i < 12; i++) {
+            output.append("[error] unrelated execution detail ").append(i).append('\n');
+        }
+        output.append("[error] cannot find symbol assertion failed SYNTHETIC_SECRET\n")
+                .append("[info] Passed: Total 1, Failed 1, Errors 0, Passed 0\n");
+
+        Map<String, Object> parsed = parser.parse(output.toString(), 1, "test");
+        var visible =
+                json.readTree(new ModelOutputPolicy().protect("analyze_build_output", json.writeValueAsString(parsed)));
+
+        assertThat(visible.get("diagnostics").size()).isEqualTo(12);
+        assertThat(visible.get("diagnostics").toString()).contains("\"category\":\"test\"");
+        assertThat(visible.toString()).doesNotContain("SYNTHETIC_SECRET");
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> summary(Map<String, Object> result) {
         return (Map<String, Object>) result.get("testSummary");
