@@ -19,6 +19,7 @@ package com.pragmatik.buildtools.plan;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.pragmatik.buildtools.build.BuildToolProvider;
+import com.pragmatik.buildtools.maven.MavenHomeResolver;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,20 +35,8 @@ class PlanExecutionEngineTest {
     private BuildToolProvider provider;
     private static final String MAVEN_WRAPPER = "mvn";
 
-    /**
-     * Resolve the Maven home directory, preferring environment variables
-     * (set by CI runners like GitHub Actions' setup-java) over the
-     * local SDKMAN path used on the developer machine.
-     */
-    private static String resolveMavenHome() {
-        String envHome = System.getenv("M2_HOME");
-        if (envHome != null && !envHome.isEmpty()) return envHome;
-        envHome = System.getenv("MAVEN_HOME");
-        if (envHome != null && !envHome.isEmpty()) return envHome;
-        return "/Users/rath/.sdkman/candidates/maven/current";
-    }
-
-    private static final String MAVEN_HOME = resolveMavenHome();
+    private static final String MAVEN_HOME = MavenHomeResolver.resolveMavenHome()
+            .orElseThrow(() -> new IllegalStateException("Maven installation required for plan tests"));
 
     @BeforeEach
     void setUp() {

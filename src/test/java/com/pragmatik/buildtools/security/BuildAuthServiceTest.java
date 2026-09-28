@@ -46,8 +46,8 @@ class BuildAuthServiceTest {
         @Test
         @DisplayName("masks password showing only last 3 chars")
         void masksPasswordShowingLast3Chars() {
-            String masked = BuildAuthService.maskCredential("s3cret-password-abc");
-            assertThat(masked).isEqualTo("****abc");
+            String masked = BuildAuthService.maskCredential("synthetic-value");
+            assertThat(masked).isEqualTo("****lue");
         }
 
         @Test
@@ -106,12 +106,12 @@ class BuildAuthServiceTest {
             Map<String, Object> server1 = servers.get(0);
             assertThat(server1.get("id")).isEqualTo("central-repo");
             assertThat(server1.get("username")).isEqualTo("deploy-user");
-            assertThat(server1.get("password")).isEqualTo("****abc");
+            assertThat(server1.get("password")).isEqualTo("****lue");
 
             // Second server: private-nexus
             Map<String, Object> server2 = servers.get(1);
             assertThat(server2.get("id")).isEqualTo("private-nexus");
-            assertThat(server2.get("password")).isEqualTo("****789");
+            assertThat(server2.get("password")).isEqualTo("****nly");
         }
 
         @Test

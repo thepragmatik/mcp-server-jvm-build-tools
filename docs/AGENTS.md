@@ -19,6 +19,11 @@ leave it out.
 For build-result changes, keep raw logs and commands out of model-visible JSON.
 Diagnostics must remain bounded structured objects with redacted messages and safe fallback text;
 test them with synthetic path, email, secret, and prompt-injection canaries.
+Privacy scanner findings use opaque file references. The local interactive
+`--resolve-ref` option is for a human maintainer; agents must not invoke it or
+copy resolved paths into model-visible output.
+Scanner exit code 2 means the scan could not complete (for example, an unreadable
+tracked file); fix the local state and rerun it before claiming a privacy pass.
 
 ## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
 1. **Branch** off `main` (`fix/<issue>-<slug>` or `feat/<issue>-<slug>`). Never
@@ -27,12 +32,15 @@ test them with synthetic path, email, secret, and prompt-injection canaries.
    Prefer whole-file writes over fuzzy partial diffs. Add/adjust tests. **Commit
    early** (after the fix compiles; after tests compile) so a transient failure
    never loses work.
-3. `mvn -B verify` **GREEN**. Push. Open a PR with `Closes #<issue>` and a body:
-   summary + root cause + changes + the real `Tests run:` line.
+3. `mvn -B verify` **GREEN**. Push. Open a PR with a body covering the summary,
+   root cause, changes, and the real `Tests run:` line. Include `Closes #<issue>`
+   only when the PR actually resolves a tracked issue.
 4. **GATE 1 — CI:** all checks pass. Never merge on red/pending/unknown.
-5. **GATE 2 — TWO independent reviews.** Each reviewer does a *fresh checkout*,
-   runs `mvn -B verify` itself (don't trust prior runs), leaves **inline comments**
-   (GitHub review API, `path`+`line`), and posts a role-tagged verdict comment.
+5. **GATE 2 — TWO independent reviews of the exact final PR head.** Each reviewer
+   uses a *fresh checkout*, runs focused tests for changed paths, inspects the
+   independent full CI verify, and runs a local full verify when risk warrants it.
+   Leave **inline comments** for specific findings (GitHub review API, `path`+`line`)
+   and post a role-tagged verdict comment.
    **Reviews MUST be posted through the GitHub PR interface** using the `gh` CLI —
    Kanban comments alone are insufficient because they are not visible to the PR
    author in the GitHub UI and do not trigger CI re-evaluation.
@@ -40,10 +48,11 @@ test them with synthetic path, email, secret, and prompt-injection canaries.
    **Review command example:**
    ```sh
    git fetch origin pull/<PR_NUMBER>/head:pr-review && git checkout pr-review
-   mvn -B verify --no-transfer-progress
+   mvn -B -Dtest=RelevantTest test --no-transfer-progress
+   gh pr checks <PR_NUMBER> --repo thepragmatik/mcp-server-jvm-build-tools
    # After full review, post verdict via GitHub:
    gh pr review <PR_NUMBER> --repo thepragmatik/mcp-server-jvm-build-tools \
-     --request-changes --body "ADVERSARIAL — VERDICT: REQUEST_CHANGES
+     --comment --body "ADVERSARIAL — VERDICT: REQUEST_CHANGES
 
    <specific findings with file paths and line numbers>"
    ```
@@ -56,7 +65,7 @@ test them with synthetic path, email, secret, and prompt-injection canaries.
      `CODE-QUALITY — VERDICT: APPROVE | REQUEST_CHANGES`.
    (Single shared bot identity cannot natively self-approve; verdicts live in the
    comment bodies, not GitHub's approval state. Do not rubber-stamp — cite specific
-   code and your own build output.)
+   code and the tests or CI evidence you inspected.)
 6. **GATE 3 — Author responds to EVERY review comment.** For each comment thread,
    either: (a) **implement** the change, commit, and reply linking the commit; or
    (b) **reply with a clear rationale** for declining. No comment is left
@@ -75,8 +84,10 @@ test them with synthetic path, email, secret, and prompt-injection canaries.
    > Then delete the branch after merge completes:
    > `gh api repos/:owner/:repo/git/refs/heads/<branch> -X DELETE`
 
-   If any condition is not met, block and notify. Never force-push,
-   never modify branch protection, and never merge on red/unknown CI.
+   If any condition is not met, block and notify. Do not rewrite a branch while
+   reviewers are assessing it. A solo feature branch may be rebased before final
+   reviews; use `--force-with-lease` only for that isolated branch and notify
+   reviewers of the new head. Never modify branch protection or merge on red/unknown CI.
 
    **Restrictions:**
    - A single bot identity **cannot self-approve** on GitHub (`--approve` returns `GraphQL: Review Can not approve your own pull request`).
