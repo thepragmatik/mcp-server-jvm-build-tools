@@ -25,6 +25,8 @@ Set `buildtools.oauth.authorization-servers` to one or more issuer URLs only whe
 
 **Issuer configuration alone does not make this application an OAuth token validator.** The built-in filter still accepts only locally configured opaque keys; it does not fetch JWKS, validate JWT signatures, check issuer or audience claims, or introspect remote tokens. A gateway that validates issuer-issued tokens must be deployed so that clients cannot bypass it. It must securely map the verified identity and scopes to a locally recognized credential before forwarding to this server; a JWT forwarded unchanged will receive 401. Do not advertise an issuer until that end-to-end path has been tested.
 
+Behind a TLS-terminating proxy, set `buildtools.oauth.resource` to the external canonical URL, such as `https://mcp.example.com/mcp`. The 401 challenge then links to `https://mcp.example.com/.well-known/oauth-protected-resource`, not the internal listener. If the public MCP endpoint has a path prefix, the proxy must still route this root well-known path to the server. The configured resource and issuer URLs must be absolute HTTPS URLs, except loopback HTTP for local development; user information, query strings, and fragments are rejected at startup. The server does not trust client-supplied forwarding headers to form OAuth discovery URLs.
+
 ```mermaid
 flowchart LR
   C["OAuth-capable MCP client"] --> A["Configured authorization server"]

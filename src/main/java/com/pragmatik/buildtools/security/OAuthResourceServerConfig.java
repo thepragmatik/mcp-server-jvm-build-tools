@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -60,6 +61,7 @@ public class OAuthResourceServerConfig {
 
     private final boolean enabled;
     private final String configuredResource;
+    private final URI configuredResourceUri;
     private final List<String> authorizationServers;
 
     /**
@@ -79,6 +81,9 @@ public class OAuthResourceServerConfig {
             @Value("${buildtools.oauth.authorization-servers:}") String authorizationServers) {
         this.enabled = enabled;
         this.configuredResource = configuredResource == null ? "" : configuredResource.trim();
+        this.configuredResourceUri = this.configuredResource.isEmpty()
+                ? null
+                : validatedHttpUrl(this.configuredResource, "buildtools.oauth.resource");
         this.authorizationServers = parseCsv(authorizationServers);
     }
 
@@ -92,7 +97,15 @@ public class OAuthResourceServerConfig {
     public OAuthResourceServerConfig(boolean enabled, String configuredResource, List<String> authorizationServers) {
         this.enabled = enabled;
         this.configuredResource = configuredResource == null ? "" : configuredResource.trim();
-        this.authorizationServers = authorizationServers == null ? List.of() : List.copyOf(authorizationServers);
+        this.configuredResourceUri = this.configuredResource.isEmpty()
+                ? null
+                : validatedHttpUrl(this.configuredResource, "buildtools.oauth.resource");
+        this.authorizationServers = authorizationServers == null
+                ? List.of()
+                : authorizationServers.stream()
+                        .map(value -> validatedHttpUrl(value, "buildtools.oauth.authorization-servers")
+                                .toString())
+                        .toList();
     }
 
     /**
@@ -165,13 +178,18 @@ public class OAuthResourceServerConfig {
      * @return the absolute metadata URL
      */
     public String metadataUrl(HttpServletRequest request) {
+        if (configuredResourceUri != null) {
+            // RFC9728 root well-known URI. Never derive a public discovery URL from
+            // untrusted Forwarded/X-Forwarded headers or the internal proxy connection.
+            return configuredResourceUri.resolve("/") + PROTECTED_RESOURCE_METADATA_PATH.substring(1);
+        }
         return baseUrl(request) + PROTECTED_RESOURCE_METADATA_PATH;
     }
 
     /**
      * Builds the scheme/host/port/context-path prefix of the current request. Behind a
-     * TLS-terminating reverse proxy, set {@code buildtools.oauth.resource} explicitly (or enable
-     * Spring's {@code ForwardedHeaderFilter}) so the advertised URLs reflect the external origin.
+     * TLS-terminating reverse proxy, configure {@code buildtools.oauth.resource} explicitly;
+     * request forwarding headers are not trusted by this component.
      *
      * @param request the current request
      * @return the request's origin prefix, without a trailing slash
@@ -200,6 +218,39 @@ public class OAuthResourceServerConfig {
         return Arrays.stream(csv.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
+                .map(value -> validatedHttpUrl(value, "buildtools.oauth.authorization-servers")
+                        .toString())
                 .toList();
+    }
+
+    private static URI validatedHttpUrl(String value, String property) {
+        URI uri;
+        try {
+            uri = URI.create(value);
+        } catch (IllegalArgumentException invalid) {
+            throw invalidUrl(property);
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (host == null
+                || host.isBlank()
+                || uri.getRawUserInfo() != null
+                || uri.getRawQuery() != null
+                || uri.getRawFragment() != null
+                || uri.getPort() == 0
+                || uri.getPort() > 65535
+                || !("https".equalsIgnoreCase(scheme) || ("http".equalsIgnoreCase(scheme) && isLoopbackHost(host)))) {
+            throw invalidUrl(property);
+        }
+        return uri;
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "[::1]".equals(host);
+    }
+
+    private static IllegalArgumentException invalidUrl(String property) {
+        return new IllegalArgumentException(
+                property + " must be an absolute HTTPS URL (or loopback HTTP) without user info, query, or fragment");
     }
 }

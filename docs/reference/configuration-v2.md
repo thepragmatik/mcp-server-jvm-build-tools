@@ -29,6 +29,7 @@ system permissions. Isolate untrusted projects in a container.
 | `BUILDTOOLS_API_KEY_<NAME>_SCOPES` | empty | Comma-separated scopes for that key. No scopes means no public tool call is authorized. Grant only the scopes needed; see the [tool catalog](tool-catalog.md). |
 | `buildtools.oauth.resource-server.enabled` | `true` in the HTTP profile | Require a configured bearer key for MCP requests. `tools/call` also checks the key's tool scope and returns 403 when it is absent. |
 | `buildtools.oauth.authorization-servers` | empty | Comma-separated issuer URLs. With bearer enforcement active, enables RFC 9728 metadata and a `resource_metadata` challenge; it does **not** enable JWT or remote-token validation. |
+| `buildtools.oauth.resource` | empty | External canonical MCP resource URL for proxy deployments. When configured, its origin supplies the public metadata link; route the root `/.well-known/oauth-protected-resource` path through the proxy. |
 
 The default HTTP mode uses local opaque keys. See [HTTP authentication](http-authentication.md)
 before configuring an issuer; discovery alone does not validate OAuth tokens.

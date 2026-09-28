@@ -127,6 +127,25 @@ class OAuthResourceServerFilterTest {
         }
 
         @Test
+        @DisplayName("proxied challenge advertises the external metadata URL")
+        void proxyChallengeUsesConfiguredResourceOrigin() throws Exception {
+            MockHttpServletRequest internal = mcpPost(null);
+            internal.setServerName("127.0.0.1");
+            internal.addHeader("X-Forwarded-Host", "untrusted.example.net");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            new OAuthResourceServerFilter(
+                            new OAuthResourceServerConfig(
+                                    true, "https://mcp.example.com/mcp", List.of("https://as.example.com")),
+                            authService)
+                    .doFilter(internal, response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            assertThat(response.getHeader("WWW-Authenticate"))
+                    .contains("resource_metadata=\"https://mcp.example.com/.well-known/oauth-protected-resource\"")
+                    .doesNotContain("127.0.0.1", "untrusted.example.net");
+        }
+
+        @Test
         @DisplayName("invalid token -> 401 with invalid_token error and challenge")
         void invalidTokenChallenged() throws Exception {
             MockHttpServletResponse res = new MockHttpServletResponse();

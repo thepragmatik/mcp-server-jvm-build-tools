@@ -153,20 +153,13 @@ also offers an opt-in **Streamable HTTP** transport.
       -jar target/mcp-server-jvm-build-tools.jar
     ```
 
-    The transport is **stateless** (MCP 2026-07-28 RC): no sessions, no `Mcp-Session-Id`, and no
-    SSE-stream resumability, so it sits cleanly behind a load balancer — any replica can serve any
-    request. It also exposes discovery surfaces: the server card
-    (`GET /.well-known/mcp-server`), `server/discover` (`GET`/`POST /mcp/discover`), and OAuth
-    Protected Resource Metadata (`GET /.well-known/oauth-protected-resource`). See the
-    [Configuration reference](../reference/configuration.md#streamable-http-transport).
-
-!!! tip "OAuth 2.1 integration for shared/remote deployments"
-    Under the HTTP profile the server behaves as an **OAuth 2.1 resource server**. Bearer-token
-    enforcement on `/mcp/**` is opt-in (`buildtools.oauth.resource-server.enabled=true`): clients
-    then send `Authorization: Bearer <token>`, and a missing/invalid token gets a `401` with a
-    `WWW-Authenticate` challenge pointing at the metadata document. For untrusted exposure, front
-    the server with a TLS-terminating OAuth gateway. See the
-    [Security reference](../reference/security.md#oauth-21-resource-server-http-transport).
+    The transport is stateless. The HTTP profile binds to loopback and requires a
+    configured, scoped opaque API key by default. In this 1.x usage page, the
+    examples above are historical; use the
+    [2.0 HTTP authentication guide](../reference/http-authentication.md) for
+    current key setup and optional OAuth discovery. Without a configured issuer,
+    the OAuth metadata endpoint returns 404 and a 401 response carries a plain
+    Bearer challenge. Issuer configuration does not add JWT validation.
 
 ## Verifying behaviour quickly
 
