@@ -542,22 +542,21 @@ public class DependencyService {
     /**
      * Bulk-scan a project's direct dependencies for known vulnerabilities.
      * <p>
-     * Parses the project's pom.xml or build.gradle to extract direct dependencies,
-     * then queries OSV.dev for each one. Returns a prioritized vulnerability report
-     * filtered by severity threshold.
+     * Reads a bounded POM or Gradle build file, extracts direct dependencies, and
+     * sends supported package coordinates to OSV.dev. The MCP projection returns
+     * aggregate counts and safe warnings; package and CVE identities stay local.
      * <p>
-     * <b>Performance:</b> Scans one dependency at a time with a 1-hour in-memory
-     * cache. For projects with 100+ dependencies, the scan may take several seconds.
-     * Set a higher {@code severityThreshold} to get faster results.
+     * <b>Performance:</b> Uncached coordinates are queried in batches of up to 100;
+     * an in-memory cache lasts one hour. The severity threshold filters results
+     * after lookup and does not reduce outbound query work.
      */
     @Tool(
             name = "scan_dependency_cves",
-            description = "Scan a project's direct dependencies for known vulnerabilities (CVEs) using OSV.dev. "
-                    + "Parses pom.xml or build.gradle to extract dependencies, queries OSV.dev for each, "
-                    + "and returns a prioritized vulnerability report filtered by severity threshold. "
-                    + "Use this to audit a project's dependencies for security issues. "
-                    + "Default threshold is HIGH (includes HIGH and CRITICAL). "
-                    + "Rate-limited — large projects may take several seconds.")
+            description = "Scan direct Maven or Gradle dependencies for known vulnerabilities using OSV.dev. "
+                    + "Sends supported package coordinates and versions to OSV.dev. Reads at most 1 MiB "
+                    + "through a no-symlink project handle. MCP returns aggregate counts and safe warnings; "
+                    + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
+                    + "Uncached coordinates are queried in batches of up to 100.")
     public String scanDependencyCves(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir,
