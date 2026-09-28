@@ -20,11 +20,8 @@ import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -117,30 +114,17 @@ public class GradleBuildTool implements BuildTool {
         try {
             String[] cmd = {resolveGradleExecutable(null, null), "--version", "--no-daemon"};
             Process process = new ProcessBuilder(cmd).start();
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
-                }
+            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "gradle-version");
+            if (result.exitCode() != 0) {
+                throw new RuntimeException(
+                        "Gradle --version failed with exit code " + result.exitCode() + ": " + result.stderr());
             }
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                StringBuilder errors = new StringBuilder();
-                try (BufferedReader reader =
-                        new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errors.append(line).append(System.lineSeparator());
-                    }
-                }
-                throw new RuntimeException("Gradle --version failed with exit code " + exitCode + ": " + errors);
-            }
-            return output.toString().trim();
-        } catch (IOException | InterruptedException e) {
+            return result.stdout().trim();
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to determine Gradle version", e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Unable to determine Gradle version: " + e.getMessage(), e);
+            throw new RuntimeException("Gradle version check interrupted", e);
         }
     }
 

@@ -21,11 +21,8 @@ import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.gradle.GradleBuildTool;
 import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -96,27 +93,12 @@ public class SbtBuildTool implements BuildTool {
         try {
             String executable = resolveSbtExecutable(null, null);
             Process process = new ProcessBuilder(executable, "--no-colors", "--version").start();
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
-                }
+            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "sbt-version");
+            if (result.exitCode() != 0) {
+                throw new RuntimeException(
+                        "sbt --version failed with exit code " + result.exitCode() + ": " + result.stderr());
             }
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                StringBuilder errors = new StringBuilder();
-                try (BufferedReader reader =
-                        new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errors.append(line).append(System.lineSeparator());
-                    }
-                }
-                throw new RuntimeException("sbt --version failed with exit code " + exitCode + ": " + errors);
-            }
-            return output.toString().trim();
+            return result.stdout().trim();
         } catch (IOException e) {
             throw new RuntimeException("Unable to determine SBT version: " + e.getMessage(), e);
         } catch (InterruptedException e) {

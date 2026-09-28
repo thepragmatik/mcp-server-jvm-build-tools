@@ -170,13 +170,20 @@ public class TransportConfig {
     /** Servlet transport bypasses MVC, so its endpoint needs a servlet CORS filter. */
     @Bean
     @Profile("http")
-    public FilterRegistrationBean<CorsFilter> mcpCorsFilter() {
+    public FilterRegistrationBean<CorsFilter> mcpCorsFilter(@Value("${server.address:127.0.0.1}") String bindAddress) {
         CorsConfiguration cors = new CorsConfiguration();
         String[] origins = parsedAllowedOrigins();
         if (containsWildcard(origins)) {
             cors.setAllowedOriginPatterns(List.of(origins));
         } else {
             cors.setAllowedOrigins(List.of(origins));
+        }
+        if (isLoopback(bindAddress)) {
+            // The Host/Origin guard checks the actual bound port. Permit CORS to
+            // reach that guard when a loopback server uses an ephemeral port.
+            cors.addAllowedOriginPattern("http://localhost:[*]");
+            cors.addAllowedOriginPattern("http://127.0.0.1:[*]");
+            cors.addAllowedOriginPattern("http://[::1]:[*]");
         }
         cors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin"));

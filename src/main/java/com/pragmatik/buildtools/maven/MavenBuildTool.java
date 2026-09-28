@@ -58,7 +58,7 @@ public class MavenBuildTool implements BuildTool {
     @Override
     public String executeCommand(String buildToolHome, String projectDir, String command) {
         String home = requireMavenHome(buildToolHome);
-        return MavenInvoker.executeCommandUsingMavenInvoker(home, MavenInvoker.getCommands(command), projectDir);
+        return MavenInvoker.executeCommand(home, MavenInvoker.getCommands(command), projectDir);
     }
 
     /**

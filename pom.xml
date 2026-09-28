@@ -44,6 +44,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <spring-ai.version>2.0.1</spring-ai.version>
+        <mcp-sdk.version>2.0.1</mcp-sdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacoco.version>0.8.15</jacoco.version>
         <spotless.version>3.10.2</spotless.version>
@@ -108,11 +109,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.maven.shared</groupId>
-            <artifactId>maven-invoker</artifactId>
-            <version>3.3.0</version>
-        </dependency>
-        <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-embedder</artifactId>
             <version>3.9.16</version>
@@ -126,6 +122,13 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp-bom</artifactId>
+                <version>${mcp-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>

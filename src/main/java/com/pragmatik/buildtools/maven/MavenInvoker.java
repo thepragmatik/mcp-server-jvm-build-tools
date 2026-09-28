@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.maven;
 
+import com.pragmatik.buildtools.build.BoundedProcessOutput;
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
 import java.io.*;
@@ -25,84 +26,57 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.apache.maven.cli.MavenCli;
-import org.apache.maven.shared.invoker.*;
 
 public class MavenInvoker {
 
-    static String executeCommandUsingMavenInvoker(String mavenHome, String[] commands, String currentProjectDirectory) {
-        InvocationRequest request = new DefaultInvocationRequest();
-        request.setInputStream(InputStream.nullInputStream());
-        request.setBaseDirectory(new File(currentProjectDirectory));
-        request.addArgs(Arrays.asList(commands));
-
-        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess
-        // through the SAME mechanism every other build path uses
-        // (TraceContextHolder.applyToEnvironment), so TRACEPARENT is set and stale
-        // TRACESTATE/BAGGAGE are cleared symmetrically. The maven-invoker API can
-        // only ADD shell variables, never remove them, so we materialise the full
-        // subprocess environment from the server's own environment, apply the trace
-        // context to that map, and pass it verbatim with inheritance disabled.
-        TraceContextHolder.currentSpan().ifPresent(span -> {
-            Map<String, String> environment = new HashMap<>(System.getenv());
-            TraceContextHolder.applyToEnvironment(environment);
-            request.setShellEnvironmentInherited(false);
-            environment.forEach(request::addShellEnvironment);
-        });
-
-        Invoker invoker = new DefaultInvoker();
-        invoker.setWorkingDirectory(new File(currentProjectDirectory));
-
-        // If the configured mavenHome directory doesn't exist, skip
-        // setMavenHome so the DefaultInvoker falls back to the system
-        // PATH. This handles CI runners (setup-java, SDKMAN) where mvn
-        // is on PATH but the home directory may not be at the configured
-        // path (e.g. a contributor's local SDKMAN path hard-coded in tests).
-        File mavenHomeFile = new File(mavenHome);
-        if (mavenHomeFile.exists() && mavenHomeFile.isDirectory()) {
-            invoker.setMavenHome(mavenHomeFile);
-        }
-
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
-
-        request.setOutputHandler(s -> output.append(s).append(System.lineSeparator()));
-        request.setErrorHandler(s -> errors.append(s).append(System.lineSeparator()));
-
-        String finalResult;
+    static String executeCommand(String mavenHome, String[] commands, String currentProjectDirectory) {
         try {
-            InvocationResult result = invoker.execute(request);
-            if (invocationResultedInError(result)) {
-                if (result.getExecutionException() != null) {
-                    System.err.println("[ERROR] Maven execution failed: "
-                            + result.getExecutionException().getMessage());
-                }
-                // Maven test/compile failures write to stdout, not stderr.
-                // Combine both streams so the caller sees the actual output.
-                String errText = errors.toString();
-                String outText = output.toString();
-                finalResult = errText.isEmpty() ? outText : errText + "\n" + outText;
-                throw new RuntimeException("Maven exited with code " + result.getExitCode() + ":\n" + finalResult);
-            } else {
-                finalResult = output.toString();
+            MavenProcessExecution execution = executeWithProcessCapture(mavenHome, commands, currentProjectDirectory);
+            Process process = execution.process();
+            boolean finished;
+            try {
+                finished = process.waitFor(
+                        SyncProcessRunner.resolveTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                SyncProcessRunner.terminateTree(process);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Maven execution interrupted", e);
             }
-        } catch (MavenInvocationException e) {
-            finalResult = "Unable to invoke Maven command: " + e.getMessage();
-            throw new RuntimeException(finalResult);
+            if (!finished) {
+                SyncProcessRunner.terminateTree(process);
+                throw new SyncProcessRunner.ExecutionTimeoutException("Maven execution timed out");
+            }
+            try {
+                execution.outputCollector().join(5000);
+            } catch (InterruptedException e) {
+                SyncProcessRunner.terminateTree(process);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Maven output collection interrupted", e);
+            }
+            if (execution.outputCollector().isAlive()) {
+                SyncProcessRunner.terminateTree(process);
+                throw new IOException("Maven output collector did not finish");
+            }
+            String stdout = execution.output().snapshot();
+            if (process.exitValue() != 0) {
+                // Maven compile and test failures commonly appear on stdout.
+                String stderr = execution.errors().snapshot();
+                throw new RuntimeException("Maven exited with code " + process.exitValue() + ":\n"
+                        + (stderr.isEmpty() ? stdout : stderr + "\n" + stdout));
+            }
+            return stdout;
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to invoke Maven command", e);
         }
-
-        return finalResult;
     }
 
     static String executeUsingMavenEmbedder(String[] command, String currentProjectDirectory) {
         String finalResult;
 
-        // Capture the embedder's stdout/stderr as raw bytes so the UTF-8 encoding
-        // applied by the PrintStreams below is decoded back symmetrically. The
-        // previous sink appended one Java char per byte, which reinterpreted each
-        // byte as Latin-1 and mojibake'd any multi-byte UTF-8 output. Buffering the
-        // bytes and decoding once via toString(UTF_8) keeps the round-trip lossless.
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
+        // Keep only bounded leading and trailing UTF-8 output from the in-process
+        // version probe. PrintStream writes bytes directly to these collectors.
+        BoundedProcessOutput outputStream = new BoundedProcessOutput();
+        BoundedProcessOutput errorStream = new BoundedProcessOutput();
 
         PrintStream outPrintStream = new PrintStream(outputStream, false, StandardCharsets.UTF_8);
         PrintStream errPrintStream = new PrintStream(errorStream, false, StandardCharsets.UTF_8);
@@ -115,8 +89,8 @@ public class MavenInvoker {
         outPrintStream.flush();
         errPrintStream.flush();
 
-        String outText = outputStream.toString(StandardCharsets.UTF_8);
-        String errText = errorStream.toString(StandardCharsets.UTF_8);
+        String outText = outputStream.snapshot();
+        String errText = errorStream.snapshot();
 
         if (exitCode != 0) {
             finalResult = errText;
@@ -214,16 +188,12 @@ public class MavenInvoker {
         return validated.toArray(new String[0]);
     }
 
-    static boolean invocationResultedInError(InvocationResult result) {
-        return result.getExitCode() != 0;
-    }
-
     /**
      * A cancellable Maven execution that exposes the underlying {@link Process}
      * so the async build service can destroy it on task cancellation.
      */
     public record MavenProcessExecution(
-            Process process, Thread outputCollector, StringBuilder output, StringBuilder errors) {}
+            Process process, Thread outputCollector, BoundedProcessOutput output, BoundedProcessOutput errors) {}
 
     /**
      * Execute a Maven command using {@link ProcessBuilder} so the caller can
@@ -266,8 +236,8 @@ public class MavenInvoker {
         TraceContextHolder.applyToEnvironment(pb.environment());
         Process process = pb.start();
 
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
+        BoundedProcessOutput output = new BoundedProcessOutput();
+        BoundedProcessOutput errors = new BoundedProcessOutput();
 
         // Drain stdout and stderr concurrently to avoid the pipe-buffer deadlock that
         // occurs when one stream is read to EOF before the other is drained. The
@@ -285,6 +255,7 @@ public class MavenInvoker {
                     }
                 },
                 "maven-output-collector");
+        collector.setDaemon(true);
         collector.start();
 
         return new MavenProcessExecution(process, collector, output, errors);

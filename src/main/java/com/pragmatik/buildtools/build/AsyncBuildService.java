@@ -29,11 +29,8 @@ import com.pragmatik.buildtools.tracing.TraceContextHolder;
 import com.pragmatik.buildtools.tracing.TraceScope;
 import com.pragmatik.buildtools.tracing.W3CTraceContext;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -198,15 +195,14 @@ public class AsyncBuildService {
         }
 
         // Partial output snapshot (last 200 lines)
-        synchronized (task.outputLock) {
-            String output = task.output.toString();
-            if (!output.isEmpty()) {
-                String[] lines = output.split("\n");
-                int start = Math.max(0, lines.length - 200);
-                String[] recent = Arrays.copyOfRange(lines, start, lines.length);
-                result.put("outputLines", recent.length);
-                result.put("output", String.join("\n", recent));
-            }
+        String output = task.output.snapshot();
+        if (!output.isEmpty()) {
+            String[] lines = output.split("\n");
+            int start = Math.max(0, lines.length - 200);
+            String[] recent = Arrays.copyOfRange(lines, start, lines.length);
+            result.put("outputLines", recent.length);
+            result.put("output", String.join("\n", recent));
+            result.put("outputTruncated", task.output.truncated());
         }
 
         // Final result
@@ -261,6 +257,10 @@ public class AsyncBuildService {
             return JsonUtils.toJson(result);
         }
 
+        // Publish cancellation intent before interrupting or terminating the
+        // process so worker completion cannot race it back to failed/completed.
+        task.cancellationRequested = true;
+
         // Cancel the future (interrupts the thread)
         if (task.future != null) {
             task.future.cancel(true);
@@ -268,7 +268,7 @@ public class AsyncBuildService {
 
         // Kill the underlying process
         if (task.buildProcess != null && task.buildProcess.isAlive()) {
-            task.buildProcess.destroyForcibly();
+            SyncProcessRunner.terminateTree(task.buildProcess);
         }
 
         task.status = "cancelled";
@@ -338,17 +338,29 @@ public class AsyncBuildService {
                 }
             }
 
-            task.exitCode = 0;
-            task.status = "completed";
+            if (!task.cancellationRequested) {
+                task.exitCode = 0;
+                task.status = "completed";
+            }
+        } catch (InterruptedException e) {
+            if (task.buildProcess != null) {
+                SyncProcessRunner.terminateTree(task.buildProcess);
+            }
+            task.status = "cancelled";
+            task.errorMessage = "Build cancelled by user";
+            Thread.currentThread().interrupt();
         } catch (CancellationException e) {
             task.status = "cancelled";
             task.errorMessage = "Build cancelled by user";
         } catch (Exception e) {
-            task.exitCode = 1;
-            task.status = "failed";
-            task.errorMessage = e.getMessage();
-            synchronized (task.outputLock) {
-                task.output.append("ERROR: ").append(e.getMessage()).append("\n");
+            if (task.cancellationRequested) {
+                task.status = "cancelled";
+                task.errorMessage = "Build cancelled by user";
+            } else {
+                task.exitCode = 1;
+                task.status = "failed";
+                task.errorMessage = e.getMessage();
+                task.output.appendLine("ERROR: " + e.getMessage());
             }
         } finally {
             task.completedAt = Instant.now();
@@ -358,13 +370,9 @@ public class AsyncBuildService {
             if (("completed".equals(task.status) || "failed".equals(task.status)) && task.exitCode != null) {
                 try {
                     BuildOutputParser parser = outputParsers.getOrDefault(task.toolName, outputParsers.get("maven"));
-                    String output;
-                    synchronized (task.outputLock) {
-                        output = task.output.toString();
-                    }
-                    task.parsedResult = parser.parse(output, task.exitCode, task.command);
+                    task.parsedResult = parser.parse(task.output.snapshot(), task.exitCode, task.command);
                 } catch (Exception e) {
-                    System.err.println("[WARN] Output parsing failed for " + task.toolName + ": " + e.getMessage());
+                    System.err.println("[WARN] Async build output parsing failed");
                 }
             }
 
@@ -388,26 +396,26 @@ public class AsyncBuildService {
         task.buildProcess = exec.process();
 
         // Wait for process completion, collecting phase progress
-        int exitCode = exec.process().waitFor();
+        int exitCode = awaitProcess(exec.process(), "maven-async");
         exec.outputCollector().join(5000); // Wait for collector thread to finish
-
-        synchronized (task.outputLock) {
-            task.output.append(exec.output().toString());
+        if (exec.outputCollector().isAlive()) {
+            SyncProcessRunner.terminateTree(exec.process());
+            throw new IOException("Maven output collector did not finish");
         }
+
+        task.output.append(exec.output().snapshot());
 
         if (exitCode != 0) {
             String errOutput = exec.errors().toString();
             if (!errOutput.isEmpty()) {
-                synchronized (task.outputLock) {
-                    task.output.append(errOutput);
-                }
+                task.output.append(errOutput);
             }
             throw new RuntimeException(
                     "Maven exited with code " + exitCode + (errOutput.isEmpty() ? "" : ": " + errOutput));
         }
 
         // Extract phase progress from output
-        extractPhaseProgress(task, exec.output().toString(), "maven");
+        extractPhaseProgress(task, exec.output().snapshot(), "maven");
     }
 
     private void executeGradleAsync(BuildTask task) throws Exception {
@@ -428,14 +436,14 @@ public class AsyncBuildService {
         Process process = pb.start();
         task.buildProcess = process;
 
-        readProcessOutput(task, process);
-
-        int exitCode = process.waitFor();
+        Thread[] readers = readProcessOutput(task, process);
+        int exitCode = awaitProcess(process, "gradle-async");
+        joinReaders(process, readers);
         if (exitCode != 0) {
             throw new RuntimeException("Gradle exited with code " + exitCode);
         }
 
-        extractPhaseProgress(task, task.output.toString(), "gradle");
+        extractPhaseProgress(task, task.output.snapshot(), "gradle");
     }
 
     private void executeSbtAsync(BuildTask task) throws Exception {
@@ -454,9 +462,9 @@ public class AsyncBuildService {
         Process process = pb.start();
         task.buildProcess = process;
 
-        readProcessOutput(task, process);
-
-        int exitCode = process.waitFor();
+        Thread[] readers = readProcessOutput(task, process);
+        int exitCode = awaitProcess(process, "sbt-async");
+        joinReaders(process, readers);
         if (exitCode != 0) {
             throw new RuntimeException("sbt exited with code " + exitCode);
         }
@@ -465,53 +473,41 @@ public class AsyncBuildService {
     private void executeGenericAsync(BuildTask task, BuildTool tool) throws Exception {
         // Fallback: use synchronous executeCommand in a thread
         String output = tool.executeCommand(task.buildToolHome, task.projectDir, task.command);
-        synchronized (task.outputLock) {
-            task.output.append(output);
+        task.output.append(output);
+    }
+
+    private Thread[] readProcessOutput(BuildTask task, Process process) {
+        return new Thread[] {
+            SyncProcessRunner.drain(process.getInputStream(), task.output, "async-stdout-" + task.taskId),
+            SyncProcessRunner.drain(process.getErrorStream(), task.output, "async-stderr-" + task.taskId)
+        };
+    }
+
+    private static int awaitProcess(Process process, String label) throws InterruptedException {
+        try {
+            if (!process.waitFor(SyncProcessRunner.resolveTimeoutSeconds(), TimeUnit.SECONDS)) {
+                SyncProcessRunner.terminateTree(process);
+                throw new SyncProcessRunner.ExecutionTimeoutException("Process '" + label + "' timed out");
+            }
+            return process.exitValue();
+        } catch (InterruptedException e) {
+            SyncProcessRunner.terminateTree(process);
+            throw e;
         }
     }
 
-    private void readProcessOutput(BuildTask task, Process process) {
-        Thread outThread = new Thread(
-                () -> {
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            synchronized (task.outputLock) {
-                                task.output.append(line).append("\n");
-                            }
-                        }
-                    } catch (IOException e) {
-                        System.err.println("[WARN] Process cleanup: " + e.getMessage());
-                        // Process destroyed
-                    }
-                },
-                "async-stdout-" + task.taskId);
-
-        Thread errThread = new Thread(
-                () -> {
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            synchronized (task.outputLock) {
-                                task.output.append(line).append("\n");
-                            }
-                        }
-                    } catch (IOException e) {
-                        System.err.println("[WARN] Process cleanup: " + e.getMessage());
-                        // Process destroyed
-                    }
-                },
-                "async-stderr-" + task.taskId);
-
-        outThread.start();
-        errThread.start();
-        try {
-            outThread.join();
-            errThread.join();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    private static void joinReaders(Process process, Thread[] readers) throws InterruptedException, IOException {
+        for (Thread reader : readers) {
+            try {
+                reader.join(5000);
+            } catch (InterruptedException e) {
+                SyncProcessRunner.terminateTree(process);
+                throw e;
+            }
+            if (reader.isAlive()) {
+                SyncProcessRunner.terminateTree(process);
+                throw new IOException("Process output reader did not finish");
+            }
         }
     }
 
@@ -556,7 +552,6 @@ public class AsyncBuildService {
             summary.put("taskId", task.taskId);
             summary.put("status", task.status);
             summary.put("tool", task.toolName);
-            summary.put("command", task.command);
             summary.put("createdAt", task.createdAt.toString());
             if (task.completedAt != null) {
                 summary.put("completedAt", task.completedAt.toString());
@@ -564,12 +559,8 @@ public class AsyncBuildService {
             if (task.exitCode != null) {
                 summary.put("exitCode", task.exitCode);
             }
-            if (task.errorMessage != null) {
-                summary.put("error", task.errorMessage);
-            }
-            if (task.phaseProgress != null) {
-                summary.put("phaseProgress", task.phaseProgress);
-            }
+            // Project directories are often Git repositories. Never persist a
+            // command, exception text, or plugin/task name that may contain PII.
 
             Path taskFile = tasksDir.resolve(task.taskId + ".json");
             Files.writeString(
@@ -578,7 +569,7 @@ public class AsyncBuildService {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
-            System.err.println("[WARN] Process cleanup: " + e.getMessage());
+            System.err.println("[WARN] Async task summary could not be persisted");
             // Non-critical
         }
     }
@@ -612,12 +603,12 @@ public class AsyncBuildService {
         volatile String errorMessage;
         volatile Process buildProcess;
         volatile Future<?> future;
+        volatile boolean cancellationRequested;
         volatile List<Map<String, Object>> phaseProgress;
         volatile Map<String, Object> parsedResult;
         volatile W3CTraceContext inboundTrace;
 
-        final StringBuilder output = new StringBuilder();
-        final Object outputLock = new Object();
+        final BoundedProcessOutput output = new BoundedProcessOutput();
 
         BuildTask(
                 String taskId,

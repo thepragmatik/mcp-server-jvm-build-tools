@@ -274,6 +274,21 @@ class McpHeaderValidationFilterTest {
         }
 
         @Test
+        @DisplayName("a headerless body over the cap is also rejected with 413")
+        void oversizedHeaderlessBodyRejected() throws Exception {
+            McpHeaderValidationFilter small = cappedFilter(8);
+            MockHttpServletRequest req = mcpPost("x".repeat(128));
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            small.doFilter(req, res, chain);
+
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+            assertThat(res.getContentAsString()).contains("PayloadTooLargeError");
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
         @DisplayName("a body at/under the cap is validated and replayed unchanged")
         void bodyWithinCapPassesThrough() throws Exception {
             String body = "{\"method\":\"tools/list\"}";

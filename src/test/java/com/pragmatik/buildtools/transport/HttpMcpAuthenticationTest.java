@@ -42,6 +42,15 @@ class HttpMcpAuthenticationTest {
     private int port;
 
     @Test
+    void rejectsDnsRebindingHeadersBeforeAuthentication() throws Exception {
+        assertThat(RawMcpRequest.postStatus(port, "evil.example.test:" + port, "http://evil.example.test"))
+                .isEqualTo(403);
+        assertThat(RawMcpRequest.postStatus(port, "evil.example.test:" + port, null))
+                .isEqualTo(403);
+        assertThat(RawMcpRequest.postStatus(port, "127.0.0.1:" + port, null)).isEqualTo(401);
+    }
+
+    @Test
     void requiresTokenForMcpTools() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

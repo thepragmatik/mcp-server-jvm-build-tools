@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Regression tests for {@link SyncProcessRunner}.
@@ -47,6 +50,9 @@ class SyncProcessRunnerTest {
     private static final int FLOOD_LINES = 4_000;
 
     private String savedTimeoutProperty;
+
+    @TempDir
+    Path temporaryDirectory;
 
     @BeforeEach
     void captureProperty() {
@@ -93,8 +99,10 @@ class SyncProcessRunnerTest {
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stdout()).isEmpty();
-            assertThat(result.stderr()).contains("STDERR_PADDING").hasLineCount(FLOOD_LINES);
-            assertThat(result.stderr().length()).isGreaterThan(64 * 1024);
+            assertThat(result.stderr()).contains("STDERR_PADDING");
+            assertThat(result.stderr().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+                    .isLessThanOrEqualTo(128 * 1024);
+            assertThat(result.stderrTruncated()).isTrue();
         }
 
         @Test
@@ -108,8 +116,10 @@ class SyncProcessRunnerTest {
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stderr()).isEmpty();
-            assertThat(result.stdout()).contains("STDOUT_PADDING").hasLineCount(FLOOD_LINES);
-            assertThat(result.stdout().length()).isGreaterThan(64 * 1024);
+            assertThat(result.stdout()).contains("STDOUT_PADDING");
+            assertThat(result.stdout().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+                    .isLessThanOrEqualTo(128 * 1024);
+            assertThat(result.stdoutTruncated()).isTrue();
         }
 
         @Test
@@ -124,8 +134,12 @@ class SyncProcessRunnerTest {
             SyncProcessRunner.Result result = SyncProcessRunner.run(process, "test-both");
 
             assertThat(result.exitCode()).isZero();
-            assertThat(result.stdout()).contains("BOTH_PADDING").hasLineCount(FLOOD_LINES);
-            assertThat(result.stderr()).contains("BOTH_PADDING").hasLineCount(FLOOD_LINES);
+            assertThat(result.stdout()).contains("BOTH_PADDING");
+            assertThat(result.stderr()).contains("BOTH_PADDING");
+            assertThat(result.stdout().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+                    .isLessThanOrEqualTo(128 * 1024);
+            assertThat(result.stderr().getBytes(java.nio.charset.StandardCharsets.UTF_8).length)
+                    .isLessThanOrEqualTo(128 * 1024);
         }
     }
 
@@ -163,6 +177,33 @@ class SyncProcessRunnerTest {
 
             assertThat(result.exitCode()).isZero();
             assertThat(result.stdout()).contains("done");
+        }
+
+        @Test
+        @Timeout(value = 30, unit = TimeUnit.SECONDS)
+        void timeoutTerminatesDescendantProcess() throws Exception {
+            assumeShellAvailable();
+            Path childPidFile = temporaryDirectory.resolve("child.pid");
+            Process process = spawn("sleep 60 & echo $! > '" + childPidFile + "'; wait");
+            for (int attempt = 0; attempt < 100 && !Files.exists(childPidFile); attempt++) {
+                Thread.sleep(10);
+            }
+            assertThat(Files.exists(childPidFile)).isTrue();
+            long childPid = Long.parseLong(Files.readString(childPidFile).trim());
+
+            assertThatThrownBy(() -> SyncProcessRunner.run(process, "tree", 1, TimeUnit.SECONDS))
+                    .isInstanceOf(SyncProcessRunner.ExecutionTimeoutException.class);
+
+            for (int attempt = 0;
+                    attempt < 100
+                            && ProcessHandle.of(childPid)
+                                    .map(ProcessHandle::isAlive)
+                                    .orElse(false);
+                    attempt++) {
+                Thread.sleep(10);
+            }
+            assertThat(ProcessHandle.of(childPid).map(ProcessHandle::isAlive).orElse(false))
+                    .isFalse();
         }
     }
 
