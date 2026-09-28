@@ -153,6 +153,18 @@ class McpServerDiscoverJsonRpcControllerTest {
         }
 
         @Test
+        @DisplayName("empty POST discovery probes remain available on both HTTP paths")
+        void emptyBodyDiscoverProbes() throws Exception {
+            mockMvc.perform(post("/mcp").contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl(
+                            "/mcp/discover"));
+            mockMvc.perform(post("/mcp/discover").contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.serverInfo.name").value(SERVER_NAME));
+        }
+
+        @Test
         @DisplayName("a different JSON-RPC method is NOT answered with a discover result")
         void doesNotShadowOtherMethods() throws Exception {
             mockMvc.perform(post("/mcp")

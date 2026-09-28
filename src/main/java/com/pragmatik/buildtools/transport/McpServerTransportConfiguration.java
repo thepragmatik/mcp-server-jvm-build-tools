@@ -56,6 +56,8 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnProperty(name = "spring.ai.mcp.server.stdio", havingValue = "true", matchIfMissing = true)
 public class McpServerTransportConfiguration {
 
+    private static final int STDIO_INPUT_MAX_CHARS = 1_048_576;
+
     private static final Logger log = LoggerFactory.getLogger(McpServerTransportConfiguration.class);
 
     /**
@@ -77,7 +79,7 @@ public class McpServerTransportConfiguration {
      */
     @Bean
     public McpJsonMapper mcpJsonMapper(JsonMapper jsonMapper) {
-        return new JacksonMcpJsonMapper(jsonMapper);
+        return new PrivacySafeMcpJsonMapper(new JacksonMcpJsonMapper(jsonMapper));
     }
 
     /**
@@ -93,8 +95,12 @@ public class McpServerTransportConfiguration {
      */
     @Bean
     public McpServerTransportProvider stdioServerTransportProvider(
-            McpJsonMapper jsonMapper, McpDiscoverController discoverController) {
-        McpServerTransportProvider stdio = new StdioServerTransportProvider(jsonMapper);
+            JsonMapper jsonMapper, McpDiscoverController discoverController) {
+        McpServerTransportProvider stdio = new StdioServerTransportProvider(
+                new PrivacySafeMcpJsonMapper(new JacksonMcpJsonMapper(jsonMapper), true),
+                System.in,
+                System.out,
+                STDIO_INPUT_MAX_CHARS);
         return new StdioServerTransportDiscoverProvider(
                 stdio,
                 // Wrap the framework session factory: sessions created from it answer
