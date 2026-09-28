@@ -80,6 +80,39 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void acceptsDirectAndMalformedListingsWithoutExposingPrivateText() {
+        String direct = policy.protect(
+                "list_build_tools",
+                "sbt: test\nmaven: install\ngradle: build\nprivate-tool: synthetic@example.invalid");
+        assertTrue(direct.contains("\"tools\":[\"maven\",\"gradle\",\"sbt\"]"));
+        assertFalse(direct.contains("synthetic@example.invalid"));
+        assertFalse(direct.contains("install"));
+
+        String malformed =
+                policy.protect("list_build_tools", "maven: validate\n{broken-json\ntoken=SYNTHETIC_PRIVATE_CANARY");
+        assertTrue(malformed.contains("\"tools\":[\"maven\"]"));
+        assertFalse(malformed.contains("SYNTHETIC_PRIVATE_CANARY"));
+    }
+
+    @Test
+    void objectListingDoesNotInterpretPrivateFieldsAsToolNames() {
+        String safe = policy.protect(
+                "list_build_tools", "{\"description\":\"maven: private\",\"email\":\"synthetic@example.invalid\"}");
+        assertTrue(safe.contains("\"tools\":[]"));
+        assertFalse(safe.contains("synthetic@example.invalid"));
+        assertFalse(safe.contains("private"));
+    }
+
+    @Test
+    void listingUsesBoundedTailAndReportsTruncation() {
+        String output = "maven: hidden\n" + "x".repeat(260_000) + "\nsbt: test";
+        String safe = policy.protect("list_build_tools", output);
+        assertTrue(safe.contains("\"truncated\":true"));
+        assertTrue(safe.contains("\"tools\":[\"sbt\"]"));
+        assertFalse(safe.contains("hidden"));
+    }
+
+    @Test
     void extractsVersionWithoutRuntimeEnvironmentDetails() {
         String output = "Apache Maven 3.9.16\nJava home: /home/private-user/jdk";
         String safe = policy.protect("get_build_tool_version", output);
