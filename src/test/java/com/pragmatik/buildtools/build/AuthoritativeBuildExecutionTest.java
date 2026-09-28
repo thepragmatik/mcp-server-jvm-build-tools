@@ -50,6 +50,22 @@ class AuthoritativeBuildExecutionTest {
     }
 
     @Test
+    void maximumCapturedStreamsPreserveEarlyDiagnostic() throws Exception {
+        String error = "[ERROR] /synthetic/private/Sample.java:42: cannot find symbol\n";
+        String output = error + "x".repeat(131_072 - error.length()) + "\n" + "y".repeat(131_072);
+
+        String privateResult = BuildToolsService.boundedMcpExecutionResult(new BuildExecutionResult(output, 1, false));
+        String safe = policy.protect("execute_build_command", privateResult);
+        var result = mapper.readTree(safe);
+
+        assertThat(privateResult.length()).isLessThanOrEqualTo(BuildResultLimits.MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS);
+        assertThat(result.path("exitCode").intValue()).isEqualTo(1);
+        assertThat(result.path("outputTruncated").booleanValue()).isTrue();
+        assertThat(result.path("diagnostics").size()).isGreaterThan(0);
+        assertThat(safe).doesNotContain("/synthetic/private");
+    }
+
+    @Test
     void builtInsUseProcessStatusEvenWhenBuildMarkersDisagree() throws Exception {
         for (String tool : List.of("maven", "gradle", "sbt")) {
             for (int status : List.of(0, 1)) {

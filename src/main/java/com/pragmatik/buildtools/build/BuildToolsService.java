@@ -184,7 +184,7 @@ public class BuildToolsService {
         String output = result.output();
         boolean truncated = result.outputTruncated();
         if (output.length() > BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS) {
-            output = output.substring(output.length() - BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS);
+            output = retainOutputEdges(output, BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS);
             truncated = true;
         }
         for (; ; ) {
@@ -200,10 +200,18 @@ public class BuildToolsService {
             if (json.length() <= BuildResultLimits.MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS) {
                 return json;
             }
-            int edgeLength = Math.max(1, output.length() / 4);
-            output = output.substring(0, edgeLength) + "\n" + output.substring(output.length() - edgeLength);
+            output = retainOutputEdges(output, Math.max(3, output.length() / 2));
             truncated = true;
         }
+    }
+
+    private static String retainOutputEdges(String output, int limit) {
+        if (output.length() <= limit) {
+            return output;
+        }
+        int headLength = limit / 2;
+        int tailLength = limit - headLength - 1;
+        return output.substring(0, headLength) + "\n" + output.substring(output.length() - tailLength);
     }
 
     /**
