@@ -50,6 +50,10 @@ public class MavenOutputParser implements BuildOutputParser {
         return ERROR_FILE_LINE_PATTERN.matcher(line).find();
     }
 
+    static boolean isTestSummaryLine(String line) {
+        return TEST_SUMMARY_PATTERN.matcher(line).find();
+    }
+
     // Build result: "BUILD SUCCESS" or "BUILD FAILURE"
     private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile("BUILD\\s+(SUCCESS|FAILURE)");
 
@@ -163,11 +167,20 @@ public class MavenOutputParser implements BuildOutputParser {
         // compiler-style [ERROR] file:line record. Keep one bounded, generic
         // diagnostic per failure kind; assertion values and test names stay in
         // private raw output.
+        List<Map<String, Object>> testErrors = new ArrayList<>(2 + errors.size());
         if (completedTests.failures > 0) {
-            errors.add(testDiagnostic("Test assertion failed"));
+            testErrors.add(testDiagnostic("Test assertion failed"));
         }
         if (completedTests.errors > 0) {
-            errors.add(testDiagnostic("Test failed during execution"));
+            testErrors.add(testDiagnostic("Test failed during execution"));
+        }
+        // The model-visible policy keeps twelve diagnostics. Preserve compiler
+        // priority ordinarily, but keep the test result visible at that limit.
+        if (errors.size() + testErrors.size() > BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+            testErrors.addAll(errors);
+            errors = testErrors;
+        } else {
+            errors.addAll(testErrors);
         }
 
         result.put("success", success);

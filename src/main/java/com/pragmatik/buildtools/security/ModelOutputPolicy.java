@@ -33,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public final class ModelOutputPolicy {
-    private static final int MAX_DIAGNOSTICS = 12;
+    private static final int MAX_DIAGNOSTICS = BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS;
     private static final int MAX_MESSAGE_LENGTH = 500;
     private static final int MAX_RESULT_CHARS = BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS;
     private static final Set<String> COUNTERS = Set.of(

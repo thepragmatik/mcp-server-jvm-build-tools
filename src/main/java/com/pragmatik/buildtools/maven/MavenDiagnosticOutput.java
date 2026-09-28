@@ -23,17 +23,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/** Captures a few complete Maven compiler lines without retaining the intervening log. */
+/** Captures bounded Maven compiler lines and test totals without retaining the intervening log. */
 final class MavenDiagnosticOutput extends OutputStream {
     private static final int MAX_LINE_BYTES = 2_048;
     private static final int MAX_LINES = 13;
     private static final int MAX_ANSI_PREFIX_BYTES = 32;
-    private static final byte[] PREFIX = "[ERROR] ".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[][] PREFIXES = {
+        "[ERROR] ".getBytes(StandardCharsets.US_ASCII),
+        "[INFO] Tests run:".getBytes(StandardCharsets.US_ASCII),
+        "[ERROR] Tests run:".getBytes(StandardCharsets.US_ASCII)
+    };
     private static final Pattern ANSI_SGR = Pattern.compile("\u001b\\[[0-9;:]*m");
 
     private final BoundedProcessOutput capture;
     private final byte[] line = new byte[MAX_LINE_BYTES];
     private final List<String> diagnostics = new ArrayList<>(MAX_LINES);
+    private final List<String> testSummaries = new ArrayList<>(MAX_LINES);
     private int length;
     private int prefixLength;
     private int ansiPrefixBytes;
@@ -65,7 +70,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     finishLine();
                     i++;
                 }
-            } else if (prefixLength < PREFIX.length) {
+            } else if (!candidate) {
                 accept(source[i++]);
             } else {
                 int start = i;
@@ -89,7 +94,10 @@ final class MavenDiagnosticOutput extends OutputStream {
     }
 
     synchronized List<String> diagnostics() {
-        return List.copyOf(diagnostics);
+        List<String> retained = new ArrayList<>(diagnostics.size() + testSummaries.size());
+        retained.addAll(diagnostics);
+        retained.addAll(testSummaries);
+        return List.copyOf(retained);
     }
 
     synchronized boolean diagnosticsTruncated() {
@@ -104,7 +112,7 @@ final class MavenDiagnosticOutput extends OutputStream {
         if (overflow) {
             return;
         }
-        if (prefixLength < PREFIX.length) {
+        if (!candidate) {
             if (ansiState != 0 || (prefixLength == 0 && value == 0x1b)) {
                 if (++ansiPrefixBytes > MAX_ANSI_PREFIX_BYTES) {
                     overflow = true;
@@ -120,9 +128,16 @@ final class MavenDiagnosticOutput extends OutputStream {
                     overflow = true;
                     return;
                 }
-            } else if (value == PREFIX[prefixLength]) {
+            } else if (matchesCandidatePrefix(value)) {
                 prefixLength++;
-                candidate = true;
+                for (byte[] prefix : PREFIXES) {
+                    if (prefixLength == prefix.length
+                            && prefix[prefixLength - 1] == value
+                            && matchesPrefix(prefix, prefixLength - 1)) {
+                        candidate = true;
+                        break;
+                    }
+                }
             } else {
                 overflow = true; // An ordinary log line never needs buffering.
                 return;
@@ -147,6 +162,12 @@ final class MavenDiagnosticOutput extends OutputStream {
                 } else {
                     diagnostics.add(text);
                 }
+            } else if (MavenOutputParser.isTestSummaryLine(text)) {
+                if (testSummaries.size() == MAX_LINES) {
+                    testSummaries.remove(0);
+                    diagnosticsTruncated = true;
+                }
+                testSummaries.add(text);
             }
         }
         length = 0;
@@ -155,5 +176,23 @@ final class MavenDiagnosticOutput extends OutputStream {
         ansiState = 0;
         candidate = false;
         overflow = false;
+    }
+
+    private boolean matchesCandidatePrefix(byte value) {
+        for (byte[] prefix : PREFIXES) {
+            if (prefixLength < prefix.length && prefix[prefixLength] == value && matchesPrefix(prefix, prefixLength)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesPrefix(byte[] prefix, int count) {
+        for (int i = 0; i < count; i++) {
+            if (line[ansiPrefixBytes + i] != prefix[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 }

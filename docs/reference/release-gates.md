@@ -10,8 +10,9 @@ output.
 
 The packaged Maven synthetic probe exercises both transports for a retained
 middle compiler diagnostic, a failed `execute_build_command` whose output
-also claims success, and a Surefire test failure without a compiler-style
-error. It checks authoritative `exitCode`, a bounded generic test diagnostic,
+also claims success, and a Surefire test failure in discarded middle output
+after twelve compiler diagnostics. It checks authoritative `exitCode`, retention
+of the failed-test count, a visible bounded generic test diagnostic,
 structured/text parity, and private canary suppression without printing build logs.
 
 The release workflow also runs the packaged Gradle/sbt middle-diagnostic probe

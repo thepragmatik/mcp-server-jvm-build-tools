@@ -166,7 +166,9 @@ If Surefire/Failsafe reports failed tests without a compiler-style error line,
 the result includes one generic test diagnostic for assertion failures and one
 for test execution errors when present. These add at most two entries to
 `errorCount`, while `testSummary` retains the number of failed tests. Test names,
-assertion values, and raw reports stay local.
+assertion values, and raw reports stay local. Up to 13 middle-stream test totals
+are retained separately from compiler diagnostics; when `diagnosticsTruncated`
+is true, inspect the local report for exact counts.
 When a count exceeds the model-visible limit of 1,000,000, or Maven reports
 inconsistent categories, the summary remains nonnegative and includes
 `countsCapped: true`; treat its numbers as bounded approximations.

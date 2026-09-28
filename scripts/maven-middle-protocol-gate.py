@@ -56,11 +56,13 @@ def assert_test_failure(result):
     safe = result.get("structuredContent")
     if not isinstance(safe, dict) or safe.get("success") is not False:
         raise AssertionError("Maven test failure was not reported")
-    if safe.get("testSummary", {}).get("failed") != 1 or safe.get("errorCount") != 1:
+    if safe.get("testSummary", {}).get("failed") != 1 or safe.get("errorCount") != 13:
         raise AssertionError("Maven test failure lacked a bounded diagnostic")
     diagnostics = safe.get("diagnostics", [])
-    if len(diagnostics) != 1 or diagnostics[0].get("category") != "test":
+    if not diagnostics or diagnostics[0].get("category") != "test":
         raise AssertionError("Maven test failure category was lost")
+    if safe.get("outputTruncated") is not True or safe.get("diagnosticsTruncated") is not True:
+        raise AssertionError("Maven test or diagnostic truncation was not reported")
     content = result.get("content", [])
     if not content or json.loads(content[0].get("text", "")) != safe:
         raise AssertionError("Maven test structured and text results differ")
@@ -104,9 +106,14 @@ def test_failure_fixture(root):
     emitter = home / "emit.py"
     emitter.write_text(
         "import sys\n"
-        "print('[ERROR] expected ready but was stale for test.user@example.invalid SYNTHETIC_SECRET')\n"
-        "print('[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0')\n"
-        "print('[INFO] BUILD FAILURE')\n"
+        "out = sys.stdout.buffer\n"
+        "out.write(b'[INFO] ordinary build output\\n' * 480000)\n"
+        "for i in range(1, 13):\n"
+        "    out.write(f'[ERROR] /synthetic/private/Sample.java:[{i},1] cannot find symbol\\n'.encode())\n"
+        "out.write(b'[ERROR] expected ready but was stale for test.user@example.invalid SYNTHETIC_SECRET\\n')\n"
+        "out.write(b'[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\\n')\n"
+        "out.write(b'[INFO] ordinary build output\\n' * 480000)\n"
+        "out.write(b'[INFO] BUILD FAILURE\\n')\n"
         "sys.exit(1)\n",
         encoding="utf-8",
     )
