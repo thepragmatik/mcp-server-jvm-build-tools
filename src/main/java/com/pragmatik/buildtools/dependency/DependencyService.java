@@ -556,11 +556,12 @@ public class DependencyService {
      */
     @Tool(
             name = "scan_dependency_cves",
-            description = "Scan recognized direct Maven or Gradle dependency declarations for known vulnerabilities using OSV.dev. "
-                    + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
-                    + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
-                    + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
-                    + "Scans at most 500 coordinates in batches of up to 100; unknown severity is explicit.")
+            description =
+                    "Scan recognized direct Maven or Gradle dependency declarations for known vulnerabilities using OSV.dev. "
+                            + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
+                            + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
+                            + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
+                            + "Scans at most 500 coordinates in batches of up to 100; unknown severity is explicit.")
     public String scanDependencyCves(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir,
