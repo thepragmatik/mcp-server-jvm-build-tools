@@ -543,7 +543,7 @@ public class DependencyService {
     }
 
     /**
-     * Bulk-scan a project's direct dependencies for known vulnerabilities.
+     * Bulk-scan a project's recognized direct literal declarations for known vulnerabilities.
      * <p>
      * Reads a bounded POM or Gradle build file, extracts direct dependencies, and
      * sends supported package coordinates to OSV.dev. The MCP projection returns
@@ -556,7 +556,7 @@ public class DependencyService {
      */
     @Tool(
             name = "scan_dependency_cves",
-            description = "Scan direct Maven or Gradle dependencies for known vulnerabilities using OSV.dev. "
+            description = "Scan recognized direct Maven or Gradle dependency declarations for known vulnerabilities using OSV.dev. "
                     + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
                     + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
                     + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
