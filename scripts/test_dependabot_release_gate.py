@@ -55,11 +55,16 @@ class DependabotReleaseGateTest(unittest.TestCase):
         private_package = "synthetic-private-canary.invalid"
         head = "a" * 40
         pages = [[{"state": "open", "dependency": {"package": private_package}}]]
-        with patch.object(gate, "gh", side_effect=["main", head, gate.json.dumps(pages)]):
+        with patch.object(
+            gate, "gh", side_effect=["main", head, gate.json.dumps(pages), head]
+        ):
             with patch.object(
                 gate.subprocess,
                 "run",
-                return_value=subprocess.CompletedProcess([], 0, head, ""),
+                side_effect=[
+                    subprocess.CompletedProcess([], 0, head, ""),
+                    subprocess.CompletedProcess([], 0, "", ""),
+                ],
             ):
                 with patch.object(gate.sys, "argv", ["gate", "--repo", "owner/repo"]):
                     output = io.StringIO()
@@ -67,6 +72,37 @@ class DependabotReleaseGateTest(unittest.TestCase):
                         self.assertEqual(1, gate.main())
         self.assertIn("1 open alert", output.getvalue())
         self.assertNotIn(private_package, output.getvalue())
+
+    def test_default_branch_advance_during_query_fails_closed(self):
+        head = "a" * 40
+        with patch.object(gate, "gh", side_effect=["main", head, "[[]]", "b" * 40]):
+            with patch.object(
+                gate.subprocess,
+                "run",
+                side_effect=[
+                    subprocess.CompletedProcess([], 0, head, ""),
+                    subprocess.CompletedProcess([], 0, "", ""),
+                ],
+            ):
+                with patch.object(gate.sys, "argv", ["gate", "--repo", "owner/repo"]):
+                    with redirect_stderr(io.StringIO()):
+                        self.assertEqual(2, gate.main())
+
+    def test_dirty_checkout_fails_before_alert_query(self):
+        head = "a" * 40
+        with patch.object(gate, "gh", side_effect=["main", head]) as api:
+            with patch.object(
+                gate.subprocess,
+                "run",
+                side_effect=[
+                    subprocess.CompletedProcess([], 0, head, ""),
+                    subprocess.CompletedProcess([], 0, " M pom.xml", ""),
+                ],
+            ):
+                with patch.object(gate.sys, "argv", ["gate", "--repo", "owner/repo"]):
+                    with redirect_stderr(io.StringIO()):
+                        self.assertEqual(2, gate.main())
+        self.assertEqual(2, api.call_count)
 
 
 if __name__ == "__main__":

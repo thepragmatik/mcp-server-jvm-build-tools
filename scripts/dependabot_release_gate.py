@@ -73,6 +73,15 @@ def main() -> int:
         ).stdout.strip()
         if not re.fullmatch(r"[0-9a-f]{40}", remote_head) or local_head != remote_head:
             raise GateError("Local checkout is not the current default-branch commit")
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+        if dirty:
+            raise GateError("Local checkout has uncommitted changes")
         pages = json.loads(
             gh(
                 f"repos/{args.repo}/dependabot/alerts?state=open&per_page=100",
@@ -81,6 +90,8 @@ def main() -> int:
             )
         )
         count = open_alert_count(pages)
+        if gh(f"repos/{args.repo}/commits/{default_branch}", "--jq", ".sha") != local_head:
+            raise GateError("Default branch moved during the alert audit")
     except (
         GateError,
         json.JSONDecodeError,

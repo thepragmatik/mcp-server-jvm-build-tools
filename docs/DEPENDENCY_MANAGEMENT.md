@@ -45,9 +45,10 @@ python3 scripts/dependabot_release_gate.py --repo thepragmatik/mcp-server-jvm-bu
 
 The script uses the maintainer's existing `gh` login and GitHub's paginated
 [Dependabot alert API](https://docs.github.com/en/rest/dependabot/alerts). It
-requires the local commit to equal GitHub's current default-branch commit, then
-fails if **any** alert is open. API denial, timeout, malformed response, or a
-stale local checkout fail closed. Output contains only pass/fail and an alert
+requires a clean local checkout at GitHub's current default-branch commit,
+then fails if **any** alert is open. It rechecks that commit after pagination;
+API denial, timeout, malformed response, a dirty checkout, or branch movement
+fail closed. Output contains only pass/fail and an alert
 count: no package name, private path, advisory text, or token. An authorized
 credential with Dependabot-alert read access is required; `GITHUB_TOKEN` is not
 assumed to have that permission. Wait for GitHub to process newly merged
