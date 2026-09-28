@@ -137,7 +137,7 @@ class CveLookupServiceTest {
         @DisplayName("parseOsvResponse extracts vulnerability IDs")
         void extractsVulnerabilityIds() {
             String json = """
-                    {"vulns":[{"id":"CVE-2024-1234","summary":"Test vuln","severity":[{"type":"CVSS_V3","score":"9.8"}],"affected":[{"ranges":[{"type":"ECOSYSTEM","events":[{"introduced":"1.0.0"},{"fixed":"1.2.0"}]}]}]}]}""";
+                    {"vulns":[{"id":"CVE-2024-1234","summary":"Test vuln","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}],"affected":[{"ranges":[{"type":"ECOSYSTEM","events":[{"introduced":"1.0.0"},{"fixed":"1.2.0"}]}]}]}]}""";
 
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);
 
@@ -178,7 +178,7 @@ class CveLookupServiceTest {
         @DisplayName("parseOsvResponse handles multiple vulnerabilities")
         void handlesMultipleVulnerabilities() {
             String json = """
-                    {"vulns":[{"id":"CVE-2024-AAAA","summary":"A","severity":[{"type":"CVSS_V3","score":"7.5"}]},{"id":"CVE-2024-BBBB","summary":"B","severity":[{"type":"CVSS_V3","score":"5.0"}]}]}""";
+                    {"vulns":[{"id":"CVE-2024-AAAA","summary":"A","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}]},{"id":"CVE-2024-BBBB","summary":"B","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N"}]}]}""";
 
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);
 
@@ -202,11 +202,31 @@ class CveLookupServiceTest {
         }
 
         @Test
-        void cvssVectorIsUnknownUntilValidatedScoringExists() {
+        void scoresOfficialCvss31Vector() {
             var entries = service.parseOsvResponse("""
                     {"vulns":[{"id":"OSV-2026-1","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}""");
             assertThat(entries).hasSize(1);
-            assertThat(entries.get(0).severity()).isEqualTo("UNKNOWN");
+            assertThat(entries.get(0).severity()).isEqualTo("CRITICAL");
+            assertThat(entries.get(0).cvssScore()).isEqualTo(9.8);
+        }
+
+        @Test
+        void rejectsNumericAndUnsupportedVectorsWithoutInventingSeverity() {
+            var entries = service.parseOsvResponse("""
+                    {"vulns":[{"id":"OSV-NUM","severity":[{"type":"CVSS_V3","score":"9.8"}]},{"id":"OSV-V3","severity":[{"type":"CVSS_V3","score":"CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]},{"id":"OSV-OTHER","severity":[{"type":"CVSS_V4","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}""");
+            assertThat(entries)
+                    .extracting(CveLookupService.VulnerabilityEntry::severity)
+                    .containsExactly("UNKNOWN", "UNKNOWN", "UNKNOWN");
+        }
+
+        @Test
+        void treatsValidZeroImpactAsNoneAndUsesHighestValidVector() {
+            var entries = service.parseOsvResponse("""
+                    {"vulns":[{"id":"OSV-ZERO","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N"}]},{"id":"OSV-MULTI","severity":[{"type":"CVSS_V3","score":"9.9"},{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"},{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"}]}]}""");
+            assertThat(entries)
+                    .extracting(CveLookupService.VulnerabilityEntry::severity)
+                    .containsExactly("NONE", "CRITICAL");
+            assertThat(entries.get(1).cvssScore()).isEqualTo(10.0);
         }
     }
 

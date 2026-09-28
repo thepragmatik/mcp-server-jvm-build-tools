@@ -137,7 +137,7 @@ registry JSON, and tests the release alert audit. Its green status is a
 distinct gate. The keyless `Dependency review` PR job blocks newly introduced
 known vulnerabilities of moderate severity or higher in runtime, development,
 and unknown scopes. On the final default-branch commit, run the separate
-[Dependabot release alert audit](../DEPENDENCY_MANAGEMENT.md) with an authorized
+[Dependabot release alert audit](https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/main/docs/DEPENDENCY_MANAGEMENT.md) with an authorized
 maintainer credential. It fails on any open alert or unavailable API. Record
 both results; a PR-only scan does not clear pre-existing alerts, and Dependabot
 can take time to process a newly merged dependency change. No NVD API key is
