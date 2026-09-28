@@ -143,6 +143,11 @@ coordinates. Coordinates containing whitespace, control characters, quotes, or
 unsupported punctuation are skipped before the HTTP request; the CVE scan
 reports an aggregate skipped count. OSV responses and transport failures do
 not cause raw package coordinates or exception messages to be logged.
+The scan reads the first present POM or Gradle build file through one held,
+no-symlink project directory handle. An unsafe path, unsupported filesystem,
+file over 1 MiB, or invalid UTF-8 fails before any OSV request. OSV receives
+valid dependency coordinates by design; run the scan only when that egress is
+acceptable for the project.
 
 The server holds its **own** dependencies to the same bar as the SBOM /
 supply-chain tooling it ships to users (issue #78). The keyless

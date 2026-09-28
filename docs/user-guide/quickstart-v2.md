@@ -17,6 +17,8 @@ java -Dbuildtools.projects.allowed-roots=/workspace/projects -jar target/mcp-ser
 Before running a build, an agent can call `validate_build_configuration` with `{"projectDir":"service-a"}`. A Maven POM with a missing coordinate returns `valid: false`, an `issueCount`, and a fixed `configuration` diagnostic such as `Required POM artifactId is missing.` The agent should inspect `pom.xml` locally before editing; raw XML, coordinates, and paths do not enter the MCP result. See [what validation checks](../reference/configuration-validation.md).
 Build-file symlinks are rejected. If the local filesystem/JDK cannot support race-free directory access, validation returns a fixed unavailable diagnostic; use the supported Docker image or a local runtime with `SecureDirectoryStream` support.
 
+`scan_dependency_cves` reads a project's POM or Gradle build file locally, then sends supported Maven group, artifact, and version coordinates to OSV.dev. Run it only when that outbound dependency inventory is acceptable for the project. The scan rejects build-file symlinks, files over 1 MiB, invalid UTF-8, and filesystems without race-free directory access before querying OSV. Its MCP result contains aggregate counts and safe warnings; inspect local dependency reports for package identities.
+
 To use a guided workflow, ask the client to run `prompts/list`, select
 `diagnose_build_failure`, then call `prompts/get` with
 `{"name":"diagnose_build_failure"}`. These are native MCP prompts and take no

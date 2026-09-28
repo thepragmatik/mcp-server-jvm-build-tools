@@ -19,11 +19,19 @@ package com.pragmatik.buildtools.dependency;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pragmatik.buildtools.build.BuildToolProvider;
+import com.pragmatik.buildtools.dependency.security.CveLookupService;
+import com.pragmatik.buildtools.security.ProjectAccessPolicy;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for CVE/security features added to DependencyService in v1.1.0 (F2).
@@ -32,6 +40,30 @@ import org.junit.jupiter.api.Test;
 class DependencyServiceSecurityTest {
 
     private final DependencyService service = new DependencyService(new BuildToolProvider());
+
+    @TempDir
+    Path temporary;
+
+    private static final String POM = """
+            <project><dependencies><dependency><groupId>org.example</groupId>
+            <artifactId>safe</artifactId><version>1.2.3</version></dependency></dependencies></project>
+            """;
+
+    private static final class CountingLookup extends CveLookupService {
+        private final AtomicInteger calls = new AtomicInteger();
+        private List<PackageRef> queried = List.of();
+
+        @Override
+        public Map<String, List<VulnerabilityEntry>> bulkLookup(List<PackageRef> packages) {
+            calls.incrementAndGet();
+            queried = List.copyOf(packages);
+            Map<String, List<VulnerabilityEntry>> result = new LinkedHashMap<>();
+            for (PackageRef pkg : packages) {
+                result.put(pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version(), List.of());
+            }
+            return result;
+        }
+    }
 
     // ── Security enrichment (internal) ──────────────────────────────
 
@@ -46,7 +78,14 @@ class DependencyServiceSecurityTest {
             result.put("groupId", "com.example");
             result.put("artifactId", "test-lib");
 
-            service.enrichWithSecurityInfo(result, "com.example", "test-lib", "1.0.0");
+            CveLookupService lookup = new CveLookupService() {
+                @Override
+                public List<VulnerabilityEntry> lookup(String groupId, String artifactId, String version) {
+                    return List.of();
+                }
+            };
+            new DependencyService(new BuildToolProvider(), lookup)
+                    .enrichWithSecurityInfo(result, "com.example", "test-lib", "1.0.0");
 
             assertThat(result).containsKey("security");
             @SuppressWarnings("unchecked")
@@ -58,8 +97,15 @@ class DependencyServiceSecurityTest {
         @DisplayName("handles network errors gracefully (returns partial result with warning)")
         void handlesNetworkErrorsGracefully() {
             Map<String, Object> result = new LinkedHashMap<>();
-            // Use a non-existent host to trigger network error
-            service.enrichWithSecurityInfo(result, "com.nonexistent.dep", "fake-artifact", "999.0.0");
+            CveLookupService lookup = new CveLookupService() {
+                @Override
+                public List<VulnerabilityEntry> lookup(String groupId, String artifactId, String version)
+                        throws IOException {
+                    throw new IOException("PRIVATE_EMAIL@example.com");
+                }
+            };
+            new DependencyService(new BuildToolProvider(), lookup)
+                    .enrichWithSecurityInfo(result, "com.nonexistent.dep", "fake-artifact", "999.0.0");
 
             assertThat(result).containsKey("security");
             @SuppressWarnings("unchecked")
@@ -67,6 +113,7 @@ class DependencyServiceSecurityTest {
             // Should still have the basic fields even on error
             assertThat(security).containsKey("cveCount");
             assertThat(security).containsKey("highestSeverity");
+            assertThat(security.get("warning").toString()).doesNotContain("PRIVATE_EMAIL");
         }
     }
 
@@ -93,10 +140,117 @@ class DependencyServiceSecurityTest {
         @Test
         @DisplayName("returns error for directory without build files")
         void returnsErrorForNoBuildFiles() throws Exception {
-            String tmpdir = System.getProperty("java.io.tmpdir");
+            String tmpdir = temporary.toRealPath().toString();
             String json = service.scanDependencyCves(tmpdir, null);
             assertThat(json).contains("error");
             assertThat(json).contains("No build files");
+        }
+
+        @Test
+        void validInRootPomQueriesOnlyItsCoordinates() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), POM);
+            Files.writeString(project.resolve("build.gradle.kts"), "implementation(\"org.example:ignored:9.9\")");
+            CountingLookup lookup = new CountingLookup();
+            DependencyService scanner = new DependencyService(new BuildToolProvider(), lookup);
+
+            String result = scanner.scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(1);
+            assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "safe", "1.2.3"));
+            assertThat(result).contains("scanSummary").doesNotContain(project.toString());
+        }
+
+        @Test
+        void kotlinGradleMarkerPrecedesGroovyMarker() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle.kts"), "implementation(\"org.example:kts:2.0\")");
+            Files.writeString(project.resolve("build.gradle"), "implementation 'org.example:ignored:9.9'");
+            CountingLookup lookup = new CountingLookup();
+
+            new DependencyService(new BuildToolProvider(), lookup).scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "kts", "2.0"));
+        }
+
+        @Test
+        void groovyGradleMarkerIsReadWhenOthersAreAbsent() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle"), "implementation 'org.example:groovy:3.0'");
+            CountingLookup lookup = new CountingLookup();
+
+            new DependencyService(new BuildToolProvider(), lookup).scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "groovy", "3.0"));
+        }
+
+        @Test
+        void fileSymlinkSwapAfterGuardFailsBeforeEgress() throws Exception {
+            Path root = temporary.toRealPath();
+            Path allowed = Files.createDirectory(root.resolve("allowed"));
+            Path project = Files.createDirectory(allowed.resolve("project"));
+            Path pom = Files.writeString(project.resolve("pom.xml"), POM);
+            Path outside = Files.writeString(root.resolve("outside.xml"), POM + "PRIVATE_EMAIL@example.com");
+            new ProjectAccessPolicy(allowed.toString()).requireAllowed(project.toString());
+            Files.delete(pom);
+            Files.createSymbolicLink(pom, outside);
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result)
+                    .contains("Cannot safely read build configuration")
+                    .doesNotContain("PRIVATE_EMAIL", project.toString());
+        }
+
+        @Test
+        void directorySymlinkSwapAfterGuardFailsBeforeEgress() throws Exception {
+            Path root = temporary.toRealPath();
+            Path allowed = Files.createDirectory(root.resolve("allowed"));
+            Path project = Files.createDirectory(allowed.resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), POM);
+            Path outside = Files.createDirectory(root.resolve("outside"));
+            Files.writeString(outside.resolve("pom.xml"), POM + "PRIVATE_SECRET");
+            new ProjectAccessPolicy(allowed.toString()).requireAllowed(project.toString());
+            Files.move(project, allowed.resolve("moved"));
+            Files.createSymbolicLink(project, outside);
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result)
+                    .contains("Cannot safely read build configuration")
+                    .doesNotContain("PRIVATE_SECRET", project.toString());
+        }
+
+        @Test
+        void oversizedBuildFileFailsBeforeEgress() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), "x".repeat(1024 * 1024 + 1));
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result).contains("exceeds the 1 MiB scan limit").doesNotContain(project.toString());
+        }
+
+        @Test
+        void malformedUtf8FailsBeforeEgress() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.write(project.resolve("build.gradle.kts"), new byte[] {(byte) 0xc3, (byte) 0x28});
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result).contains("not valid UTF-8").doesNotContain(project.toString());
         }
     }
 }

@@ -22,6 +22,7 @@ import com.pragmatik.buildtools.dependency.pom.PomDependencyResolver;
 import com.pragmatik.buildtools.dependency.pom.PomModel.AnalysisResult;
 import com.pragmatik.buildtools.dependency.security.CveLookupService;
 import com.pragmatik.buildtools.dependency.security.CveLookupService.VulnerabilityEntry;
+import com.pragmatik.buildtools.security.AnchoredProjectFileReader;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tool.XmlUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,13 +31,19 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -59,20 +66,26 @@ public class DependencyService {
     private static final Logger logger = LoggerFactory.getLogger(DependencyService.class);
 
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
+    private static final int MAX_SCAN_BUILD_FILE_BYTES = 1024 * 1024;
 
     private final HttpClient httpClient;
     private final BuildToolProvider buildToolProvider;
     private final PomDependencyResolver pomResolver;
     private final CveLookupService cveLookup;
 
+    @Autowired
     public DependencyService(BuildToolProvider buildToolProvider) {
+        this(buildToolProvider, new CveLookupService());
+    }
+
+    DependencyService(BuildToolProvider buildToolProvider, CveLookupService cveLookup) {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
         this.buildToolProvider = buildToolProvider;
         this.pomResolver = new PomDependencyResolver();
-        this.cveLookup = new CveLookupService();
+        this.cveLookup = Objects.requireNonNull(cveLookup);
     }
 
     /**
@@ -402,7 +415,7 @@ public class DependencyService {
             }
         } catch (Exception e) {
             // If project context can't be determined, just omit it
-            logger.warn("[DependencyService] Could not enrich project context: {}", e.getMessage());
+            logger.warn("[DependencyService] Could not enrich project context");
         }
     }
 
@@ -558,46 +571,20 @@ public class DependencyService {
             return JsonUtils.errorJson("projectDir is required");
         }
 
-        Path dir;
-        try {
-            dir = Path.of(projectDir).toRealPath();
-        } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
-        }
-        if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
-        }
-
         String threshold =
                 severityThreshold != null && !severityThreshold.isBlank() ? severityThreshold.toUpperCase() : "HIGH";
 
         Map<String, Object> result = new LinkedHashMap<>();
 
-        // Detect build tool and file
-        String tool = null;
-        Path buildFile = null;
-
-        if (Files.exists(dir.resolve("pom.xml"))) {
-            tool = "maven";
-            buildFile = dir.resolve("pom.xml");
-        } else if (Files.exists(dir.resolve("build.gradle.kts"))) {
-            tool = "gradle";
-            buildFile = dir.resolve("build.gradle.kts");
-        } else if (Files.exists(dir.resolve("build.gradle"))) {
-            tool = "gradle";
-            buildFile = dir.resolve("build.gradle");
-        }
-
-        if (buildFile == null) {
-            return JsonUtils.errorJson(
-                    "No build files found (pom.xml, build.gradle, build.gradle.kts). " + "Cannot scan dependencies.");
-        }
-
-        result.put("project", Map.of("tool", tool, "dir", dir.toString()));
-
         try {
-            String content = Files.readString(buildFile);
-            List<CveLookupService.PackageRef> packages = extractPackages(content, tool);
+            BuildFileSnapshot buildFile =
+                    readScanBuildFile(Path.of(projectDir).toAbsolutePath().normalize());
+            if (buildFile == null) {
+                return JsonUtils.errorJson(
+                        "No build files found (pom.xml, build.gradle, build.gradle.kts). Cannot scan dependencies.");
+            }
+            result.put("project", Map.of("tool", buildFile.tool()));
+            List<CveLookupService.PackageRef> packages = extractPackages(buildFile.content(), buildFile.tool());
 
             // Bulk lookup
             Map<String, List<VulnerabilityEntry>> scanResults = cveLookup.bulkLookup(packages);
@@ -671,8 +658,34 @@ public class DependencyService {
 
             return JsonUtils.toJson(result);
 
-        } catch (IOException e) {
-            return JsonUtils.errorJson("Error scanning dependencies: " + e.getMessage());
+        } catch (BuildFileTooLargeException e) {
+            return JsonUtils.errorJson("Build configuration exceeds the 1 MiB scan limit");
+        } catch (CharacterCodingException e) {
+            return JsonUtils.errorJson("Build configuration is not valid UTF-8");
+        } catch (IOException | InvalidPathException | UnsupportedOperationException | SecurityException e) {
+            return JsonUtils.errorJson("Cannot safely read build configuration");
+        }
+    }
+
+    private record BuildFileSnapshot(String tool, String content) {}
+
+    private static final class BuildFileTooLargeException extends IOException {}
+
+    private static BuildFileSnapshot readScanBuildFile(Path project) throws IOException {
+        try (AnchoredProjectFileReader.ProjectDirectory directory = AnchoredProjectFileReader.open(project)) {
+            for (String filename : List.of("pom.xml", "build.gradle.kts", "build.gradle")) {
+                byte[] bytes = directory.readIfPresent(filename, MAX_SCAN_BUILD_FILE_BYTES);
+                if (bytes == null) continue;
+                if (bytes.length > MAX_SCAN_BUILD_FILE_BYTES) throw new BuildFileTooLargeException();
+                String content = StandardCharsets.UTF_8
+                        .newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes))
+                        .toString();
+                return new BuildFileSnapshot("pom.xml".equals(filename) ? "maven" : "gradle", content);
+            }
+            return null;
         }
     }
 
