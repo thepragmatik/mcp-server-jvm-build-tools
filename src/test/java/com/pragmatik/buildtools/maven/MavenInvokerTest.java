@@ -86,6 +86,33 @@ class MavenInvokerTest {
         assertThat(result.output()).contains("BUILD FAILURE");
     }
 
+    @Test
+    @DisplayName("analysis counts one compiler error repeated in discarded stdout and stderr only once")
+    void analysisDeduplicatesDiscardedErrorsAcrossStreams(@TempDir Path projectDir) throws Exception {
+        Path mavenHome = Files.createDirectory(projectDir.resolve("maven-home"));
+        Path bin = Files.createDirectory(mavenHome.resolve("bin"));
+        Path fakeMaven = bin.resolve("mvn");
+        Files.writeString(
+                fakeMaven,
+                "#!/bin/sh\n"
+                        + "yes '[INFO] stdout head' | head -n 4096\n"
+                        + "yes '[INFO] stderr head' | head -n 4096 >&2\n"
+                        + "printf '[ERROR] /synthetic/Repeated.java:[42,1] cannot find symbol\\n'\n"
+                        + "printf '[ERROR] /synthetic/Repeated.java:[42,1] cannot find symbol\\n' >&2\n"
+                        + "yes '[INFO] stdout tail' | head -n 10000\n"
+                        + "yes '[INFO] stderr tail' | head -n 10000 >&2\n"
+                        + "printf '[INFO] BUILD FAILURE\\n'\n"
+                        + "exit 1\n");
+        assertThat(fakeMaven.toFile().setExecutable(true)).isTrue();
+
+        MavenInvoker.AnalysisResult result =
+                MavenInvoker.executeForAnalysis(mavenHome.toString(), new String[] {"compile"}, projectDir.toString());
+        var parsed = new MavenOutputParser().parse(result.output(), result.exitCode(), "compile");
+
+        assertThat(result.outputTruncated()).isTrue();
+        assertThat(parsed.get("errorCount")).isEqualTo(1);
+    }
+
     @Nested
     @DisplayName("getCommands()")
     class GetCommands {

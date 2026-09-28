@@ -48,12 +48,13 @@ public class MavenInvoker {
                 ? completed.stdout()
                 : completed.stderr() + "\n" + completed.stdout();
         StringBuilder combined = new StringBuilder();
+        Set<String> appended = new HashSet<>();
         boolean diagnosticsTruncated = false;
         if (completed.exitCode() != 0) {
             for (MavenDiagnosticOutput diagnostics : completed.execution().diagnosticStreams()) {
                 diagnosticsTruncated |= diagnostics.diagnosticsTruncated();
                 for (String line : diagnostics.diagnostics()) {
-                    if (!output.contains(line)) {
+                    if (!output.contains(line) && appended.add(line)) {
                         combined.append(line).append('\n');
                     }
                 }
