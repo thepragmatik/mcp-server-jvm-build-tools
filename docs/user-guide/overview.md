@@ -1,89 +1,40 @@
 # Overview
 
-## What this server does
+`mcp-server-jvm-build-tools` lets an MCP client detect, run, and inspect Maven, Gradle, and sbt builds. The current 2.0 release-candidate contract exposes [24 public tools](../reference/tool-catalog.md) through stdio or optional Streamable HTTP using MCP `2025-11-25`.
 
-`mcp-server-jvm-build-tools` is a [Model Context Protocol](https://spec.modelcontextprotocol.io)
-server that lets AI coding agents **execute and inspect JVM builds**. It speaks the MCP
-protocol over **stdio** (and, optionally, Streamable HTTP), and exposes a curated set of
-tools for **Maven**, **Gradle**, and **SBT**.
+A client can discover a project's build tool, validate supported build files, run allowed commands, inspect bounded test and compiler diagnostics, and query dependency versions. Call `tools/list` for the exact input schemas in the installed JAR.
 
-An agent connected to the server can:
+## A first useful session
 
-- Detect which build tool a project uses and list available commands.
-- Run safe build commands (`clean`, `compile`, `test`, `package`, …) and read the output.
-- Get **structured JSON** results — test counts, compile errors with `file:line`, and warnings.
-- Validate `pom.xml` / `build.gradle` / `build.gradle.kts` statically, without running a build.
-- Look up the latest version of a Maven Central dependency and detect version conflicts.
-- Check Java/JDK compatibility, scan for build credential configuration, and analyse SBT projects.
-- Retrieve build/dependency **resources** and **prompt templates** to guide multi-step workflows.
+1. Follow the [quickstart](quickstart-v2.md): configure an existing allowed project root and launch the packaged server.
+2. Ask the client to call `detect_build_tool` with `{"projectDir":"."}`. The alias selects the first configured root without placing an absolute host path in a model-visible argument.
+3. Ask for `list_build_tools` or run a supported test command with `execute_build_command`. The server returns a bounded result with structured, redacted diagnostics. Raw build logs and process commands remain local.
 
-## Who it's for
+For existing clients, read [migration to 2.0](migration-v2.md) before upgrading. For each tool's scope and schema, use the [current catalog](../reference/tool-catalog.md).
 
-This server is for developers who use AI coding agents — Claude Desktop, Cursor, Cline,
-Windsurf, Goose, Continue, GitHub Copilot, and any other MCP-capable client — and who want
-those agents to **interact with real build tooling** rather than only generating code.
+## Where the boundaries are
 
-## How it works at a glance
-
-```text
-┌──────────────────────────┐   JSON-RPC (MCP)   ┌────────────────────────────┐
-│  MCP client (the agent)  │ ◀────────────────▶ │  mcp-server-jvm-build-tools │
-│  Claude Desktop, Cursor… │      over stdio    │  (Spring Boot + Spring AI)  │
-└──────────────────────────┘                    └──────────────┬─────────────┘
-                                                               │ spawns isolated processes
-                                       ┌───────────────────────┼───────────────────────┐
-                                       ▼                       ▼                       ▼
-                                  ┌─────────┐            ┌──────────┐            ┌─────────┐
-                                  │  Maven  │            │  Gradle  │            │   SBT   │
-                                  │ invoker │            │ --no-daemon            │--no-colors
-                                  └─────────┘            └──────────┘            └─────────┘
+```mermaid
+flowchart LR
+    A["🟣 Agent / MCP client"] -->|stdio or HTTP| B["🔵 SDK transport"]
+    B --> C{"🟠 Scope, root, command checks"}
+    C -->|allowed| D["🟢 Child build process"]
+    D --> E["🟢 Bounded output + redaction"]
+    E --> A
+    C -->|denied| F["🔴 Safe error"]
+    F --> A
+    classDef client fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef server fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef boundary fill:#ffedd5,stroke:#ea580c,color:#512600
+    classDef safe fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef deny fill:#fee2e2,stroke:#dc2626,color:#4c1111
+    class A client
+    class B server
+    class C boundary
+    class D,E safe
+    class F deny
 ```
 
-1. The agent connects to the server and calls `tools/list` to discover available tools.
-2. When the agent calls a tool (for example `execute_build_command`), the server validates
-   the request, resolves the right build tool (explicitly or by auto-detection), and runs it
-   in an **isolated child process**.
-3. The build's output is returned to the agent — either as raw text or parsed into JSON.
+Project roots and command checks constrain requests; they do **not** sandbox a build script. A build process inherits the server's OS permissions and may run other programs, access files, or use the network. Use [container isolation](../reference/design-v2.md#container-isolation) for untrusted projects. The default stdio transport opens no listening port, but dependency lookups and build scripts may use network access. HTTP is opt-in and requires a configured bearer key and per-tool scopes.
 
-See the [Architecture reference](../reference/architecture.md) for the full component map and
-request flow.
-
-## Design principles
-
-!!! abstract "Unified, not lowest-common-denominator"
-    The server presents a consistent tool surface across Maven, Gradle, and SBT, while still
-    honouring each tool's real command syntax (Maven space-separated phases, Gradle tasks, SBT
-    semicolon-chained tasks).
-
-!!! abstract "Secure by construction"
-    Builds execute external processes, so security is a first-class concern. A
-    [five-layer defense model](../reference/security.md) constrains *what* can run before any
-    process is ever spawned.
-
-!!! abstract "Local-first"
-    The default **stdio** transport runs entirely on your machine: no listening port, no TLS,
-    no cloud dependency. The attack surface is limited to MCP JSON-RPC messages, filesystem
-    paths, and spawned build processes.
-
-!!! abstract "Stateless and concurrent-friendly"
-    Each tool call carries its own `projectDir` and is independent. One agent can build a Maven
-    project and then a Gradle project with no shared state between calls.
-
-## Supported build tools
-
-| Build tool | Detected by | Execution method | Installation needed? |
-|------------|-------------|------------------|----------------------|
-| **Maven**  | `pom.xml` | Maven Shared Invoker (out-of-process); Maven Embedder for version queries | Yes — a Maven install via `MAVEN_HOME` or `buildToolHome` |
-| **Gradle** | `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts` | `ProcessBuilder` with `--no-daemon --console=plain`; auto-detects the `gradlew` wrapper | No — uses the wrapper, falls back to `gradle` on `PATH` |
-| **SBT**    | `build.sbt` | `ProcessBuilder` with `--no-colors`; auto-detects an `sbt` wrapper | No — falls back to `sbt` on `PATH` |
-
-## What it deliberately does **not** do
-
-- It is **not** a remote build farm. There is no persistent daemon; each command spawns a fresh process.
-- It does **not** protect against a trusted operator deliberately running a legitimate build
-  command (for example, `mvn clean` removes the `target/` directory). It protects against
-  *injection* and *unsafe flags*, not intentional, allowed build operations.
-- It does **not** require network access for its core stdio operation; only
-  `check_dependency_version` reaches out to Maven Central.
-
-Ready to install? Head to the [Installation guide](installation.md).
+See the [architecture reference](../reference/architecture.md) for component details and the [configuration guide](configuration.md) for local and HTTP setup.

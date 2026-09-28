@@ -1,4 +1,4 @@
-# Architecture — mcp-server-jvm-build-tools
+# Architecture (historical 1.x design) — mcp-server-jvm-build-tools
 
 > **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
 

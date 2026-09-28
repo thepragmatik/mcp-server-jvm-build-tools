@@ -42,6 +42,8 @@ jobs:
 
       - name: Build site (strict)
         run: mkdocs build --strict
+      - name: Check Pages root and key routes
+        run: python3 scripts/check_site_landing.py
 
       - name: Configure Pages
         # Pinned to a full commit SHA (v5.0.0) for supply-chain safety.

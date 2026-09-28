@@ -99,5 +99,6 @@ jobs:
         run: |
           python3 -m pip install -r docs/requirements.txt
           mkdocs build --strict
+          python3 scripts/check_site_landing.py
       - name: Validate registry catalog count
         run: python3 -m json.tool mcp-registry.json > /dev/null
