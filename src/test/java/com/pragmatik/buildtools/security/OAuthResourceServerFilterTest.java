@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,7 +48,15 @@ class OAuthResourceServerFilterTest {
         System.clearProperty("buildtools.auth.enabled");
         System.clearProperty("buildtools.auth.mode");
         System.clearProperty("spring.profiles.active");
+        System.setProperty("buildtools.api.key.integration", VALID_TOKEN);
+        System.setProperty("buildtools.api.key.integration.scopes", "build:read");
         authService = new ToolAuthorizationService();
+    }
+
+    @AfterEach
+    void clearKey() {
+        System.clearProperty("buildtools.api.key.integration");
+        System.clearProperty("buildtools.api.key.integration.scopes");
     }
 
     private OAuthResourceServerFilter filter(boolean enabled) {
@@ -128,10 +137,33 @@ class OAuthResourceServerFilterTest {
             MockHttpServletResponse res = new MockHttpServletResponse();
             MockFilterChain chain = new MockFilterChain();
 
-            filter(true).doFilter(mcpPost(VALID_TOKEN), res, chain);
+            MockHttpServletRequest req = mcpPost(VALID_TOKEN);
+            req.setContent("{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"params\":{}}".getBytes());
+            filter(true).doFilter(req, res, chain);
 
             assertThat(chain.getRequest()).as("downstream reached").isNotNull();
             assertThat(res.getStatus()).isNotEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+
+        @Test
+        void toolCallRequiresMatchingScope() throws Exception {
+            MockHttpServletRequest denied = mcpPost(VALID_TOKEN);
+            denied.setContent(
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"execute_build_command\",\"arguments\":{}}}"
+                            .getBytes());
+            MockHttpServletResponse deniedResponse = new MockHttpServletResponse();
+            MockFilterChain deniedChain = new MockFilterChain();
+            filter(true).doFilter(denied, deniedResponse, deniedChain);
+            assertThat(deniedResponse.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
+            assertThat(deniedChain.getRequest()).isNull();
+
+            MockHttpServletRequest allowed = mcpPost(VALID_TOKEN);
+            allowed.setContent(
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"detect_build_tool\",\"arguments\":{}}}"
+                            .getBytes());
+            MockFilterChain allowedChain = new MockFilterChain();
+            filter(true).doFilter(allowed, new MockHttpServletResponse(), allowedChain);
+            assertThat(allowedChain.getRequest()).isNotNull();
         }
 
         @Test

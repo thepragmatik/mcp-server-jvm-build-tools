@@ -1,5 +1,7 @@
 # Authorization Model — MCP OAuth 2.1 resource-server alignment
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
+
 This document is the **recorded decision** (ADR) for how this server's HTTP transport
 relates to the MCP authorization spec, which profiles an MCP server as an **OAuth 2.1
 resource server** (RFC9728 Protected Resource Metadata, RFC6750 `WWW-Authenticate`

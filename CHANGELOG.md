@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0-SNAPSHOT] - Unreleased
+
+This line is a breaking redesign; the first proposed prerelease is v2.0.0-rc.1 after review and conformance gates.
+
+### Changed
+
+- Project access now requires configured roots. Relative project aliases resolve beneath the first root; traversal and symlink escapes are rejected.
+- HTTP binds loopback and enables bearer enforcement by default. The built-in development key is gone, API keys have no implicit scopes, and every HTTP tool call checks its assigned scope.
+- The model-visible catalog has 24 explicitly scoped tools. Credential inspection, token validation, audit reading, stored-plan execution, and raw resource-reading tools are withheld while their privacy and ownership contracts are redesigned.
+- Tool results expose bounded, redacted diagnostics and selected safe fields. Raw build output and exception details no longer cross the MCP boundary.
+- Unknown and hybrid project auto-detection now asks for an explicit build tool instead of silently selecting Maven.
+- Discovery advertises the Java SDK's documented MCP 2025-11-25 revision, not the custom 2026 draft feature set.
+
+### Fixed
+
+- The packaged jar now includes the HTTP and metrics profiles and Logback configuration.
+- Invalid tool schemas abort startup and tool inputs are validated.
+- Docker runs as a nonroot user, verifies Gradle and sbt downloads, and reuses a BuildKit Maven cache.
+
+See [the 2.0 quickstart](docs/user-guide/quickstart-v2.md) and [design review](docs/reference/design-v2.md) for migration details and remaining risks.
+
 ## [1.3.1] - 2026-09-11
 
 ### Fixed

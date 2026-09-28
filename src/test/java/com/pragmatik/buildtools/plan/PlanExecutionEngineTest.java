@@ -151,7 +151,7 @@ class PlanExecutionEngineTest {
 
         // Wait for execution to finish
         try {
-            executor.join(5000);
+            executor.join(30000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

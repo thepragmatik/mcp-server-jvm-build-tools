@@ -1,5 +1,7 @@
 # Architecture — mcp-server-jvm-build-tools
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
+
 ## Overview
 
 This project is an MCP (Model Context Protocol) server that gives AI agents hands-on access to JVM build tools — Maven, Gradle, and SBT — through a single unified interface. Built with Spring Boot 3.5.14 and Spring AI 2.0.0-RC2, it exposes build operations as MCP tools discoverable by any MCP-compatible client.

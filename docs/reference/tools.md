@@ -1,5 +1,7 @@
 # Tools / MCP API
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](../user-guide/quickstart-v2.md) and [2.0 design review](design-v2.md) for the current public contract.
+
 This is the reference for the **28 MCP tools** the server registers with the tool callback
 provider and exposes over `tools/list`. Each tool is grouped by the service that implements it.
 Parameter names, requiredness, and descriptions are taken directly from the `@Tool` / `@ToolParam`
