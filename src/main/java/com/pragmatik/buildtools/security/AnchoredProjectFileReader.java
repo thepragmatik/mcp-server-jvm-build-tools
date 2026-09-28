@@ -35,8 +35,13 @@ public final class AnchoredProjectFileReader {
 
     public static byte[] read(Path project, String filename, int maxBytes) throws IOException {
         Path root = project.getRoot();
-        if (root == null || maxBytes < 1 || filename.isEmpty() || ".".equals(filename)
-                || "..".equals(filename) || filename.contains("/") || filename.contains("\\")) {
+        if (root == null
+                || maxBytes < 1
+                || filename.isEmpty()
+                || ".".equals(filename)
+                || "..".equals(filename)
+                || filename.contains("/")
+                || filename.contains("\\")) {
             throw new IOException("Invalid project file request");
         }
         Path relativeProject = root.relativize(project);
