@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
@@ -100,6 +101,26 @@ class ConformanceMatrixAuditTest(unittest.TestCase):
                                      Path(temporary), audit.clean_environment(Path(temporary)))
             finally:
                 audit.RUNNER_TIMEOUT_SECONDS = old_timeout
+
+    def test_normal_launcher_exit_ends_child_process_group(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            marker = work / "orphan-marker"
+            child = ("import pathlib,time; time.sleep(0.4); "
+                     "pathlib.Path('orphan-marker').write_text('survived')")
+            launcher = ("import subprocess,sys; "
+                        f"subprocess.Popen([sys.executable, '-c', {child!r}], "
+                        "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+                        "stderr=subprocess.DEVNULL)")
+            subprocess.run([sys.executable, "-c", launcher], cwd=work,
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.6)
+            self.assertTrue(marker.exists(), "control launcher did not start its child")
+            marker.unlink()
+            self.assertEqual(0, audit.run_runner([sys.executable, "-c", launcher],
+                                                 work, audit.clean_environment(work)))
+            time.sleep(0.6)
+            self.assertFalse(marker.exists(), "runner child survived launcher exit")
 
 
 if __name__ == "__main__":

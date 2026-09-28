@@ -187,19 +187,18 @@ def stop_process(process):
 
 def run_runner(command, work, environment):
     # npx starts a Node child. Keep both in one private process group so a
-    # timeout or interruption cannot leave the runner behind.
+    # timeout, interruption, or early launcher exit cannot leave it behind.
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                cwd=work, env=environment, start_new_session=True)
     try:
         return process.wait(timeout=RUNNER_TIMEOUT_SECONDS)
     finally:
-        if process.poll() is None:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
 
 
 def run_audit():
