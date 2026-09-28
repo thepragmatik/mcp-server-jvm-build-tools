@@ -397,6 +397,11 @@ public class BuildToolsService {
         // Parse output using the appropriate parser
         BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
         Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
+        // The parser retains these for local callers, but neither belongs in the
+        // JSON handed to the model-visible output boundary. A large log would
+        // otherwise cause that boundary to discard the structured result.
+        result.remove("rawOutput");
+        result.remove("command");
 
         return JsonUtils.toJson(result);
     }
