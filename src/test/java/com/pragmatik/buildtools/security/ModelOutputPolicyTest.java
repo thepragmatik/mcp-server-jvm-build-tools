@@ -40,6 +40,19 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void executeStatusUsesAuthoritativeExitCodeOverMisleadingOutput() {
+        String raw = "{\"exitCode\":1,\"success\":false,\"rawOutput\":\"BUILD SUCCESS /synthetic/private alice@example.invalid\"}";
+
+        String safe = policy.protect("execute_build_command", raw);
+
+        assertTrue(safe.contains("\"success\":false"));
+        assertTrue(safe.contains("\"exitCode\":1"));
+        assertTrue(safe.contains("\"isError\":true"));
+        assertFalse(safe.contains("/synthetic/private"));
+        assertFalse(safe.contains("alice@example.invalid"));
+    }
+
+    @Test
     void preservesOnlyApprovedAggregateFields() {
         String output = """
                 {"success":false,"errorCount":2,"testSummary":{"total":4,"failed":1},
