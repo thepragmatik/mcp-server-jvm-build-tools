@@ -1,7 +1,10 @@
 """Focused tests for the public-data scanner's narrow exceptions."""
 
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 
 
@@ -32,6 +35,35 @@ class PublicDataScannerTest(unittest.TestCase):
         self.assertIn("secret assignment", SCANNER.issues("pass" + "word = " + "syntheticcredential123456!", "gradle.properties"))
         self.assertIn("secret assignment", SCANNER.issues("pass" + "word = " + "syntheticcredential123456(", "gradle.properties"))
         self.assertEqual([], SCANNER.issues("password = integration-test-only"))
+
+
+    def test_camel_case_secret_name_is_detected(self):
+        candidate = "nexus" + "Password=" + "syntheticcredential123456"
+        self.assertIn("secret assignment", SCANNER.issues(candidate, "gradle.properties"))
+
+    def test_symlinks_scan_targets_without_dereferencing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            repo.mkdir()
+            (root / "outside.txt").write_text("person@" + "private.example.net\n")
+            (repo / "tracked-link").symlink_to("../outside.txt")
+            (repo / "untracked-link").symlink_to("../outside.txt")
+            original = Path.cwd()
+            try:
+                os.chdir(repo)
+                subprocess.run(["git", "init", "-q"], check=True)
+                subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                                "commit", "--allow-empty", "-q", "-m", "init"], check=True)
+                subprocess.run(["git", "add", "tracked-link"], check=True)
+                tracked = list(SCANNER.tracked_lines())
+                changed = list(SCANNER.added_lines("HEAD"))
+            finally:
+                os.chdir(original)
+
+            self.assertIn(("tracked-link", 1, "../outside.txt"), tracked)
+            self.assertIn(("untracked-link", 1, "../outside.txt"), changed)
+            self.assertFalse(any("person@" in line for _, _, line in tracked + changed))
 
 
 if __name__ == "__main__":

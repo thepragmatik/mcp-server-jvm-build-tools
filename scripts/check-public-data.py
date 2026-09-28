@@ -2,6 +2,7 @@
 """Fail on likely private data without printing the matched value."""
 
 import argparse
+import os
 import pathlib
 import re
 import subprocess
@@ -11,7 +12,7 @@ EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 HOME = re.compile(r"(?:/Users/|/home/)[A-Za-z0-9._-]+")
 PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
 SECRET_ASSIGNMENT = re.compile(
-    r"(?i)\b(?:api[_-]?key|access[_-]?token|password|passwd|client[_-]?secret)"
+    r"(?i)(?<![A-Za-z0-9])(?:[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|password|passwd|client[_-]?secret))"
     r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
 )
 SAFE_EMAIL_SUFFIXES = (".invalid", ".example", "@example.com", "@example.org")
@@ -73,13 +74,20 @@ def added_lines(base: str):
             if not raw:
                 continue
             file = pathlib.Path(raw.decode())
-            if not file.is_file():
-                continue
-            try:
-                for number, line in enumerate(file.read_text().splitlines(), 1):
-                    yield str(file), number, line
-            except UnicodeDecodeError:
-                continue
+            for number, line in local_file_lines(file):
+                yield str(file), number, line
+
+
+def local_file_lines(file: pathlib.Path):
+    """Read local tracked content; inspect symlink text without following it."""
+    try:
+        if file.is_symlink():
+            yield 1, os.readlink(file)
+        elif file.is_file():
+            for number, line in enumerate(file.read_text().splitlines(), 1):
+                yield number, line
+    except (UnicodeDecodeError, OSError):
+        return
 
 
 def tracked_lines():
@@ -91,13 +99,8 @@ def tracked_lines():
         if not raw:
             continue
         file = pathlib.Path(raw.decode())
-        if not file.is_file():
-            continue
-        try:
-            for number, line in enumerate(file.read_text().splitlines(), 1):
-                yield str(file), number, line
-        except (UnicodeDecodeError, OSError):
-            continue
+        for number, line in local_file_lines(file):
+            yield str(file), number, line
 
 
 def main() -> int:
