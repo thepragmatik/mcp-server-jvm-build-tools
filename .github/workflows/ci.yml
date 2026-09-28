@@ -91,6 +91,8 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: docs/requirements.txt
+      - name: Verify synthetic benchmark evidence
+        run: python3 -m unittest -v scripts/test_benchmark_release_gate.py
       - name: Build documentation strictly
         run: |
           python3 -m pip install -r docs/requirements.txt
