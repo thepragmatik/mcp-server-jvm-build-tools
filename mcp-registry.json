@@ -1,6 +1,6 @@
 {
   "name": "mcp-server-jvm-build-tools",
-  "version": "2.0.0-rc.1",
+  "version": "2.0.0-rc.2",
   "description": "MCP server for Maven, Gradle, and SBT with guarded project access and redacted diagnostics.",
   "homepage": "https://github.com/thepragmatik/mcp-server-jvm-build-tools",
   "license": "Apache-2.0",

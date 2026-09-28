@@ -2,7 +2,9 @@
 
 This is the active 2.0 roadmap. The 1.x research history remains in Git history and release notes; its tool counts and 2026 draft claims are not the current contract.
 
-## Current line: [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1) published prerelease
+## Current development line: 2.0.0-rc.2 (unreleased)
+
+The latest published 2.0 prerelease is [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1). Builds from `main` report the next candidate version so they cannot be confused with that immutable release artifact.
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.

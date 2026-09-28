@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] - toward 2.0.0-rc.2
+
+- Failed test assertions with `expected` values and source locations remain test diagnostics rather than compiler errors.
+- `analyze_build_output` now provides schema-checked MCP `structuredContent` alongside the existing redacted JSON text result for older clients.
+
 ## [2.0.0-rc.1] - Release candidate
 
 This breaking prerelease is tagged only after review, conformance, dependency, and performance gates pass.
