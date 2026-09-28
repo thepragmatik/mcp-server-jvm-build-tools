@@ -66,12 +66,17 @@ checks a clean build but does not turn
 the server itself into a sandbox.
 
 The normal CI `Privacy and docs` job scans changed lines without printing
-matches, builds the documentation with `mkdocs build --strict`, and checks the
-registry JSON. Its green status is a distinct gate. The OWASP dependency-check
-workflow is **skipped** when `NVD_API_KEY` is absent; a skipped job is not
-security-scan evidence. Configure the repository secret and obtain a successful
-scan before declaring a release candidate security-complete. See
-[dependency management](../DEPENDENCY_MANAGEMENT.md).
+matches, builds the documentation with `mkdocs build --strict`, checks the
+registry JSON, and tests the release alert audit. Its green status is a
+distinct gate. The keyless `Dependency review` PR job blocks newly introduced
+known vulnerabilities of moderate severity or higher in runtime, development,
+and unknown scopes. On the final default-branch commit, run the separate
+[Dependabot release alert audit](../DEPENDENCY_MANAGEMENT.md) with an authorized
+maintainer credential. It fails on any open alert or unavailable API. Record
+both results; a PR-only scan does not clear pre-existing alerts, and Dependabot
+can take time to process a newly merged dependency change. No NVD API key is
+required. The old OWASP Maven profile remains optional for local independent
+investigation, not a release gate.
 
 Local repeat command after packaging:
 

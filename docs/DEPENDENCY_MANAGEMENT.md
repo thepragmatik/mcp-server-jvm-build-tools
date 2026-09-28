@@ -12,82 +12,69 @@ It is the recorded decision for issue
 
 ## 1. Scanning the server's own dependencies
 
-Two complementary, automated mechanisms run in CI. They overlap on purpose
-(defence in depth): one proposes upgrades, the other blocks known-vulnerable
-dependencies from shipping.
+The release security decision uses GitHub's existing dependency graph and
+advisory database. No NVD API key or additional vulnerability service is
+needed. These checks complement tests and review; they only find known
+vulnerabilities in dependencies that GitHub can identify.
 
-### 1.1 OWASP dependency-check (vulnerability gate)
+### 1.1 Pull-request gate: Dependency Review
 
-The [OWASP dependency-check](https://owasp.org/www-project-dependency-check/)
-Maven plugin matches every resolved dependency against the National
-Vulnerability Database (NVD) and fails the build on any **High/Critical**
-finding (CVSS ≥ 7, configurable via `-Dowasp.failBuildOnCVSS`).
+The [Dependency Review action](https://github.com/actions/dependency-review-action)
+in [`.github/workflows/dependency-review.yml`](../.github/workflows/dependency-review.yml)
+runs on every PR. It blocks newly introduced vulnerabilities rated **moderate
+or higher** in runtime, development, or unknown scope. It has read-only
+repository permission and does not run build scripts or need a secret. The
+action is pinned to an immutable v5.0.0 commit. Its result must be green before
+merge, including for Dependabot PRs.
 
-- **Where it lives:** behind the opt-in `owasp` Maven profile in `pom.xml`. It is
-  intentionally **not** bound to the default `verify` lifecycle: the NVD download
-  makes it far slower than the test suite, so binding it everywhere would tax
-  every local build and the whole cross-JDK CI matrix in `ci.yml`.
-- **How it runs in CI:** a dedicated workflow,
-  [`.github/workflows/dependency-check.yml`](../.github/workflows/dependency-check.yml),
-  runs it
-  - **weekly** (so CVEs disclosed *after* a dependency was last touched are still
-    caught),
-  - on **`workflow_dispatch`** (manual runs), and
-  - on **pull requests / pushes that change the dependency surface** (`pom.xml`,
-    the suppression file, or the workflow itself) — failing fast before merge.
-- **Reports:** HTML, JSON, and SARIF are produced under `target/`. The workflow
-  uploads them as artifacts and pushes the SARIF to GitHub code scanning.
-- **NVD API key (required to activate the CI gate):** the OWASP NVD API 2.0 is
-  heavily rate-limited for anonymous access and cold-cache CI runs routinely
-  fail, so the CI scan runs **only when the `NVD_API_KEY` repository secret is
-  configured**. When the secret is absent the scan job is **skipped (not failed)**
-  with a warning — CI stays green and Dependabot remains the active mechanism
-  until a key is provisioned. Get a free key at
-  <https://nvd.nist.gov/developers/request-an-api-key> and add it as the
-  `NVD_API_KEY` repository secret. (Local runs work without a key, just slowly
-  — see the commands below.)
-- **Suppressions:** investigated false positives / accepted risks go in
-  [`owasp-suppressions.xml`](../owasp-suppressions.xml), each with a written
-  justification and, where possible, an `until` expiry so it gets revisited.
+This check compares the PR with its base branch. It cannot clear vulnerabilities
+already present on the base branch, nor does a green result prove that GitHub
+has a complete dependency graph. Maven fixture POMs and pinned
+`docs/requirements.txt` are included in the repository; recent Dependabot
+alerts have covered both. Review the dependency diff when a build plugin or
+transitive dependency changes.
 
-Run it locally:
+### 1.2 Final-release gate: open Dependabot alerts
 
-```bash
-# Full scan via the profile (also runs the rest of `verify`):
-./mvnw -Powasp verify
+After all release changes are merged, check out the **current default-branch
+commit** and run:
 
-# Just the dependency scan (skips tests/other verify-bound checks):
-./mvnw -Powasp org.owasp:dependency-check-maven:check
-
-# Faster NVD downloads with an API key:
-./mvnw -Powasp org.owasp:dependency-check-maven:check -Dnvd.api.key="$NVD_API_KEY"
+```sh
+python3 scripts/dependabot_release_gate.py --repo thepragmatik/mcp-server-jvm-build-tools
 ```
 
-### 1.2 Dependabot (upgrade proposals)
+The script uses the maintainer's existing `gh` login and GitHub's paginated
+[Dependabot alert API](https://docs.github.com/en/rest/dependabot/alerts). It
+requires the local commit to equal GitHub's current default-branch commit, then
+fails if **any** alert is open. API denial, timeout, malformed response, or a
+stale local checkout fail closed. Output contains only pass/fail and an alert
+count: no package name, private path, advisory text, or token. An authorized
+credential with Dependabot-alert read access is required; `GITHUB_TOKEN` is not
+assumed to have that permission. Wait for GitHub to process newly merged
+dependency changes, then record the exact commit, result, and time in the
+release evidence. A zero count is a point-in-time observation, not a guarantee
+that new advisories will never appear.
+
+The previous NVD-dependent CI workflow was removed because it skipped its
+blocking scan without `NVD_API_KEY`. The opt-in `owasp` Maven profile and
+[`owasp-suppressions.xml`](../owasp-suppressions.xml) remain available for local
+independent investigation, but are **not** release evidence. The official
+[OSV Scanner](https://google.github.io/osv-scanner/supported-languages-and-lockfiles/)
+is another keyless option; it is not the primary gate here because its Maven
+transitive graph omits test dependencies and its default resolution queries
+deps.dev. That would add package-coordinate sharing and leave a coverage gap.
+
+### 1.3 Dependabot (upgrade proposals)
 
 [`.github/dependabot.yml`](../.github/dependabot.yml) opens weekly PRs for
-out-of-date / vulnerable dependencies, covering two ecosystems:
-
-- **`maven`** — project dependencies and plugins. Related upgrades are grouped
-  (Spring Boot, Spring AI, Maven tooling, build-quality plugins) so coordinated
-  stacks land in a single reviewable PR. **Spring AI is grouped on its own** so
-  the GA-tracking upgrade (below) is easy to review in isolation.
-- **`github-actions`** — the actions pinned in the CI / Pages / publish
-  workflows.
-
-Dependabot PRs go through the standard two-reviewer process in `AGENTS.md` and
-trigger the OWASP scan workflow (they touch `pom.xml`). **Caveat:** Dependabot-
-raised `pull_request` runs receive **Dependabot secrets**, not Actions secrets,
-so `secrets.NVD_API_KEY` is empty in that context unless the key is *also* added
-as a Dependabot secret — in which case the `guard` job skips the OWASP scan for
-the bump PR itself. Coverage is preserved by the weekly schedule and the
-post-merge `push: main` run, so no vulnerable dependency ships either way; but
-to make the PR-time gate active on Dependabot bumps, mirror `NVD_API_KEY` into
-the Dependabot secret store alongside the Actions secret (§1.1).
+Maven dependencies and plugins, pinned Python documentation tools, and GitHub
+Actions. Related Maven upgrades are grouped; Spring AI has its own group.
+Dependabot PRs pass the same CI and two-reviewer process. The release audit
+also catches advisories disclosed after a dependency was last changed.
 
 ## 2. Spring AI version policy
 
-The current `pom.xml` pins Spring AI `2.0.1` through `spring-ai.version`. The decision below is retained as historical context from June 2026 and is superseded; Spring AI GA has already been adopted. Keep this document aligned with the actual Maven property when the dependency changes. The OWASP scan described above still requires an NVD API key to run in CI; a skipped scan is not evidence of vulnerability clearance.
+The current `pom.xml` pins Spring AI `2.0.1` through `spring-ai.version`. The decision below is retained as historical context from June 2026 and is superseded; Spring AI GA has already been adopted. Keep this document aligned with the actual Maven property when the dependency changes. The active security gates are in §1.
 
 ### Historical decision: track Spring AI GA when released
 
@@ -114,7 +101,7 @@ RCs and GA and do not carry GA stability/support guarantees.
    BOM, so the GA bump is a one-line change plus a `verify`.
 4. **De-risk while on the RC** by:
    - keeping the version in one property (no scattered pins),
-   - running the OWASP scan (§1.1) so any CVE against the RC is caught,
+   - running the then-current OWASP scan to look for known vulnerabilities,
    - relying on the full `mvn -B verify` suite (504+ tests) to catch RC→GA
      behavioural regressions when the bump lands.
 
@@ -129,6 +116,6 @@ RCs and GA and do not carry GA stability/support guarantees.
 
 1. Bump `spring-ai.version` in `pom.xml` to the GA version.
 2. `./mvnw -B verify --no-transfer-progress` → BUILD SUCCESS, all tests green.
-3. `./mvnw -Powasp org.owasp:dependency-check-maven:check` → no new High/Critical.
+3. Require green PR Dependency Review, then run the default-branch Dependabot alert audit after merge (§1).
 4. Update `CHANGELOG.md`; open a PR (`Closes #<issue>`); follow the `AGENTS.md`
    review gates.
