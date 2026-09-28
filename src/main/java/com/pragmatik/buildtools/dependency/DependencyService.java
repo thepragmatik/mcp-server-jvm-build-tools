@@ -553,7 +553,7 @@ public class DependencyService {
     @Tool(
             name = "scan_dependency_cves",
             description = "Scan direct Maven or Gradle dependencies for known vulnerabilities using OSV.dev. "
-                    + "Sends supported package coordinates and versions to OSV.dev. Reads at most 1 MiB "
+                    + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
                     + "through a no-symlink project handle. MCP returns aggregate counts and safe warnings; "
                     + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
                     + "Uncached coordinates are queried in batches of up to 100.")
