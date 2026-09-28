@@ -37,6 +37,9 @@ build/
 # Generated documentation site (built by `mkdocs build`); never commit it.
 site/
 
+### Python checks ###
+__pycache__/
+
 ### Mac OS ###
 .DS_Store
 /.idea/
