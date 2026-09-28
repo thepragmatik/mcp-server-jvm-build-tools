@@ -15,6 +15,7 @@ The latest published 2.0 prerelease is [v2.0.0-rc.1](https://github.com/thepragm
 - Cached callbacks and credential digests.
 - Explicit error for markerless and hybrid project auto-detection.
 - Nonroot Docker image with verified Gradle/sbt downloads and reusable Maven build cache.
+- Bounded, offline Maven POM structural validation with model-visible fixed configuration diagnostics and packaged HTTP/stdio privacy probes.
 
 ## Release candidate gate: v2.0.0-rc.1
 

@@ -2,6 +2,7 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- Maven POM configuration validation now uses a 1 MiB bounded, offline XML parser that rejects malformed XML, DTDs, and external entities, checks direct elements accurately, and emits finite privacy-safe diagnostics through MCP. Gradle validation issues use the same safe projection.
 - Removed the `buildtools.cache.hit.rate` gauge, which always reported an unmeasured `0.0`. Remove `buildtools_cache_hit_rate` dashboard queries and alerts; `buildtools.cache.score` remains a cache health score (0-100), not a comparable per-tool hit rate. sbt scoring can include locally parsed cache hits and misses.
 - Built-in Maven, Gradle, and sbt MCP execution now reports completed-process `exitCode` and derives success from it, even when output markers disagree. Legacy custom plugins report unknown status; Gradle/sbt MCP analysis now retains bounded stdout diagnostics from failed builds.
 - Maven build analysis now preserves a bounded set of compiler diagnostics from the middle of large process output, while keeping raw logs local. The structured result marks retained-output and diagnostic truncation explicitly.

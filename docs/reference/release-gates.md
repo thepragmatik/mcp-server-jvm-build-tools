@@ -23,6 +23,8 @@ privacy-safe `test` diagnostic on both tools. It also drives a 28 MiB synthetic 
 case whose final stderr error has no newline, and a colored Kotlin `e:` error in the discarded middle of a Gradle stream. It then checks analysis and execution, structured/text parity, exit status, and
 synthetic path/email/secret suppression.
 
+The packaged configuration-validation probe runs on HTTP and stdio. Synthetic Maven POMs cover a missing required coordinate, malformed XML, a rejected external entity, the 1 MiB input limit, and inherited parent coordinates. It checks fixed `configuration` diagnostics, aggregate validity, and suppression of project paths, email addresses, and secret canaries.
+
 The official scenarios selected for this product are `server-initialize`,
 `ping`, `tools-list`, `resources-list`, `prompts-list`, and
 `dns-rebinding-protection`. The official runner's frozen `--requirements

@@ -49,6 +49,12 @@ jobs:
       - name: Run packaged protocol and adversarial gate
         run: python3 scripts/release-gate.py
 
+      - name: Verify Gradle and sbt diagnostics on both transports
+        run: python3 scripts/gradle-sbt-middle-protocol-gate.py
+
+      - name: Verify configuration validation on both transports
+        run: python3 scripts/config-validation-protocol-gate.py
+
       - name: Confirm packaged artifact
         run: test -s target/mcp-server-jvm-build-tools.jar
 

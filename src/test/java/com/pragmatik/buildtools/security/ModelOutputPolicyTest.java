@@ -253,6 +253,30 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void validationIssuesUseFiniteTemplatesWithoutPrivateText() {
+        String output = """
+                {"valid":false,"tool":"maven","issueCount":2,
+                 "projectDir":"/synthetic/private/user@example.invalid",
+                 "issues":[
+                   {"severity":"ERROR","path":"/synthetic/private/pom.xml",
+                    "message":"Missing required element: <artifactId>",
+                    "suggestion":"token=SYNTHETIC_SECRET"},
+                   {"severity":"WARNING","message":"user@example.invalid SYNTHETIC_SECRET"}
+                 ]}
+                """;
+
+        String safe = policy.protect("validate_build_configuration", output);
+
+        assertTrue(safe.contains("\"valid\":false"));
+        assertTrue(safe.contains("\"issueCount\":2"));
+        assertTrue(safe.contains("\"category\":\"configuration\""));
+        assertTrue(safe.contains("Required POM artifactId is missing"));
+        assertFalse(safe.contains("SYNTHETIC_SECRET"));
+        assertFalse(safe.contains("user@example.invalid"));
+        assertFalse(safe.contains("/synthetic/private"));
+    }
+
+    @Test
     void boundsLargeResultsAndKeepsFinalDiagnostic() {
         String output = "x".repeat(300_000) + "\nERROR /home/private-user/File.java";
         String safe = policy.protect("execute_build_command", output);

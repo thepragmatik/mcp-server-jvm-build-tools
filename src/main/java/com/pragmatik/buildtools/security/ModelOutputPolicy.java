@@ -223,6 +223,10 @@ public final class ModelOutputPolicy {
                             copyDiagnostics(root.get("errors"), "error", diagnostics, fileRefs, seen);
                     diagnosticsTruncated |=
                             copyDiagnostics(root.get("warnings"), "warning", diagnostics, fileRefs, seen);
+                    if ("validate_build_configuration".equals(toolName)) {
+                        copySafeField(root, "tool", Set.of("maven", "gradle", "sbt"), safe);
+                        diagnosticsTruncated |= copyValidationIssues(root.get("issues"), diagnostics);
+                    }
                     diagnosticsTruncated |= root.path("diagnosticsTruncated").asBoolean(false);
                     if (("analyze_build_output".equals(toolName) || "execute_build_command".equals(toolName))
                             && hasFailedTests(tests)
@@ -431,6 +435,54 @@ public final class ModelOutputPolicy {
             }
         }
         return truncated;
+    }
+
+    private static boolean copyValidationIssues(JsonNode source, List<Map<String, Object>> target) {
+        if (source == null || !source.isArray()) {
+            return false;
+        }
+        for (JsonNode issue : source) {
+            if (!issue.isObject()) {
+                continue;
+            }
+            if (target.size() == MAX_DIAGNOSTICS) {
+                return true;
+            }
+            Map<String, Object> diagnostic = new LinkedHashMap<>();
+            diagnostic.put("severity", "WARNING".equals(issue.path("severity").asText()) ? "warning" : "error");
+            diagnostic.put("category", "configuration");
+            diagnostic.put(
+                    "message", validationIssueMessage(issue.path("message").asText()));
+            target.add(diagnostic);
+        }
+        return false;
+    }
+
+    private static String validationIssueMessage(String message) {
+        return switch (message) {
+            case "Missing required element: <modelVersion>" -> "Required POM modelVersion is missing.";
+            case "Missing required element: <groupId>" -> "Required POM groupId is missing.";
+            case "Missing required element: <artifactId>" -> "Required POM artifactId is missing.";
+            case "Missing required element: <version>" -> "Required POM version is missing.";
+            case "Missing <project> root element" -> "POM needs a project root element.";
+            case "Malformed pom.xml" -> "POM XML is malformed; inspect pom.xml locally.";
+            case "pom.xml is too large to validate" -> "POM exceeds the local 1 MiB validation limit.";
+            case "Cannot read pom.xml" -> "POM cannot be read locally.";
+            case "Secure XML parser is unavailable" -> "Secure XML parser is unavailable in the local runtime.";
+            case "Duplicate dependency declaration" -> "POM repeats a dependency declaration.";
+            case "Inconsistent plugin versions" -> "POM declares inconsistent plugin versions.";
+            case "Build file is empty" -> "Build file is empty.";
+            case "Unclosed string literal detected" -> "Build file has an unclosed string literal.";
+            case "No plugin declarations found but dependencies are defined" ->
+                "Gradle dependencies have no plugin declarations.";
+            case "Using Groovy-style single quotes in Kotlin DSL" ->
+                "Gradle Kotlin DSL uses Groovy-style dependency quoting.";
+            case "Cannot read build file" -> "Build file cannot be read locally.";
+            default ->
+                message.startsWith("Unbalanced braces:")
+                        ? "Build file has unbalanced braces."
+                        : "Build configuration issue; inspect the local build file.";
+        };
     }
 
     private static void copyPlainDiagnostics(String output, Map<String, Object> safe) {

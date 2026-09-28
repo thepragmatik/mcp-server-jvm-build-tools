@@ -14,6 +14,8 @@ java -Dbuildtools.projects.allowed-roots=/workspace/projects -jar target/mcp-ser
 
 3. Call `detect_build_tool` with `{"projectDir":"."}`. A relative path such as `"service-a"` selects a child of the first allowed root. Absolute home paths stay out of the conversation.
 
+Before running a build, an agent can call `validate_build_configuration` with `{"projectDir":"service-a"}`. A Maven POM with a missing coordinate returns `valid: false`, an `issueCount`, and a fixed `configuration` diagnostic such as `Required POM artifactId is missing.` The agent should inspect `pom.xml` locally before editing; raw XML, coordinates, and paths do not enter the MCP result. See [what validation checks](../reference/configuration-validation.md).
+
 To use a guided workflow, ask the client to run `prompts/list`, select
 `diagnose_build_failure`, then call `prompts/get` with
 `{"name":"diagnose_build_failure"}`. These are native MCP prompts and take no

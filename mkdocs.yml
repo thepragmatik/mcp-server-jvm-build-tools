@@ -129,6 +129,7 @@ nav:
       - Architecture: reference/architecture.md
       - Design 2.0: reference/design-v2.md
       - Current Tool Catalog: reference/tool-catalog.md
+      - Configuration Validation: reference/configuration-validation.md
       - Native Prompts: reference/native-prompts.md
       - Structured Build Results: reference/structured-build-results.md
       - Configuration 2.0: reference/configuration-v2.md
