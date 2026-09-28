@@ -22,7 +22,7 @@ No. The root limits accepted project paths. A build script runs with the server 
 
 ## Do I need Docker or a global Maven installation?
 
-Docker is optional for local trusted projects and useful for untrusted test fixtures. The included Maven wrapper builds the server. Runtime project builds use project wrappers when available, then installed Maven, Gradle, or sbt. See [installation](user-guide/installation.md).
+Docker is optional for local trusted projects and useful for untrusted test fixtures. The included Maven wrapper builds the server. Maven project builds need an available Maven installation through `MAVEN_HOME`, `maven.home`, or `mvn` on `PATH`; a project-local `mvnw` alone is not auto-selected. Gradle and sbt use project wrappers when available, then tools on `PATH`. See [installation](user-guide/installation.md).
 
 ## Can I migrate an existing 1.x client unchanged?
 

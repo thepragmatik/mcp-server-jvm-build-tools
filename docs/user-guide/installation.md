@@ -1,6 +1,6 @@
 # Install the 2.0 server
 
-Use Java 21 or later and an MCP client that can launch a local stdio process. The repository includes a Maven wrapper, so a separate Maven installation is not required to **build this server**. Running a Maven *project* requires that project's Maven wrapper or an available Maven installation; Gradle and sbt likewise use a project wrapper when present or a tool on `PATH`.
+Use Java 21 or later and an MCP client that can launch a local stdio process. The repository includes a Maven wrapper, so a separate Maven installation is not required to **build this server**. Running a Maven *project* requires an available Maven installation through `MAVEN_HOME`, the `maven.home` JVM property, or `mvn` on `PATH`. A project-local `mvnw` alone is not auto-selected. Gradle and sbt use a project wrapper when present or a tool on `PATH`.
 
 ## Build and verify
 
