@@ -43,6 +43,8 @@ java -Dbuildtools.projects.allowed-roots=/workspace/projects -jar target/mcp-ser
 
 Send MCP requests to `POST /mcp` with the configured bearer key in the Authorization header. A non-loopback bind additionally requires an explicit project root, a configured key, authentication enforcement, and restricted CORS. Do not put a key or a private project path in a prompt, issue, commit, or build log.
 
+HTTP requests to `/mcp` validate the `Origin` header when present and reject invalid origins with 403. Loopback binds also reject non-local `Host` values to prevent DNS rebinding. If a local reverse proxy sends its own Host value, add its hostname to `mcp.transport.allowed-hosts` (comma-separated); keep `mcp.transport.cors.allowed-origins` restricted to trusted browser origins. CLI clients may omit `Origin`.
+
 ## What 2.0 changes
 
 - Every path-bearing tool call is checked against canonical allowed roots. Relative project aliases resolve under the first root. Missing roots deny project access.

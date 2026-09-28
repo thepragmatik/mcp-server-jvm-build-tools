@@ -60,7 +60,7 @@ A configured root is a filesystem boundary, not a sandbox. The canonical path ch
 
 ## Protocol contract
 
-The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/java-sdk/blob/main/VERSIONING.md), whose documented spec line is `2025-11-25`. The SDK BOM aligns all resolved MCP modules to 2.0.1. The HTTP profile registers the SDK's stateless servlet on `/mcp`; its packaged-jar smoke and automated integration tests exercise `initialize`, `tools/list`, and `tools/call`. Discovery advertises that revision only. The 2026 draft `server/discover` handler is an inactive compatibility experiment; `/mcp/discover` remains an informational probe. A stable release still needs a real MCP client/inspector conformance pass over both transports.
+The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/java-sdk/blob/main/VERSIONING.md), whose documented spec line is `2025-11-25`. The SDK BOM aligns all resolved MCP modules to 2.0.1. The HTTP profile registers the SDK's stateless servlet on `/mcp`; its packaged-jar smoke and automated integration tests exercise `initialize`, `tools/list`, and `tools/call`. Discovery advertises that revision only. The 2026 draft `server/discover` handler is an inactive compatibility experiment; `/mcp/discover` remains an informational probe. A servlet filter validates `Origin` on every MCP request before SDK dispatch and rejects untrusted loopback `Host` values, including when bearer authentication is disabled. It caches the configured Origin policy at startup. The official 2025-11-25 DNS rebinding scenario is a release gate; other conformance scenarios and both transports need client coverage before stable release.
 
 ## Performance budget
 

@@ -42,6 +42,19 @@ class HttpMcpProtocolDispatchTest {
     private int port;
 
     @Test
+    void rejectsDnsRebindingHeadersBeforeUnauthenticatedMcpDispatch() throws Exception {
+        assertThat(RawMcpRequest.postStatus(port, "evil.example.test:" + port, "http://evil.example.test"))
+                .isEqualTo(403);
+        assertThat(RawMcpRequest.postStatus(port, "evil.example.test:" + port, null))
+                .isEqualTo(403);
+        assertThat(RawMcpRequest.postStatus(port, "127.0.0.1:" + port, null)).isEqualTo(200);
+        assertThat(RawMcpRequest.postStatus(port, "127.0.0.1:" + port, "http://localhost:8080"))
+                .isEqualTo(200);
+        assertThat(RawMcpRequest.postStatus(port, "127.0.0.1:" + port, "http://127.0.0.1:" + port))
+                .isEqualTo(200);
+    }
+
+    @Test
     void servesActualMcpToolListAndCall() {
         RestTemplate client = new RestTemplate();
         String endpoint = "http://127.0.0.1:" + port + "/mcp";

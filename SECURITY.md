@@ -99,6 +99,11 @@ silently widen the attack surface:
   - A wildcard (`mcp.transport.cors.allowed-origins=*`) is honoured **for local
     testing only** and is applied via `allowedOriginPatterns` to remain valid
     alongside credentialed requests. Never use `*` in production.
+- **DNS rebinding guard.** Every `/mcp` request checks `Origin` when supplied
+  and returns 403 for an unapproved origin. A loopback bind also permits only
+  local `Host` names by default; local reverse proxies can add their hostname
+  through `mcp.transport.allowed-hosts`. A missing `Origin` remains valid for
+  CLI clients. This check applies with or without bearer authentication.
 - **Health details gated.** `management.endpoint.health.show-details=when-authorized`
   so unauthenticated callers see only `UP`/`DOWN`, never component-level
   internals (disk paths, dependency status, etc.). Because Spring Security is not
