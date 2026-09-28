@@ -19,6 +19,42 @@ conformance or a Tier 1 assessment. Review the [upstream requirement
 set](https://github.com/modelcontextprotocol/conformance) when changing the
 server's advertised capabilities.
 
+For roadmap work, run the **optional** full server requirement audit locally
+after packaging:
+
+```sh
+./mvnw -B package -DskipTests --no-transfer-progress
+python3 scripts/conformance_matrix_audit.py
+```
+
+This uses the same pinned official runner and the frozen `2025-11-25` set: 30
+scored server scenarios and three visibility-only server scenarios. The latter
+are `server-session-lifecycle` (added after release), `json-schema-2020-12`
+and `server-sse-polling` (pending upstream fixtures). The audit starts the jar
+on loopback, runs the runner in a private temporary working directory, and
+deletes its reports afterward. It prints only preapproved scenario/check IDs
+and aggregate statuses, substituting `unlisted-check` for any new check ID;
+server logs, transcripts, error messages, paths, and
+report artifacts never enter the terminal or CI. Node.js/npm is needed to
+fetch the pinned runner on first use; its npm package cache is reused. The
+temporary working directory manages artifacts; it is not an OS sandbox for
+the runner. Run the pinned package only in a trusted local environment.
+
+**Audit only; nonblocking; the full scored set is not passed.** The command
+returns zero when it completes and records failures, because this audit is
+deliberately outside the release gate. Successful command execution means the
+audit ran, not that the server passed the requirement set. Add
+`--fail-on-scored-failure` to return nonzero for scored failures once a
+scenario's required fixture is available. In a 2026-09-28 run against the
+packaged server, the scored set reported 6 pass, 23 fail, and 1 warning;
+the three unscored scenarios reported one failure, one warning, and one
+informational result. Most scored failures request synthetic tools, resource
+content, prompts, or optional interactions that this build-tool server does not
+advertise. Use the scenario names to prioritize applicable product behavior;
+these numbers do **not** establish or refute whole-protocol conformance. The
+six selected scenarios and the adversarial probes above remain the release
+blockers.
+
 The black-box adversarial probes send only synthetic data. They require:
 
 - Malformed JSON-RPC to return the generic JSON-RPC `-32700` parse error in a
