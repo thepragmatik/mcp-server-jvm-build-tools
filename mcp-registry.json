@@ -22,7 +22,7 @@
     }
   ],
   "tools": {
-    "total": 29,
+    "total": 27,
     "names": [
       "analyze_build_output",
       "analyze_build_performance",
@@ -47,8 +47,6 @@
       "prompt_build_and_test",
       "prompt_build_diagnosis",
       "prompt_dependency_audit",
-      "read_build_resource",
-      "read_dependency_resource",
       "resolve_resource_template",
       "scan_dependency_cves",
       "validate_build_configuration",

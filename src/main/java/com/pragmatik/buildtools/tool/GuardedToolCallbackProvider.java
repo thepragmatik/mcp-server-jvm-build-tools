@@ -18,8 +18,8 @@ package com.pragmatik.buildtools.tool;
 
 import com.pragmatik.buildtools.security.ModelOutputPolicy;
 import com.pragmatik.buildtools.security.ProjectAccessPolicy;
+import com.pragmatik.buildtools.security.ToolPermission;
 import java.util.Arrays;
-import java.util.Set;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -32,12 +32,6 @@ import tools.jackson.databind.node.ObjectNode;
 /** Applies project access checks at the shared MCP callback boundary. */
 public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
     private final ToolCallback[] callbacks;
-    private static final Set<String> PRIVATE_TOOLS = Set.of(
-            "validate_access_token",
-            "audit_tool_access",
-            "check_credential_status",
-            "execute_build_plan",
-            "create_build_plan");
     private final ProjectAccessPolicy projectAccess;
     private final ModelOutputPolicy outputPolicy;
     private final JsonMapper mapper = new JsonMapper();
@@ -48,7 +42,7 @@ public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
         this.outputPolicy = outputPolicy;
         this.callbacks = Arrays.stream(delegate.getToolCallbacks())
                 .filter(callback ->
-                        !PRIVATE_TOOLS.contains(callback.getToolDefinition().name()))
+                        ToolPermission.isKnownTool(callback.getToolDefinition().name()))
                 .map(callback -> (ToolCallback) new GuardedCallback(callback))
                 .toArray(ToolCallback[]::new);
     }

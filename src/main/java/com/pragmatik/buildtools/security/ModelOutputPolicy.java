@@ -46,10 +46,15 @@ public final class ModelOutputPolicy {
             "testCount",
             "failureCount",
             "dependencyCount",
+            "resourceCount",
+            "templateCount",
+            "paramCount",
             "toolCount");
     private static final Set<String> BOOLEANS =
-            Set.of("success", "valid", "detected", "authorized", "hasErrors", "hasWarnings");
+            Set.of("success", "valid", "detected", "authorized", "hasErrors", "hasWarnings", "allParamsResolved");
     private static final List<String> BUILD_TOOLS = List.of("maven", "gradle", "sbt");
+    private static final Set<String> PROMPTS =
+            Set.of("prompt_build_and_test", "prompt_dependency_audit", "prompt_build_diagnosis");
     private static final Set<String> STATUSES =
             Set.of("success", "failed", "error", "running", "completed", "cancelled");
     private static final Pattern VERSION = Pattern.compile("\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?\\b");
@@ -59,10 +64,15 @@ public final class ModelOutputPolicy {
     private static final List<Replacement> REDACTIONS = List.of(
             new Replacement("(?i)\\b(?:authorization\\s*:\\s*bearer|bearer)\\s+[^\\s,;]+", "[redacted-secret]"),
             new Replacement(
-                    "(?i)\\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\\s*[:=]\\s*[^\\s,;]+",
+                    "(?i)\\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\\s*[:=]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
                     "[redacted-secret]"),
             new Replacement("(?i)\\b(?:https?|file)://[^\\s<>()]+", "[redacted-url]"),
             new Replacement("(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", "[redacted-email]"),
+            new Replacement("(?i)\"(?:[A-Z]:\\\\|/)[^\"\\r\\n]+\"", "[redacted-path]"),
+            new Replacement("(?i)'(?:[A-Z]:\\\\|/)[^'\\r\\n]+'", "[redacted-path]"),
+            new Replacement(
+                    "(?i)(?:[A-Z]:\\\\|/)[^\\r\\n:;,'\"()<>]*?\\.(?:java|xml|gradle|kts|kt|scala|sbt|properties|txt|log|class|jar)",
+                    "[redacted-path]"),
             new Replacement("(?i)(?:[A-Z]:\\\\|/)(?:[^\\s:;,'\"()<>]+[/\\\\])*[^\\s:;,'\"()<>]*", "[redacted-path]"),
             new Replacement("(?<!\\d)\\+?\\d[\\d .()-]{8,}\\d(?!\\d)", "[redacted-phone]"),
             new Replacement(
@@ -86,6 +96,12 @@ public final class ModelOutputPolicy {
             try {
                 JsonNode root = mapper.readTree(output);
                 if (root != null && root.isObject()) {
+                    JsonNode success = root.get("success");
+                    JsonNode error = root.get("error");
+                    if ((success != null && success.isBoolean() && !success.booleanValue())
+                            || (error != null && !error.isNull() && (!error.isBoolean() || error.booleanValue()))) {
+                        safe.put("isError", true);
+                    }
                     for (String key : COUNTERS) {
                         copyCounter(root, key, safe);
                     }
@@ -96,8 +112,21 @@ public final class ModelOutputPolicy {
                         }
                     }
                     copySafeField(root, "status", STATUSES, safe);
+                    if ("failed".equals(safe.get("status")) || "error".equals(safe.get("status"))) {
+                        safe.put("isError", true);
+                    }
+                    copySafeField(root, "detectedTool", Set.of("maven", "gradle", "sbt", "mixed", "unknown"), safe);
                     copyVersion(root, "latestVersion", safe);
                     copyVersion(root, "currentVersion", safe);
+                    if ("list_dependency_resources".equals(toolName)) {
+                        copyAvailableBuildTools(root.get("resources"), safe);
+                    }
+                    if ("list_build_resources".equals(toolName)) {
+                        copyResourceKinds(root.get("resources"), safe);
+                    }
+                    if (PROMPTS.contains(toolName)) {
+                        copyPrompt(toolName, root, safe);
+                    }
                     if ("detect_build_tool".equals(toolName)) {
                         JsonNode detected = root.get("detectedTools");
                         if (detected != null && detected.isArray()) {
@@ -153,6 +182,7 @@ public final class ModelOutputPolicy {
                 safe.put("success", true);
             } else if (output.contains("BUILD FAILURE") || output.contains("BUILD FAILED")) {
                 safe.put("success", false);
+                safe.put("isError", true);
             }
         }
         if (safe.size() == 1) {
@@ -175,6 +205,59 @@ public final class ModelOutputPolicy {
                 && VERSION.matcher(value.asText()).matches()) {
             target.put(key, value.asText());
         }
+    }
+
+    private static void copyPrompt(String toolName, JsonNode source, Map<String, Object> target) {
+        JsonNode template = source.get("template");
+        if (template == null || !template.isTextual()) {
+            return;
+        }
+        String marker =
+                "prompt_build_diagnosis".equals(toolName) ? "Follow this diagnostic workflow:" : "Follow these steps:";
+        String text = template.asText();
+        int start = text.lastIndexOf(marker);
+        if (start >= 0) {
+            // The tool prepends user-supplied project paths and commands. Only
+            // the final, server-authored workflow section is model-visible.
+            target.put("template", redact(text.substring(start), 3_500));
+            target.put("promptName", toolName);
+        }
+    }
+
+    private static void copyAvailableBuildTools(JsonNode resources, Map<String, Object> target) {
+        if (resources == null || !resources.isArray()) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (JsonNode resource : resources) {
+            JsonNode tool = resource.get("buildTool");
+            if (tool != null
+                    && tool.isTextual()
+                    && BUILD_TOOLS.contains(tool.asText())
+                    && !names.contains(tool.asText())) {
+                names.add(tool.asText());
+            }
+        }
+        target.put("availableBuildTools", names);
+    }
+
+    private static void copyResourceKinds(JsonNode resources, Map<String, Object> target) {
+        if (resources == null || !resources.isArray()) {
+            return;
+        }
+        List<String> kinds = new ArrayList<>();
+        Set<String> allowed = Set.of("config", "dependencies", "output", "test-results", "tool-info");
+        for (JsonNode resource : resources) {
+            JsonNode uri = resource.get("uri");
+            if (uri != null && uri.isTextual()) {
+                String value = uri.asText();
+                String kind = value.substring(value.lastIndexOf('/') + 1);
+                if (allowed.contains(kind) && !kinds.contains(kind)) {
+                    kinds.add(kind);
+                }
+            }
+        }
+        target.put("resourceKinds", kinds);
     }
 
     private static void copyCounter(JsonNode source, String key, Map<String, Object> target) {
@@ -211,11 +294,15 @@ public final class ModelOutputPolicy {
     }
 
     static String redact(String value) {
+        return redact(value, MAX_MESSAGE_LENGTH);
+    }
+
+    private static String redact(String value, int maxLength) {
         String safe = value.replaceAll("[\\p{Cntrl}&&[^\\t]]", " ");
         for (Replacement replacement : REDACTIONS) {
             safe = replacement.pattern().matcher(safe).replaceAll(replacement.replacement());
         }
-        return safe.length() > MAX_MESSAGE_LENGTH ? safe.substring(0, MAX_MESSAGE_LENGTH) : safe;
+        return safe.length() > maxLength ? safe.substring(0, maxLength) : safe;
     }
 
     private record Replacement(Pattern pattern, String replacement) {

@@ -71,4 +71,15 @@ class ProjectAccessPolicyTest {
                 IllegalArgumentException.class,
                 () -> new ProjectAccessPolicy(root.toString()).requireAllowed(link.toString()));
     }
+
+    @Test
+    void rejectsSymlinkedBuildFileOutsideRoot() throws IOException {
+        Path root = Files.createDirectory(temporary.resolve("allowed"));
+        Path project = Files.createDirectory(root.resolve("project"));
+        Path outside = Files.writeString(temporary.resolve("outside-pom.xml"), "<project/>");
+        Files.createSymbolicLink(project.resolve("pom.xml"), outside);
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new ProjectAccessPolicy(root.toString()).requireAllowed("project"));
+    }
 }

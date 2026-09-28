@@ -122,7 +122,7 @@ class ToolAuthorizationServiceTest {
     @Test
     void testResourceReadScope() {
         assertTrue(ToolPermission.isToolAuthorized("list_build_resources", List.of("resource:read")));
-        assertTrue(ToolPermission.isToolAuthorized("read_build_resource", List.of("resource:read")));
+        assertFalse(ToolPermission.isToolAuthorized("read_build_resource", List.of("resource:read")));
     }
 
     @Test

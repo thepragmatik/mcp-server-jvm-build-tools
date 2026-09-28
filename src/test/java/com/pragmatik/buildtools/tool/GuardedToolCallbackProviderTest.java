@@ -60,13 +60,15 @@ class GuardedToolCallbackProviderTest {
     }
 
     @Test
-    void excludesCredentialAndUnscopedPlanTools() throws IOException {
+    void exposesOnlyExplicitlyScopedTools() throws IOException {
         Path root = Files.createDirectory(temporary.resolve("allowed"));
         GuardedToolCallbackProvider provider = new GuardedToolCallbackProvider(
                 () -> new ToolCallback[] {
                     fake("validate_access_token", new AtomicReference<>()),
                     fake("execute_build_plan", new AtomicReference<>()),
                     fake("create_build_plan", new AtomicReference<>()),
+                    fake("future_unreviewed_tool", new AtomicReference<>()),
+                    fake("read_build_resource", new AtomicReference<>()),
                     fake("detect_build_tool", new AtomicReference<>())
                 },
                 new ProjectAccessPolicy(root.toString()),

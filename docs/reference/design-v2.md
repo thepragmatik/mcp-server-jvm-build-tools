@@ -31,18 +31,18 @@ flowchart LR
     class Deny deny
 ```
 
-The `ToolCallbackProvider` is the shared boundary for stdio and HTTP. It filters tools that accept credentials or reveal audit identities, canonicalizes `projectDir` and `localRepositoryPath`, and applies the output policy. HTTP adds bearer and per-tool scope checks before dispatch. The catalog is static, so wrappers and credential digests are cached. Input schema failures abort startup and SDK input validation is enabled.
+The `ToolCallbackProvider` is the shared boundary for stdio and HTTP. Only tools explicitly mapped to a public permission are exposed; future `@Tool` methods are private by default. It canonicalizes `projectDir` and `localRepositoryPath`, rejects build files whose real paths escape the configured roots, and applies the output policy. Raw resource readers remain private. HTTP adds bearer and per-tool scope checks before dispatch. The catalog is static, so wrappers and credential digests are cached. Input schema failures abort startup and SDK input validation is enabled.
 
 ## Critical review
 
 | Finding from 1.x | 2.0 decision | Remaining risk |
 |---|---|---|
 | A built-in development key could authenticate HTTP | Remove it; HTTP defaults to bearer enforcement and keys default to no scopes | Operators must provision a key locally |
-| Scope enum omitted live tools and was not enforced on calls | Map the 29 live tools; fail CI if an exposed tool lacks a scope; check scope on HTTP `tools/call` | stdio relies on local process trust |
+| Scope enum omitted live tools and was not enforced on calls | Publish only the 27 explicitly scoped tools; fail CI on catalog drift; check scope on HTTP `tools/call` | stdio relies on local process trust |
 | Schema parse failure became an empty schema | Abort startup; validate tool inputs | Schema compatibility needs client conformance tests |
-| Arbitrary build output and exceptions could reach the model | Bound and redact diagnostics; return generic errors | Pattern redaction cannot detect all personal data or prompt injection |
+| Arbitrary build output and exceptions could reach the model | Bound and redact diagnostics, including quoted secrets and paths with spaces; return generic errors | Pattern redaction cannot detect all personal data or prompt injection |
 | A stored build plan could be executed by ID without a path on the call | Withhold `create_build_plan` and `execute_build_plan` from MCP | Plan ownership and cancellation need a later design |
-| Tool metadata, docs, and registry disagreed | Registry and quickstart describe the 29 exposed tools | Generate public catalog docs from code before stable release |
+| Tool metadata, docs, and registry disagreed | Registry and quickstart describe the 27 exposed tools | Generate public catalog docs from code before stable release |
 | Project detection could silently fall back to Maven | Treat markerless or ambiguous directories as an explicit error | Hybrid projects must specify a tool name |
 
 A configured root is a filesystem boundary, not a sandbox. The canonical path check prevents common traversal and symlink escape, but a build script can execute programs, reach the network, and mutate files accessible to its process. A hostile workspace therefore needs OS or container isolation. Likewise, client prompts and tool arguments travel through the client/model provider before reaching this server. Relative aliases avoid sending an absolute home path; the server cannot guarantee that a client or user never sends private prompt text.

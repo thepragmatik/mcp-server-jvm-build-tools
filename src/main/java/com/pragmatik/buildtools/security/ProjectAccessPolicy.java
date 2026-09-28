@@ -18,6 +18,7 @@ package com.pragmatik.buildtools.security;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +28,15 @@ import org.springframework.stereotype.Component;
 /** Restricts project file access to explicitly configured directory trees. */
 @Component
 public final class ProjectAccessPolicy {
+    private static final List<String> BUILD_FILES = List.of(
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "build.sbt",
+            "settings.gradle",
+            "settings.gradle.kts",
+            "gradle.properties",
+            "project/build.properties");
     private final List<Path> roots;
 
     public ProjectAccessPolicy(@Value("${buildtools.projects.allowed-roots:}") String configuredRoots) {
@@ -63,6 +73,13 @@ public final class ProjectAccessPolicy {
                     (requested.isAbsolute() ? requested : roots.getFirst().resolve(requested)).toRealPath();
             if (roots.stream().noneMatch(project::startsWith)) {
                 throw new IllegalArgumentException("Project directory is outside configured project roots");
+            }
+            for (String name : BUILD_FILES) {
+                Path file = project.resolve(name);
+                if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)
+                        && roots.stream().noneMatch(file.toRealPath()::startsWith)) {
+                    throw new IllegalArgumentException("Build file is outside configured project roots");
+                }
             }
             return project;
         } catch (IOException | java.nio.file.InvalidPathException e) {

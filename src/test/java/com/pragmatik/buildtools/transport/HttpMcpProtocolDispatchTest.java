@@ -67,6 +67,20 @@ class HttpMcpProtocolDispatchTest {
         assertThat(result).contains("isError").doesNotContain(canary, "alice@example.invalid", "secret-canary");
     }
 
+    @Test
+    void promptCallReturnsUsefulWorkflowWithoutEchoingInput() {
+        String result = new RestTemplate()
+                .postForObject(
+                        "http://127.0.0.1:" + port + "/mcp",
+                        rpc(
+                                "tools/call",
+                                "{\"name\":\"prompt_build_diagnosis\",\"arguments\":{\"projectDir\":\".\",\"failedCommand\":\"SYNTHETIC SECRET COMMAND\"}}"),
+                        String.class);
+        assertThat(result)
+                .contains("Follow this diagnostic workflow")
+                .doesNotContain("SYNTHETIC SECRET COMMAND", System.getProperty("user.home"));
+    }
+
     private static HttpEntity<String> rpc(String method, String params) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

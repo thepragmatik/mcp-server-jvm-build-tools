@@ -19,6 +19,7 @@ package com.pragmatik.buildtools.security;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.pragmatik.buildtools.tool.PromptService;
 import org.junit.jupiter.api.Test;
 
 class ModelOutputPolicyTest {
@@ -79,6 +80,56 @@ class ModelOutputPolicyTest {
     void malformedOutputDoesNotEscape() {
         String safe = policy.protect("execute_build_command", "{secret-value");
         assertFalse(safe.contains("secret-value"));
+    }
+
+    @Test
+    void redactsQuotedSecretsAndPathsWithSpaces() {
+        String output = "ERROR password = \"SYNTHETIC SECRET WITH SPACES\" at "
+                + "/tmp/SYNTHETIC PRIVATE NAME/project/src/Main.java";
+        String safe = policy.protect("execute_build_command", output);
+        assertFalse(safe.contains("SECRET WITH SPACES"));
+        assertFalse(safe.contains("PRIVATE NAME"));
+        assertTrue(safe.contains("[redacted-secret]"));
+        assertTrue(safe.contains("[redacted-path]"));
+    }
+
+    @Test
+    void redactsQuotedPathWithoutKnownExtension() {
+        String safe = policy.protect("execute_build_command", "ERROR at '/tmp/SYNTHETIC PRIVATE NAME/project'");
+        assertFalse(safe.contains("PRIVATE NAME"));
+    }
+
+    @Test
+    void preservesServerAuthoredPromptWithoutEchoingUserInput() {
+        String raw = new PromptService()
+                .promptBuildDiagnosis("/tmp/SYNTHETIC PRIVATE NAME/project", "SECRET SYNTHETIC COMMAND");
+        String safe = policy.protect("prompt_build_diagnosis", raw);
+        assertTrue(safe.contains("Follow this diagnostic workflow"));
+        assertFalse(safe.contains("PRIVATE NAME"));
+        assertFalse(safe.contains("SYNTHETIC COMMAND"));
+    }
+
+    @Test
+    void preservesResourceSummaryWithoutProjectIdentity() {
+        String raw = """
+                {"project":"SYNTHETIC PRIVATE NAME","projectDir":"/tmp/SYNTHETIC PRIVATE NAME",
+                 "detectedTool":"mixed","resourceCount":2,
+                 "resources":[{"uri":"build://SYNTHETIC PRIVATE NAME/dependencies/maven","buildTool":"maven"},
+                              {"uri":"build://SYNTHETIC PRIVATE NAME/dependencies/gradle","buildTool":"gradle"}]}
+                """;
+        String safe = policy.protect("list_dependency_resources", raw);
+        assertTrue(safe.contains("\"availableBuildTools\":[\"maven\",\"gradle\"]"));
+        assertTrue(safe.contains("\"resourceCount\":2"));
+        assertFalse(safe.contains("PRIVATE NAME"));
+    }
+
+    @Test
+    void preservesFailureStateWithoutPrivateErrorText() {
+        String safe = policy.protect(
+                "list_dependency_resources",
+                "{\"success\":false,\"error\":\"failed at /tmp/SYNTHETIC PRIVATE NAME/project\"}");
+        assertTrue(safe.contains("\"isError\":true"));
+        assertFalse(safe.contains("PRIVATE NAME"));
     }
 
     @Test

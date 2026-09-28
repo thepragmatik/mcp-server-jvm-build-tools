@@ -52,7 +52,8 @@ final class McpToolAdapter {
         try {
             String input = mapper.writeValueAsString(request.arguments());
             String output = callback.call(input);
-            return new CallToolResult(List.of(new TextContent(output)), Boolean.FALSE, null, null);
+            return new CallToolResult(
+                    List.of(new TextContent(output)), output.contains("\"isError\":true"), null, null);
         } catch (Exception e) {
             log.warn(
                     "Tool '{}' execution failed; details withheld",
