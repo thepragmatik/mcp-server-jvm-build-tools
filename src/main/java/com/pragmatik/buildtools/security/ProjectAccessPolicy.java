@@ -74,16 +74,45 @@ public final class ProjectAccessPolicy {
             if (roots.stream().noneMatch(project::startsWith)) {
                 throw new IllegalArgumentException("Project directory is outside configured project roots");
             }
+            checkBuildMarkers(project);
+            return project;
+        } catch (IOException | java.nio.file.InvalidPathException | SecurityException e) {
+            throw new IllegalArgumentException("Project directory cannot be resolved");
+        }
+    }
+
+    private void checkBuildMarkers(Path project) {
+        AnchoredProjectFileReader.ProjectDirectory opened;
+        try {
+            opened = AnchoredProjectFileReader.open(project);
+        } catch (AnchoredProjectFileReader.UnsupportedProviderException unsupported) {
+            checkBuildMarkersCompatibly(project);
+            return;
+        } catch (IOException | SecurityException e) {
+            throw new IllegalArgumentException("Project directory cannot be safely inspected");
+        }
+        try (AnchoredProjectFileReader.ProjectDirectory directory = opened) {
+            for (String name : BUILD_FILES) {
+                if (!name.contains("/")) directory.requireSafeMarker(name);
+            }
+            directory.requireSafeNestedMarker("project", "build.properties");
+        } catch (IOException | SecurityException e) {
+            throw new IllegalArgumentException("Project directory cannot be safely inspected");
+        }
+    }
+
+    /** Compatibility path for providers without SecureDirectoryStream; not race-free. */
+    void checkBuildMarkersCompatibly(Path project) {
+        try {
             for (String name : BUILD_FILES) {
                 Path file = project.resolve(name);
                 if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)
                         && roots.stream().noneMatch(file.toRealPath()::startsWith)) {
-                    throw new IllegalArgumentException("Build file is outside configured project roots");
+                    throw new IllegalArgumentException("Project directory cannot be safely inspected");
                 }
             }
-            return project;
-        } catch (IOException | java.nio.file.InvalidPathException e) {
-            throw new IllegalArgumentException("Project directory cannot be resolved", e);
+        } catch (IOException | SecurityException e) {
+            throw new IllegalArgumentException("Project directory cannot be safely inspected");
         }
     }
 
