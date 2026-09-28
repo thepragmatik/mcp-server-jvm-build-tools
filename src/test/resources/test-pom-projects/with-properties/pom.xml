@@ -7,7 +7,7 @@
     <artifactId>props-project</artifactId>
     <version>1.0.0</version>
     <properties>
-        <guava.version>31.1-jre</guava.version>
+        <guava.version>32.0.0-jre</guava.version>
         <junit.version>5.10.0</junit.version>
     </properties>
     <dependencies>

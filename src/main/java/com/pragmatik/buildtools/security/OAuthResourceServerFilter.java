@@ -247,7 +247,9 @@ public class OAuthResourceServerFilter implements Filter {
      */
     private boolean isServerDiscoverBody(McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered) {
         if (buffered.isBodyEmpty()) {
-            return false;
+            // The legacy empty POST /mcp is a discovery probe, not an MCP tool
+            // invocation. It is forwarded to /mcp/discover downstream.
+            return MCP_PROTOCOL_PATH.equals(pathOf(buffered));
         }
         try {
             JsonNode root = objectMapper.readTree(buffered.getInputStream());

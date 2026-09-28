@@ -67,3 +67,5 @@ An exploratory offline run on the server source at `0072560` used the benchmark 
 | Synthetic 24 MiB output | 33.90 | 34.55 | 199.25 | 152 |
 
 The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.02 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
+
+The [2.0 release gates](reference/release-gates.md) record the exact packaged-server protocol checks, adversarial probes, and remaining security-scan prerequisite.

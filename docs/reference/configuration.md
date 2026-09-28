@@ -1,5 +1,8 @@
 # Configuration Reference
 
+> **Historical 1.x configuration reference.** Some defaults and examples on this page do not apply to the 2.0 development line. Use [Configuration 2.0](configuration-v2.md) for current settings.
+
+
 A complete reference for every configuration surface: environment variables, JVM flags, Spring Boot
 properties, and the build-tool command/flag allowlists. For a task-oriented walkthrough, see the
 [Configuration guide](../user-guide/configuration.md).
