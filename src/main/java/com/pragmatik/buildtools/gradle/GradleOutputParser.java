@@ -52,6 +52,9 @@ public class GradleOutputParser implements BuildOutputParser {
     // What went wrong section
     private static final Pattern WHAT_WENT_WRONG_PATTERN = Pattern.compile("Execution failed for task\\s+'([^']+)'");
 
+    // Compiler errors may be the only useful line in a large failed build.
+    private static final Pattern COMPILER_ERROR_PATTERN = Pattern.compile("(?i)^(?:\\s*e:\\s*|.*\\berror:\\s*)(.+)$");
+
     // Warning pattern
     private static final Pattern WARNING_PATTERN = Pattern.compile("(?i)(?:warn(?:ing)?|deprecated)\\b[:\\s]*(.*)");
 
@@ -178,6 +181,14 @@ public class GradleOutputParser implements BuildOutputParser {
                     execErr.put("message", detail.toString());
                     errors.add(execErr);
                 }
+            }
+
+            Matcher compilerMatcher = COMPILER_ERROR_PATTERN.matcher(line);
+            if (compilerMatcher.find()) {
+                Map<String, Object> compilerError = new LinkedHashMap<>();
+                compilerError.put("severity", "ERROR");
+                compilerError.put("message", line.trim());
+                errors.add(compilerError);
             }
 
             // Parse warnings

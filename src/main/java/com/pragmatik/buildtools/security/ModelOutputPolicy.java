@@ -264,6 +264,9 @@ public final class ModelOutputPolicy {
             if (!safe.containsKey("diagnostics")) {
                 copyPlainDiagnostics(executionOutput, safe);
             }
+            if (parsed != null && parsed.path("diagnosticsTruncated").asBoolean(false)) {
+                safe.put("diagnosticsTruncated", true);
+            }
             if (exitCode != null) {
                 safe.put("success", exitCode == 0);
                 if (exitCode != 0) {

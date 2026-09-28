@@ -143,7 +143,10 @@ public class GradleBuildTool implements BuildTool {
         SyncProcessRunner.Result result = runCommand(buildToolHome, projectDir, command);
         String output = result.stderr().isEmpty() ? result.stdout() : result.stderr() + "\n" + result.stdout();
         return new BuildExecutionResult(
-                output, result.exitCode(), result.stdoutTruncated() || result.stderrTruncated());
+                result.exitCode() == 0 ? output : result.withDiagnostics(output),
+                result.exitCode(),
+                result.stdoutTruncated() || result.stderrTruncated(),
+                result.diagnosticsTruncated());
     }
 
     private SyncProcessRunner.Result runCommand(String buildToolHome, String projectDir, String command) {
@@ -166,7 +169,7 @@ public class GradleBuildTool implements BuildTool {
             // Drain stdout and stderr concurrently with a bounded execution timeout
             // to avoid the pipe-buffer deadlock that occurs when one stream is read
             // to EOF before the other is drained.
-            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "gradle");
+            SyncProcessRunner.Result result = SyncProcessRunner.runWithDiagnostics(process, "gradle");
             return result;
         } catch (IOException e) {
             throw new RuntimeException("Unable to invoke Gradle command: " + e.getMessage(), e);

@@ -13,7 +13,12 @@
 package com.pragmatik.buildtools.build;
 
 /** Private execution data; callers must apply the model-output policy before returning it through MCP. */
-public record BuildExecutionResult(String output, Integer exitCode, boolean outputTruncated) {
+public record BuildExecutionResult(
+        String output, Integer exitCode, boolean outputTruncated, boolean diagnosticsTruncated) {
+    public BuildExecutionResult(String output, Integer exitCode, boolean outputTruncated) {
+        this(output, exitCode, outputTruncated, false);
+    }
+
     public BuildExecutionResult {
         output = output == null ? "" : output;
     }

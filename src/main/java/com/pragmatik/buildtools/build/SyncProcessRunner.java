@@ -76,7 +76,23 @@ public final class SyncProcessRunner {
      * @param stderrTruncated whether standard error exceeded the capture limit
      */
     public record Result(
-            int exitCode, String stdout, String stderr, boolean stdoutTruncated, boolean stderrTruncated) {}
+            int exitCode,
+            String stdout,
+            String stderr,
+            boolean stdoutTruncated,
+            boolean stderrTruncated,
+            java.util.List<String> diagnostics,
+            boolean diagnosticsTruncated) {
+        public String withDiagnostics(String output) {
+            StringBuilder result = new StringBuilder();
+            for (String line : diagnostics) {
+                if (!output.contains(line)) {
+                    result.append(line).append('\n');
+                }
+            }
+            return result.append(output).toString();
+        }
+    }
 
     /**
      * Thrown when a synchronous process exceeds the configured execution timeout.
@@ -125,7 +141,15 @@ public final class SyncProcessRunner {
      * @throws ExecutionTimeoutException  if the process exceeds the configured timeout
      */
     public static Result run(Process process, String label) throws IOException, InterruptedException {
-        return run(process, label, resolveTimeoutSeconds(), TimeUnit.SECONDS);
+        return run(process, label, resolveTimeoutSeconds(), TimeUnit.SECONDS, false);
+    }
+
+    /** Capture bounded complete failure lines in addition to the output edges. */
+    public static Result runWithDiagnostics(Process process, String label) throws IOException, InterruptedException {
+        if (!"gradle".equals(label) && !"sbt".equals(label)) {
+            throw new IllegalArgumentException("Unsupported diagnostic stream");
+        }
+        return run(process, label, resolveTimeoutSeconds(), TimeUnit.SECONDS, true);
     }
 
     /**
@@ -143,11 +167,20 @@ public final class SyncProcessRunner {
      */
     public static Result run(Process process, String label, long timeout, TimeUnit unit)
             throws IOException, InterruptedException {
+        return run(process, label, timeout, unit, false);
+    }
+
+    private static Result run(Process process, String label, long timeout, TimeUnit unit, boolean collectDiagnostics)
+            throws IOException, InterruptedException {
         BoundedProcessOutput out = new BoundedProcessOutput();
         BoundedProcessOutput err = new BoundedProcessOutput();
+        BuildDiagnosticOutput outDiagnostics = collectDiagnostics ? new BuildDiagnosticOutput(out, label) : null;
+        BuildDiagnosticOutput errDiagnostics = collectDiagnostics ? new BuildDiagnosticOutput(err, label) : null;
 
-        Thread outThread = drain(process.getInputStream(), out, "sync-stdout-" + label);
-        Thread errThread = drain(process.getErrorStream(), err, "sync-stderr-" + label);
+        Thread outThread =
+                drain(process.getInputStream(), collectDiagnostics ? outDiagnostics : out, "sync-stdout-" + label);
+        Thread errThread =
+                drain(process.getErrorStream(), collectDiagnostics ? errDiagnostics : err, "sync-stderr-" + label);
 
         boolean finished;
         try {
@@ -183,7 +216,24 @@ public final class SyncProcessRunner {
             throw new IOException("Process output readers did not finish after process exit");
         }
 
-        return new Result(process.exitValue(), out.snapshot(), err.snapshot(), out.truncated(), err.truncated());
+        java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
+        boolean diagnosticsTruncated = false;
+        if (collectDiagnostics) {
+            candidates.addAll(errDiagnostics.diagnostics());
+            candidates.addAll(outDiagnostics.diagnostics());
+            diagnosticsTruncated = errDiagnostics.diagnosticsTruncated() || outDiagnostics.diagnosticsTruncated();
+            if (candidates.size() > 13) {
+                diagnosticsTruncated = true;
+            }
+        }
+        return new Result(
+                process.exitValue(),
+                out.snapshot(),
+                err.snapshot(),
+                out.truncated(),
+                err.truncated(),
+                candidates.stream().limit(13).toList(),
+                diagnosticsTruncated);
     }
 
     /** Drain raw bytes so a single unterminated line cannot allocate without bound. */

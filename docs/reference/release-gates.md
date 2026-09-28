@@ -13,6 +13,11 @@ middle compiler diagnostic and a failed `execute_build_command` whose output
 also claims success. It checks authoritative `exitCode`, structured/text
 parity, and private canary suppression without printing build logs.
 
+The release workflow also runs the packaged Gradle/sbt middle-diagnostic probe
+on HTTP and stdio. It drives a 28 MiB synthetic failure on stdout or stderr,
+then checks analysis and execution, structured/text parity, exit status, and
+synthetic path/email/secret suppression.
+
 The official scenarios selected for this product are `server-initialize`,
 `ping`, `tools-list`, `resources-list`, `prompts-list`, and
 `dns-rebinding-protection`. The official runner's frozen `--requirements
@@ -130,7 +135,15 @@ Local repeat command after packaging:
 ```sh
 ./mvnw -B package -DskipTests --no-transfer-progress
 python3 scripts/release-gate.py
+python3 scripts/gradle-sbt-middle-protocol-gate.py
 ```
+
+For any build-output capture change, test a synthetic root cause in the discarded
+middle and at each limit: per-stream head/tail bytes, complete-line length and
+candidate count, the 256,000-character private input cap, and the 240,000-character
+JSON envelope after escaping. Compare both MCP transports and inspect only
+aggregate or redacted results; raw canary logs stay in private temporary files.
+Repeat the same matrix on the exact PR head after review fixes.
 
 Run `./mvnw -B verify --no-transfer-progress` and the privacy/docs checks as
 separate gates. The Python command needs Node.js and npm to fetch the exact

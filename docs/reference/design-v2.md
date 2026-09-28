@@ -44,7 +44,34 @@ These aggregate results support triage but cannot identify a particular dependen
 
 Build execution and output analysis return `diagnostics` as structured objects: `severity` (`error` or `warning`), `category` (`compilation`, `test`, `dependency`, `configuration`, `execution`, or `other`), per-result `diagnosticRef`, optional per-result `fileRef`, `fileType` (`java`, `kt`, `scala`, `xml`, `gradle`, `kts`, or `sbt`) and positive `line`, and a redacted message of at most 500 characters. At most 12 distinct source diagnostics are returned, errors first; `diagnosticsTruncated: true` signals omitted entries. Recognized failure phrases retain the cause (for example, `cannot find symbol`) but normalize arbitrary identifiers, values, and dependency coordinates to placeholders. Unknown or suspicious text receives a generic local-inspection message. `diagnosticRef` distinguishes errors whose public fields otherwise match; `fileRef` groups messages from one file within a result but reveals no path. This is a triage contract: the user must inspect local build output to map a reference to a file and symbol before editing. The parser's raw log and command are removed before serialization for the model-visible policy, preserving final structured errors even when the original build output was large. Neither source excerpts nor raw file or symbol identities are emitted.
 
-Maven analysis now carries its actual process exit code into its parser and retains bounded compiler diagnostics from the discarded middle of a large log. `execute_build_command` still infers public status from retained log markers; a later, narrow change should carry the authoritative subprocess exit code through its guarded projection for all three build tools. Conflicting synthetic markers, both transports, and privacy projection must be tested before claiming that status is authoritative.
+Built-in Maven, Gradle, and sbt execution now carries the completed process exit code through both build tools. A nonzero exit stays a failure even if the retained log says BUILD SUCCESSFUL. Maven analysis and Gradle/sbt execution and analysis retain a bounded set of complete failure lines from the middle of a large stream. These are private candidates until the shared policy turns recognized causes into redacted diagnostics. The legacy Java execution method and custom plugins retain their existing contracts; a plugin without typed status exposes unknown public status.
+
+## Large-output diagnostic path
+
+```mermaid
+flowchart LR
+    P["🟢 Gradle / sbt child process<br/>stdout + stderr"] --> D["🔵 Concurrent 8 KiB drains"]
+    D --> E["🟡 32 KiB head + 96 KiB tail<br/>per stream"]
+    D --> C["🟠 Complete failure lines<br/>13 × 2 KiB per stream"]
+    E --> J["🟣 Bounded private result<br/>exit code + truncation flags"]
+    C --> J
+    J --> R["🔴 Shared privacy policy<br/>normalize paths, email, secrets"]
+    R --> M["🟢 MCP text + structuredContent<br/>at most 12 safe diagnostics"]
+    classDef process fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef drain fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef bounded fill:#fef9c3,stroke:#ca8a04,color:#443400
+    classDef candidate fill:#ffedd5,stroke:#ea580c,color:#512600
+    classDef private fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef policy fill:#fee2e2,stroke:#dc2626,color:#520909
+    class P,M process
+    class D drain
+    class E bounded
+    class C candidate
+    class J private
+    class R policy
+```
+
+The orange lane retains a root cause that would otherwise fall between the yellow head and tail. It never bypasses the red privacy boundary. outputTruncated means bytes were omitted from head/tail storage; diagnosticsTruncated means a candidate might be missing because a line was too long or the candidate count was exceeded. Both streams are bounded separately; the combined result keeps at most 13 distinct candidates before the public 12-diagnostic limit.
 
 ## Critical review
 
@@ -66,7 +93,7 @@ The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/ja
 
 ## Performance budget
 
-The hot path parses each tool argument once, checks canonical paths, runs the tool, then redacts a bounded result. The output policy limits parsing to the final 256,000 characters of a large result. The static callback array is built once; credential hashes are computed when keys load and incoming tokens use constant-time digest comparison. Maven, Gradle, and sbt process streams retain at most their first 32 KiB and last 96 KiB. Both pipes drain concurrently in 8 KiB chunks, including unterminated lines; the dormant async task path also uses bounded storage. Subprocesses have a configurable timeout, and timeout, interruption, and async cancellation terminate descendants before the parent. The in-process Maven version probe uses the same bounded collector. HTTP MCP POST bodies are capped at 1 MiB by default, including requests without optional MCP headers; larger bodies receive 413 before SDK dispatch. These limits bound retained capture and accepted request size, not child-process memory or disk writes; isolate untrusted build scripts in a container. Measure p50/p95 tool overhead and heap usage with synthetic projects before stable release; record baselines rather than claiming speedups from source inspection.
+The hot path parses each tool argument once, checks canonical paths, runs the tool, then redacts a bounded result. The output policy limits parsing to the final 256,000 characters of a large result. The static callback array is built once; credential hashes are computed when keys load and incoming tokens use constant-time digest comparison. Maven, Gradle, and sbt process streams retain at most their first 32 KiB and last 96 KiB. Failed Gradle/sbt calls also retain at most 13 distinct complete candidate lines per stream, each at most 2 KiB; overflow raises diagnosticsTruncated conservatively. Both pipes drain concurrently in 8 KiB chunks, including unterminated lines; the dormant async task path still has bounded head/tail storage without middle-candidate capture. Subprocesses have a configurable timeout, and timeout, interruption, and async cancellation terminate descendants before the parent. The in-process Maven version probe uses the same bounded collector. HTTP MCP POST bodies are capped at 1 MiB by default, including requests without optional MCP headers; larger bodies receive 413 before SDK dispatch. These limits bound retained capture and accepted request size, not child-process memory or disk writes; isolate untrusted build scripts in a container. Measure p50/p95 tool overhead and heap usage with synthetic projects before stable release; record baselines rather than claiming speedups from source inspection.
 
 ## Container isolation
 
