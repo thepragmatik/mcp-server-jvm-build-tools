@@ -1,5 +1,13 @@
 # Release Notes — v2.0.0-rc.1
 
+> **Current 2.0 development line:** The `buildtools.cache.hit.rate` Micrometer
+> gauge has been removed because no comparable per-tool hit rate was populated;
+> the old gauge always reported `0.0`. sbt cache scoring can incorporate hits
+> and misses parsed from a local execution log, but that is not this gauge.
+> Remove `buildtools_cache_hit_rate` dashboard queries and alerts. The
+> `buildtools.cache.score` gauge remains available as the last cache
+> health score (0-100) per tool; it is not a hit-rate metric.
+
 This is the first 2.0 release candidate. It is a breaking prerelease: existing
 1.x clients must update their configuration and refresh `tools/list` before
 using it. Publication is gated by the [release evidence

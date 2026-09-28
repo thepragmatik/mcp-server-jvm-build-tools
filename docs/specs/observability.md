@@ -80,8 +80,7 @@ beyond the Prometheus registry jar. No changes to the application's request flow
 | `buildtools.build.duration` | Timer | `tool` (maven/gradle/sbt), `command`, `success` | `BuildToolsService.executeBuildCommand` |
 | `buildtools.build.total` | Counter | `tool`, `command`, `result` (success/failure) | `BuildToolsService` |
 | `buildtools.build.errors` | Counter | `tool`, `error_type` | Output parser |
-| `buildtools.cache.hit.rate` | Gauge | `tool` | `BuildCacheService` scoring |
-| `buildtools.cache.score` | Gauge | `tool`, `category` | `BuildCacheService` |
+| `buildtools.cache.score` | Gauge | `tool`, `category=overall` | Latest cache health score from `BuildCacheService.analyzeCacheHealth` (0-100); sbt can incorporate locally parsed hit/miss counts |
 | `buildtools.auth.requests` | Counter | `auth_type` (api_key/jwt/none), `result` (allowed/denied) | `OAuthResourceServerFilter` + `ToolAuthorizationService` |
 | `buildtools.async.tasks` | Gauge | `status` (running/queued/completed) | `AsyncBuildService` (task queue) |
 | `buildtools.tools.registered` | Gauge | — | Startup registration count |
@@ -97,10 +96,10 @@ beyond the Prometheus registry jar. No changes to the application's request flow
    - Each `@Tool` method gets `@Timed(value = "buildtools.tool.calls",
      extraTags = {"tool_service", "BuildToolsService"})`.
 2. **MeterBinder beans** for custom metrics that span multiple services or need
-   programmatic construction (gauges for cache hit rates, async task counts).
-3. **Manual MeterRegistry injection** only where `@Timed` doesn't suffice:
-   `BuildCacheService` (Gauge for cache score), `AsyncBuildService` (Gauge for
-   queue depth).
+    programmatic construction (gauges for cache health scores and async task counts).
+3. **Manual MeterRegistry injection** only where `@Timed` doesn't suffice,
+   such as async task queue metrics. Cache scores are registered by
+   `CacheMetricsCollector` through `MeterBinder`.
 
 **No Micrometer imports in service code except where MeterBinder is used.** The
 `@Timed` annotation is a Micrometer annotation, but it's purely declarative — the
@@ -275,32 +274,21 @@ buildtools_build_errors_total{tool="sbt",error_type="unknown"} 1.0
 
 ```java
 @Component
-public class CacheMetricsBinder implements MeterBinder {
+public class CacheMetricsCollector implements MeterBinder {
 
     private final BuildCacheService cacheService;
 
     @Override
     public void bindTo(MeterRegistry registry) {
-        // Cache hit rate gauge (updated on each analyzeCacheHealth call)
-        Gauge.builder("buildtools.cache.hit.rate", cacheService,
-                svc -> svc.getLastHitRate("gradle"))
-            .tag("tool", "gradle")
-            .description("Last reported build cache hit rate")
-            .register(registry);
-
-        // Cache score gauge
-        Gauge.builder("buildtools.cache.score", cacheService,
-                svc -> svc.getLastScore("maven"))
-            .tag("tool", "maven")
-            .tag("category", "overall")
-            .description("Cache health score (0-100)")
-            .register(registry);
-
-        // Async task queue depth
-        Gauge.builder("buildtools.async.tasks", asyncBuildService,
-                svc -> svc.getActiveTaskCount())
-            .tag("status", "running")
-            .register(registry);
+        // Cache health score, updated by analyzeCacheHealth
+        for (String tool : new String[] {"maven", "gradle", "sbt"}) {
+            Gauge.builder("buildtools.cache.score", cacheService,
+                    svc -> svc.getLastScore(tool))
+                .tag("tool", tool)
+                .tag("category", "overall")
+                .description("Cache health score (0-100)")
+                .register(registry);
+        }
     }
 }
 ```
@@ -308,18 +296,20 @@ public class CacheMetricsBinder implements MeterBinder {
 **Exposed Prometheus metrics:**
 
 ```
-# HELP buildtools_cache_hit_rate Last reported build cache hit rate
-# TYPE buildtools_cache_hit_rate gauge
-buildtools_cache_hit_rate{tool="gradle"} 0.85
-
 # HELP buildtools_cache_score Cache health score (0-100)
 # TYPE buildtools_cache_score gauge
 buildtools_cache_score{tool="maven",category="overall"} 55.0
-
-# HELP buildtools_async_tasks Async task queue depth
-# TYPE buildtools_async_tasks gauge
-buildtools_async_tasks{tool="gradle",status="running"} 2.0
 ```
+
+`buildtools.cache.hit.rate` has been removed because no comparable per-tool
+hit rate was populated; the old gauge always reported `0.0`. sbt cache scoring
+can incorporate hit/miss counts parsed from a local execution log, while Maven
+and Gradle scoring inspects configuration. Remove
+`buildtools_cache_hit_rate` queries, alerts, and dashboard panels. Use
+`buildtools_cache_score{tool="...",category="overall"}` to monitor the last
+cache health score, but do not interpret it as a hit rate. Dashboards
+that need actual hit rates must obtain measured hits and misses from a separate
+build execution source.
 
 ### 3.5 Auth Metrics
 

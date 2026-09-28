@@ -62,6 +62,7 @@ network access.
 | Result boundary | `ModelOutputPolicy` and `PrivacySafeMcpJsonMapper` | Selects safe fields and normalized diagnostics for tool results; replaces caller-derived JSON-RPC error detail with generic text on both transports. |
 | HTTP transport | `HttpMcpServerConfiguration` and servlet filters | Exposes `/mcp` through the SDK's stateless servlet when the `http` profile is active. |
 | Stdio transport | `McpServerTransportConfiguration` | Keeps stdout reserved for SDK JSON-RPC and serves the same guarded callbacks. |
+| Cache observability | `BuildCacheService` and `CacheMetricsCollector` | Records the last per-tool cache health score and exposes it as `buildtools.cache.score` with `tool` and `category=overall` tags. Maven/Gradle scoring inspects configuration; sbt scoring can also use locally parsed hit/miss counts. No comparable per-tool hit-rate gauge is exported. |
 
 The native prompt catalog bypasses tool callbacks because its messages are static.
 It reads no project state; the existing `prompt_*` tools still use the guarded
