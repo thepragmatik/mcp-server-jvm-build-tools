@@ -21,17 +21,23 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /** Captures a few complete Maven compiler lines without retaining the intervening log. */
 final class MavenDiagnosticOutput extends OutputStream {
     private static final int MAX_LINE_BYTES = 2_048;
     private static final int MAX_LINES = 13;
+    private static final int MAX_ANSI_PREFIX_BYTES = 32;
     private static final byte[] PREFIX = "[ERROR] ".getBytes(StandardCharsets.US_ASCII);
+    private static final Pattern ANSI_SGR = Pattern.compile("\u001b\\[[0-9;:]*m");
 
     private final BoundedProcessOutput capture;
     private final byte[] line = new byte[MAX_LINE_BYTES];
     private final List<String> diagnostics = new ArrayList<>(MAX_LINES);
     private int length;
+    private int prefixLength;
+    private int ansiPrefixBytes;
+    private int ansiState;
     private boolean candidate;
     private boolean overflow;
     private boolean diagnosticsTruncated;
@@ -59,7 +65,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     finishLine();
                     i++;
                 }
-            } else if (length < PREFIX.length) {
+            } else if (prefixLength < PREFIX.length) {
                 accept(source[i++]);
             } else {
                 int start = i;
@@ -98,11 +104,30 @@ final class MavenDiagnosticOutput extends OutputStream {
         if (overflow) {
             return;
         }
-        if (length < PREFIX.length && value != PREFIX[length]) {
-            overflow = true; // An ordinary log line never needs buffering.
-            return;
+        if (prefixLength < PREFIX.length) {
+            if (ansiState != 0 || (prefixLength == 0 && value == 0x1b)) {
+                if (++ansiPrefixBytes > MAX_ANSI_PREFIX_BYTES) {
+                    overflow = true;
+                    return;
+                }
+                if (ansiState == 0) {
+                    ansiState = 1; // ESC must be followed by '['.
+                } else if (ansiState == 1 && value == '[') {
+                    ansiState = 2;
+                } else if (ansiState == 2 && value == 'm') {
+                    ansiState = 0;
+                } else if (ansiState != 2 || !((value >= '0' && value <= '9') || value == ';' || value == ':')) {
+                    overflow = true;
+                    return;
+                }
+            } else if (value == PREFIX[prefixLength]) {
+                prefixLength++;
+                candidate = true;
+            } else {
+                overflow = true; // An ordinary log line never needs buffering.
+                return;
+            }
         }
-        candidate = true;
         if (length == line.length) {
             diagnosticsTruncated = true;
             overflow = true;
@@ -113,17 +138,21 @@ final class MavenDiagnosticOutput extends OutputStream {
 
     private void finishLine() {
         if (candidate && !overflow) {
-            if (diagnostics.size() == MAX_LINES) {
-                diagnosticsTruncated = true;
-            } else {
-                int end = length > 0 && line[length - 1] == '\r' ? length - 1 : length;
-                String text = new String(line, 0, end, StandardCharsets.UTF_8);
-                if (MavenOutputParser.isCompilerDiagnosticLine(text) && !diagnostics.contains(text)) {
+            int end = length > 0 && line[length - 1] == '\r' ? length - 1 : length;
+            String text = ANSI_SGR.matcher(new String(line, 0, end, StandardCharsets.UTF_8))
+                    .replaceAll("");
+            if (MavenOutputParser.isCompilerDiagnosticLine(text) && !diagnostics.contains(text)) {
+                if (diagnostics.size() == MAX_LINES) {
+                    diagnosticsTruncated = true;
+                } else {
                     diagnostics.add(text);
                 }
             }
         }
         length = 0;
+        prefixLength = 0;
+        ansiPrefixBytes = 0;
+        ansiState = 0;
         candidate = false;
         overflow = false;
     }

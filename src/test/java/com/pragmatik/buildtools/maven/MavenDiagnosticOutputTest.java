@@ -37,6 +37,33 @@ class MavenDiagnosticOutputTest {
     }
 
     @Test
+    void coloredCompilerLineIsRetainedWithoutControlSequences() {
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
+        byte[] bytes = "\u001b[31m[ERROR] /synthetic/Sample.java:[42,1] cannot find symbol\u001b[0m\n"
+                .getBytes(StandardCharsets.UTF_8);
+        for (byte value : bytes) {
+            output.write(value);
+        }
+        assertThat(output.diagnostics()).containsExactly("[ERROR] /synthetic/Sample.java:[42,1] cannot find symbol");
+        assertThat(output.diagnosticsTruncated()).isFalse();
+    }
+
+    @Test
+    void duplicateAfterCapacityDoesNotClaimUniqueDiagnosticsWereDropped() {
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
+        for (int i = 1; i <= 13; i++) {
+            byte[] line = ("[ERROR] /synthetic/Sample.java:[" + i + ",1] cannot find symbol\n")
+                    .getBytes(StandardCharsets.UTF_8);
+            output.write(line, 0, line.length);
+        }
+        byte[] duplicate = "[ERROR] /synthetic/Sample.java:[1,1] cannot find symbol\n".getBytes(StandardCharsets.UTF_8);
+        output.write(duplicate, 0, duplicate.length);
+
+        assertThat(output.diagnostics()).hasSize(13);
+        assertThat(output.diagnosticsTruncated()).isFalse();
+    }
+
+    @Test
     void hugeUnterminatedLineCannotBecomeAnUnboundedDiagnostic() {
         BoundedProcessOutput capture = new BoundedProcessOutput();
         MavenDiagnosticOutput output = new MavenDiagnosticOutput(capture);

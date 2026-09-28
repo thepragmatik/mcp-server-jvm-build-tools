@@ -8,7 +8,7 @@ The result reports `completed: true` for a finished tool call. A recognized buil
 
 `execute_build_command` currently infers success from build-output markers rather than a separately exposed process exit status. If both success and failure markers occur, failure wins. If no marker survives the bounded output capture, `success` may be absent; callers should treat that as unknown rather than successful.
 
-The Maven middle collector recognizes standard uncolored `[ERROR]` compiler lines. A custom log prefix or ANSI color code before the marker can prevent middle retention; a diagnostic in the retained head or tail still follows the normal parser path.
+The Maven middle collector recognizes standard `[ERROR]` compiler lines, including a bounded ANSI color prefix and color reset. Custom log prefixes or oversized color sequences can still prevent middle retention; a diagnostic in the retained head or tail follows the normal parser path.
 
 For example, a synthetic compilation failure can produce:
 
