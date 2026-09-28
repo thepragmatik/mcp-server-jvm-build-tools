@@ -85,7 +85,11 @@ post-merge `push: main` run, so no vulnerable dependency ships either way; but
 to make the PR-time gate active on Dependabot bumps, mirror `NVD_API_KEY` into
 the Dependabot secret store alongside the Actions secret (§1.1).
 
-## 2. Decision: track Spring AI GA when released
+## 2. Spring AI version policy
+
+The current `pom.xml` pins Spring AI `2.0.1` through `spring-ai.version`. The decision below is retained as historical context from June 2026 and is superseded; Spring AI GA has already been adopted. Keep this document aligned with the actual Maven property when the dependency changes. The OWASP scan described above still requires an NVD API key to run in CI; a skipped scan is not evidence of vulnerability clearance.
+
+### Historical decision: track Spring AI GA when released
 
 **Status: accepted.** **Date: 2026-06.**
 

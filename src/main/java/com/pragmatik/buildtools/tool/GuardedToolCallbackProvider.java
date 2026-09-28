@@ -43,10 +43,10 @@ public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
                     "Return tracked-build and suggestion counts with an optimization potential level; raw suggestions are withheld."),
             Map.entry(
                     "execute_build_command",
-                    "Execute an allowed build command and return status with bounded redacted diagnostics, not raw logs."),
+                    "Execute an allowed build command and return status with at most 12 structured, redacted diagnostics (severity, category, diagnosticRef, optional file type and line, normalized message), not raw logs. Use for triage; inspect local files for edits."),
             Map.entry(
                     "analyze_build_output",
-                    "Run build analysis and return test counts with bounded redacted diagnostics, not raw logs."),
+                    "Run build analysis and return test counts with at most 12 structured, redacted diagnostics (severity, category, diagnosticRef, optional fileRef, file type and line, normalized message), not raw logs. Use for triage; inspect local files for edits."),
             Map.entry("profile_build", "Run a build and return duration and phase counts without raw phase details."),
             Map.entry(
                     "check_dependency_version",

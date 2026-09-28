@@ -80,7 +80,11 @@ public final class ModelOutputPolicy {
     private static final Pattern VERSION = Pattern.compile("\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?\\b");
 
     private static final Pattern DIAGNOSTIC_LINE =
-            Pattern.compile("(?i).*(?:\\berror\\b|\\bfailed\\b|\\bwarning\\b|\\bexception\\b).*");
+            Pattern.compile("(?i).*(?:\\berror\\b|\\bfailed\\b|\\bwarn(?:ing)?\\b|\\bexception\\b).*");
+    private static final Pattern WARNING_PREFIX =
+            Pattern.compile("(?i)^\\s*(?:\\[(?:warn|warning)]|(?:warn|warning)\\b).*");
+    private static final Pattern FILE_LOCATION = Pattern.compile(
+            "(?i)(?:^|[\\s(])(?:[^\\s:()]+[/\\\\])?[^\\s:()]+\\.(java|kt|scala|xml|gradle|kts|sbt):(?:\\[)?([1-9][0-9]{0,6})");
     private static final List<Replacement> REDACTIONS = List.of(
             new Replacement("(?i)\\b(?:authorization\\s*:\\s*bearer|bearer)\\s+[^\\s,;]+", "[redacted-secret]"),
             new Replacement(
@@ -205,12 +209,14 @@ public final class ModelOutputPolicy {
                             safe.put("testSummary", counts);
                         }
                     }
-                    List<String> diagnostics = new ArrayList<>();
-                    copyDiagnostics(root.get("errors"), diagnostics);
-                    copyDiagnostics(root.get("warnings"), diagnostics);
-                    if (!diagnostics.isEmpty()) {
-                        safe.put("diagnostics", diagnostics);
-                    }
+                    List<Map<String, Object>> diagnostics = new ArrayList<>();
+                    Map<String, String> fileRefs = new LinkedHashMap<>();
+                    Set<String> seen = new java.util.HashSet<>();
+                    boolean diagnosticsTruncated =
+                            copyDiagnostics(root.get("errors"), "error", diagnostics, fileRefs, seen);
+                    diagnosticsTruncated |=
+                            copyDiagnostics(root.get("warnings"), "warning", diagnostics, fileRefs, seen);
+                    putDiagnostics(safe, diagnostics, diagnosticsTruncated);
                 } else {
                     copyPlainDiagnostics(output, safe);
                 }
@@ -352,30 +358,279 @@ public final class ModelOutputPolicy {
         }
     }
 
-    private static void copyDiagnostics(JsonNode source, List<String> target) {
+    private static boolean copyDiagnostics(
+            JsonNode source,
+            String severity,
+            List<Map<String, Object>> target,
+            Map<String, String> fileRefs,
+            Set<String> seen) {
         if (source == null || !source.isArray()) {
-            return;
+            return false;
         }
+        boolean truncated = false;
         for (JsonNode item : source) {
-            if (target.size() >= MAX_DIAGNOSTICS) {
-                return;
-            }
             JsonNode message = item.isObject() ? item.get("message") : item;
             if (message != null && message.isTextual()) {
-                target.add(redact(message.asText()));
+                String file =
+                        item.isObject() && item.has("file") ? item.get("file").asText() : "";
+                String line =
+                        item.isObject() && item.has("line") ? item.get("line").asText() : "";
+                String occurrence = severity + "\u0000" + file + "\u0000" + line + "\u0000" + message.asText();
+                if (seen.add(occurrence)) {
+                    if (target.size() == MAX_DIAGNOSTICS) {
+                        truncated = true;
+                        break;
+                    }
+                    target.add(diagnostic(severity, message.asText(), item, fileRefs));
+                }
             }
         }
+        return truncated;
     }
 
     private static void copyPlainDiagnostics(String output, Map<String, Object> safe) {
-        List<String> diagnostics = output.lines()
-                .filter(line -> DIAGNOSTIC_LINE.matcher(line).matches())
-                .limit(MAX_DIAGNOSTICS)
-                .map(ModelOutputPolicy::redact)
-                .toList();
+        List<Map<String, Object>> diagnostics = new ArrayList<>();
+        Set<String> seen = new java.util.HashSet<>();
+        boolean truncated = false;
+        String[] lines = output.split("\\R");
+        for (String severity : List.of("error", "warning")) {
+            for (String line : lines) {
+                if (!DIAGNOSTIC_LINE.matcher(line).matches()
+                        || WARNING_PREFIX.matcher(line).matches() != "warning".equals(severity)) {
+                    continue;
+                }
+                if (seen.add(severity + "\u0000" + line)) {
+                    if (diagnostics.size() == MAX_DIAGNOSTICS) {
+                        truncated = true;
+                        break;
+                    }
+                    diagnostics.add(diagnostic(severity, line, null, new LinkedHashMap<>()));
+                }
+            }
+        }
+        putDiagnostics(safe, diagnostics, truncated);
+    }
+
+    private static void putDiagnostics(
+            Map<String, Object> safe, List<Map<String, Object>> diagnostics, boolean truncated) {
         if (!diagnostics.isEmpty()) {
+            for (int i = 0; i < diagnostics.size(); i++) {
+                diagnostics.get(i).put("diagnosticRef", "d" + (i + 1));
+            }
             safe.put("diagnostics", diagnostics);
         }
+        if (truncated) {
+            safe.put("diagnosticsTruncated", true);
+        }
+    }
+
+    private static Map<String, Object> diagnostic(
+            String severity, String text, JsonNode item, Map<String, String> fileRefs) {
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        String fileType = fileType(item, text);
+        String category;
+        String message;
+        if (lower.contains("cannot find symbol")) {
+            category = "compilation";
+            message = "Compiler cannot find a symbol; check local imports and declarations near the reported line.";
+        } else if (containsAny(lower, "unresolved reference", "not found: value")) {
+            category = "compilation";
+            message = "Compiler cannot resolve a reference; check local imports and declarations.";
+        } else if (containsAny(lower, "type mismatch", "incompatible types")) {
+            category = "compilation";
+            message = "Compiler found a type mismatch near the reported line.";
+        } else if (containsAny(
+                lower,
+                "compilation failure",
+                "compilejava",
+                "compilescala",
+                "unresolved reference",
+                "not found: value",
+                "type mismatch",
+                "compilation failed",
+                "compiling ")) {
+            category = "compilation";
+            message = "Compilation failed; inspect the indicated source line locally.";
+        } else if (containsAny(lower, "expected", "illegal start", "not a statement")
+                && fileType != null
+                && List.of("java", "kt", "scala").contains(fileType)) {
+            category = "compilation";
+            message = "Compiler reported a syntax error near the indicated line.";
+        } else if (containsAny(lower, "assertionerror", "assertion failed")) {
+            category = "test";
+            message = "A test assertion failed; inspect the local test report.";
+        } else if (containsAny(
+                lower,
+                "test failed",
+                "tests failed",
+                "there are test failures",
+                "assertionerror",
+                "assertion failed",
+                "execution failed for task ':test",
+                "() in ")) {
+            category = "test";
+            message = "A test failed; inspect the local test report.";
+        } else if (containsAny(
+                lower,
+                "could not resolve",
+                "failed to resolve",
+                "could not find artifact",
+                "dependency resolution",
+                "non-resolvable",
+                "unresolved dependency")) {
+            category = "dependency";
+            message = "Dependency resolution failed; inspect local dependency settings.";
+        } else if (containsAny(
+                lower,
+                "non-parseable pom",
+                "malformed pom",
+                "build.gradle",
+                "build.sbt",
+                "unknown lifecycle phase",
+                "task not found",
+                "plugin configuration",
+                "configuration failed")) {
+            category = "configuration";
+            message = "Build configuration failed; inspect the local build file.";
+        } else if (containsAny(
+                lower,
+                "execution failed",
+                "build failed",
+                "build failure",
+                "exception",
+                "timeout",
+                "timed out",
+                "failed")) {
+            category = "execution";
+            message = "Build execution failed; inspect the local build output.";
+        } else {
+            category = "other";
+            message = "Build reported a diagnostic; inspect the local output.";
+        }
+        Map<String, Object> safe = new LinkedHashMap<>();
+        safe.put("severity", severity);
+        safe.put("category", category);
+        if (fileType != null) {
+            safe.put("fileType", fileType);
+        }
+        if (item != null && item.isObject()) {
+            JsonNode file = item.get("file");
+            if (file != null && file.isTextual() && !file.asText().isBlank()) {
+                safe.put("fileRef", fileRefs.computeIfAbsent(file.asText(), ignored -> "f" + (fileRefs.size() + 1)));
+            }
+        }
+        Integer line = line(item, text);
+        if (line != null) {
+            safe.put("line", line);
+        }
+        safe.put("message", safeDiagnosticMessage(text, category, message));
+        return safe;
+    }
+
+    private static String safeDiagnosticMessage(String original, String category, String fallback) {
+        String lower = original.toLowerCase(java.util.Locale.ROOT);
+        if ("other".equals(category)
+                || original.contains("\n")
+                || original.contains("\r")
+                || containsAny(
+                        lower,
+                        "ignore previous",
+                        "system prompt",
+                        "developer instruction",
+                        "send to ",
+                        "<script",
+                        "curl ",
+                        "wget ",
+                        "http://",
+                        "https://",
+                        "public class ",
+                        "private ",
+                        "protected ",
+                        "package ",
+                        "import ",
+                        "return ")) {
+            return fallback;
+        }
+        // Preserve the failure phrase, never an arbitrary identifier or value:
+        // a source symbol can itself contain a person's or customer's name.
+        if (lower.contains("cannot find symbol")) {
+            String kind = containsAny(lower, "symbol: class ", "class ")
+                    ? "class "
+                    : containsAny(lower, "symbol: variable ", "variable ")
+                            ? "variable "
+                            : containsAny(lower, "symbol: method ", "method ") ? "method " : "";
+            return "cannot find symbol: " + kind + "[redacted-symbol]";
+        }
+        if (lower.contains("not found: value")) {
+            return "not found: value [redacted-symbol]";
+        }
+        if (lower.contains("unresolved reference")) {
+            return "unresolved reference: [redacted-symbol]";
+        }
+        if (containsAny(lower, "type mismatch", "incompatible types")) {
+            return "type mismatch: involved types withheld";
+        }
+        if (lower.contains("';' expected")) {
+            return "';' expected";
+        }
+        if (containsAny(lower, "expected", "illegal start", "not a statement")) {
+            return "compiler syntax error: token or expression withheld";
+        }
+        if (containsAny(lower, "assertionerror", "assertion failed")) {
+            return "test assertion failed: values withheld";
+        }
+        if (containsAny(lower, "test failed", "tests failed")) {
+            return "test failed: inspect local test report";
+        }
+        if (containsAny(lower, "could not resolve", "failed to resolve", "could not find artifact")) {
+            return "dependency resolution failed: identity withheld";
+        }
+        if (containsAny(lower, "non-parseable pom", "malformed pom")) {
+            return "POM parsing failed: inspect local build file";
+        }
+        if (containsAny(lower, "unknown lifecycle phase", "task not found")) {
+            return "build phase or task not found: identity withheld";
+        }
+        if (containsAny(lower, "execution failed", "build failed", "compilation failed")) {
+            return "build execution failed: inspect local build output";
+        }
+        return fallback;
+    }
+
+    private static boolean containsAny(String text, String... fragments) {
+        for (String fragment : fragments) {
+            if (text.contains(fragment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String fileType(JsonNode item, String text) {
+        if (item != null && item.isObject()) {
+            JsonNode file = item.get("file");
+            if (file != null && file.isTextual()) {
+                String name = file.asText().toLowerCase(java.util.Locale.ROOT);
+                for (String extension : List.of("java", "kt", "scala", "xml", "gradle", "kts", "sbt")) {
+                    if (name.endsWith("." + extension)) {
+                        return extension;
+                    }
+                }
+            }
+        }
+        var match = FILE_LOCATION.matcher(text);
+        return match.find() ? match.group(1).toLowerCase(java.util.Locale.ROOT) : null;
+    }
+
+    private static Integer line(JsonNode item, String text) {
+        if (item != null && item.isObject()) {
+            JsonNode value = item.get("line");
+            if (value != null && value.isIntegralNumber() && value.intValue() > 0 && value.intValue() <= 9_999_999) {
+                return value.intValue();
+            }
+        }
+        var match = FILE_LOCATION.matcher(text);
+        return match.find() ? Integer.valueOf(match.group(2)) : null;
     }
 
     static String redact(String value) {

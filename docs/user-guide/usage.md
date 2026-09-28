@@ -1,5 +1,7 @@
 # Usage
 
+> **1.x reference:** This page documents earlier raw-output behavior. For the current 2.0 result contract, use the [2.0 quickstart](quickstart-v2.md) and [2.0 design review](../reference/design-v2.md).
+
 Once the server is [installed](installation.md) and configured in your MCP client, you interact
 with it the way you interact with any MCP server: the agent **discovers** the tools, then **calls**
 them on your behalf in response to your natural-language requests.
