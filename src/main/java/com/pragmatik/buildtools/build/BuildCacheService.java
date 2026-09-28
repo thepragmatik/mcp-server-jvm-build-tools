@@ -64,14 +64,6 @@ public class BuildCacheService {
     private final java.util.concurrent.ConcurrentHashMap<String, Double> lastScores =
             new java.util.concurrent.ConcurrentHashMap<>();
 
-    /**
-     * Tracks the last cache hit rate (0.0-1.0) per tool name. Updated on every
-     * {@link #analyzeCacheHealth} call. Used by {@link CacheMetricsCollector} to expose
-     * {@code buildtools.cache.hit.rate} as a Micrometer gauge.
-     */
-    private final java.util.concurrent.ConcurrentHashMap<String, Double> lastHitRates =
-            new java.util.concurrent.ConcurrentHashMap<>();
-
     public BuildCacheService(BuildToolProvider toolProvider) {
         this.toolProvider = toolProvider;
     }
@@ -108,7 +100,6 @@ public class BuildCacheService {
         // Update gauge trackers for Micrometer
         Object scoreObj = cacheHealth.get("score");
         lastScores.put(tool.getName(), scoreObj instanceof Number n ? n.doubleValue() : 0.0);
-        lastHitRates.put(tool.getName(), 0.0); // hit rate not computed by analysis; default to 0
 
         return JsonUtils.toJson(result);
     }
@@ -169,14 +160,6 @@ public class BuildCacheService {
      */
     public double getLastScore(String tool) {
         return lastScores.getOrDefault(tool, 0.0);
-    }
-
-    /**
-     * @param tool the build tool name (e.g. "maven", "gradle", "sbt")
-     * @return the last recorded cache hit rate for the given tool, or 0.0 if never analysed
-     */
-    public double getLastHitRate(String tool) {
-        return lastHitRates.getOrDefault(tool, 0.0);
     }
 
     // ─── Cache health analysis per tool ─────────────────────────────────

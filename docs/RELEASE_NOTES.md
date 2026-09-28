@@ -1,5 +1,11 @@
 # Release Notes — v2.0.0-rc.1
 
+> **Current 2.0 development line:** The `buildtools.cache.hit.rate` Micrometer
+> gauge has been removed because cache analysis never measured hits or misses.
+> Remove `buildtools_cache_hit_rate` dashboard queries and alerts. The
+> `buildtools.cache.score` gauge remains available as the last cache
+> configuration audit score (0-100) per tool; it is not a hit rate.
+
 This is the first 2.0 release candidate. It is a breaking prerelease: existing
 1.x clients must update their configuration and refresh `tools/list` before
 using it. Publication is gated by the [release evidence

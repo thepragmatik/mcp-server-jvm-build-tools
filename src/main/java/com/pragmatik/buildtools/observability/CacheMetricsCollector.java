@@ -26,11 +26,8 @@ import org.springframework.stereotype.Component;
  * {@link MeterBinder} that wraps {@link BuildCacheService} cache-health scoring as Micrometer
  * gauges.
  *
- * <p>Registers per-tool gauges for:
- * <ul>
- *   <li>{@code buildtools.cache.hit.rate} — last reported cache hit rate per tool</li>
- *   <li>{@code buildtools.cache.score} — overall cache health score (0-100) per tool</li>
- * </ul>
+ * <p>Registers {@code buildtools.cache.score}, the last configuration health score (0-100),
+ * for each supported build tool.
  */
 @Component
 public class CacheMetricsCollector implements MeterBinder {
@@ -48,11 +45,6 @@ public class CacheMetricsCollector implements MeterBinder {
                     .tag("tool", tool)
                     .tag("category", "overall")
                     .description("Cache health score (0-100)")
-                    .register(registry);
-
-            Gauge.builder("buildtools.cache.hit.rate", buildCacheService, svc -> svc.getLastHitRate(tool))
-                    .tag("tool", tool)
-                    .description("Last reported build cache hit rate (0.0–1.0)")
                     .register(registry);
         }
     }
