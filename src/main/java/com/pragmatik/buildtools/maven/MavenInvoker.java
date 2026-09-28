@@ -130,10 +130,31 @@ public class MavenInvoker {
             "archetype:",
             "release:");
 
-    // Safe Maven flag pattern: -Dkey=value, -f file, -P profile, -q, -X, -T4, -B, -U, etc.
-    // Also accepts --long-flags like --batch-mode, --non-recursive
-    private static final Pattern SAFE_ARG_PATTERN =
-            Pattern.compile("^-{1,2}[A-Za-z0-9][A-Za-z0-9._-]*(=[A-Za-z0-9._/:@\\-]*)?$");
+    // Positive option list: Maven's other flags can select files and projects
+    // outside the validated root, including POMs, settings, and toolchains.
+    private static final Set<String> ALLOWED_FLAGS = Set.of(
+            "-q",
+            "--quiet",
+            "-X",
+            "--debug",
+            "-B",
+            "--batch-mode",
+            "-U",
+            "--update-snapshots",
+            "-N",
+            "--non-recursive",
+            "-e",
+            "--errors",
+            "-o",
+            "--offline",
+            "-ntp",
+            "--no-transfer-progress");
+    private static final Pattern PROPERTY_FLAG =
+            Pattern.compile("^-D([A-Za-z0-9][A-Za-z0-9._-]*)(?:=[A-Za-z0-9._/:@\\-]*)?$");
+    private static final Pattern PROFILE_FLAG = Pattern.compile("^-P[A-Za-z0-9._,-]+$");
+    private static final Pattern THREAD_FLAG = Pattern.compile("^-T[1-8]$");
+    private static final Set<String> BLOCKED_PROPERTIES = Set.of(
+            "maven.ext.class.path", "maven.repo.local", "maven.multimoduleprojectdirectory", "maven.home", "user.home");
 
     public static String[] getCommands(String command) {
         Objects.requireNonNull(command, "command must not be null");
@@ -173,14 +194,15 @@ public class MavenInvoker {
                 throw new IllegalArgumentException("Command not allowed: " + token + ". Allowed: " + ALLOWED_COMMANDS);
             }
 
-            // Validate flags against safe pattern
-            if (!SAFE_ARG_PATTERN.matcher(token).matches()) {
-                throw new IllegalArgumentException("Invalid flag/argument: " + token);
+            var property = PROPERTY_FLAG.matcher(token);
+            boolean allowedProperty = property.matches()
+                    && !BLOCKED_PROPERTIES.contains(property.group(1).toLowerCase(java.util.Locale.ROOT));
+            if (!ALLOWED_FLAGS.contains(token)
+                    && !allowedProperty
+                    && !PROFILE_FLAG.matcher(token).matches()
+                    && !THREAD_FLAG.matcher(token).matches()) {
+                throw new IllegalArgumentException("Invalid flag/argument");
             }
-
-            // -D system properties are passed through verbatim: the server trusts the
-            // client's choices entirely (no key allowlist/blocklist). Shell
-            // metacharacters are still rejected by SAFE_ARG_PATTERN above.
             validated.add(token);
         }
 

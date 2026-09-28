@@ -39,7 +39,9 @@ public class MavenBuildTool implements BuildTool {
 
             1. Only execute Maven lifecycle phases: clean, compile, test, package, install, validate.
                Remote publishing with deploy is unavailable through this tool.
-            2. Allowed flags: -Dproperty=value, -f, -P, -q, -X, -T, -B, -U, --batch-mode, --non-recursive.
+            2. Allowed flags include -Dproperty=value (except Maven path overrides), -Pprofile,
+               -T1 through -T8, -q, -X, -B, -U, --batch-mode, and --non-recursive.
+               Project, settings, toolchain, and reactor path selectors are unavailable.
             3. Do not invoke plugin goals directly (e.g., exec:exec, ant:ant). These are blocked.
             4. Always verify mavenHome and projectDir paths are valid before executing.
             5. If unsure about the command, ask for clarification instead of guessing.

@@ -119,8 +119,13 @@ class BuildPlanServiceTest {
 
     @Test
     void testParseAllKeywords() {
-        List<PlanStep> steps = service.parseDescription("clean compile build test package install deploy validate");
-        assertEquals(8, steps.size());
+        List<PlanStep> steps = service.parseDescription("clean compile build test package install validate");
+        assertEquals(7, steps.size());
+    }
+
+    @Test
+    void remoteDeployIsRejectedRatherThanStoredAsAPlanStep() {
+        assertThrows(IllegalArgumentException.class, () -> service.parseDescription("compile deploy"));
     }
 
     // ─── createBuildPlan tests ─────────────────────────────────────

@@ -18,7 +18,8 @@ For HTTP, set `BUILDTOOLS_API_KEY_LOCAL` from a secret store and `BUILDTOOLS_API
 
 Maven `deploy` and sbt `publish` are unavailable through `build:execute`;
 local install and publish tasks remain available. Build scripts can still have
-side effects, so isolate untrusted projects.
+side effects and inherit the server's credentials. Isolate untrusted projects
+without credentials or network access.
 
 ```mermaid
 flowchart LR
