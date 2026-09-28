@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.gradle;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -94,6 +95,7 @@ public class GradleOutputParser implements BuildOutputParser {
 
         int totalTests = 0;
         int failedTests = 0;
+        boolean hasTestDiagnostic = false;
 
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
@@ -115,6 +117,7 @@ public class GradleOutputParser implements BuildOutputParser {
             // Parse individual test failures
             Matcher testFailMatcher = TEST_FAILURE_PATTERN.matcher(line);
             if (testFailMatcher.find()) {
+                hasTestDiagnostic = true;
                 Map<String, Object> testErr = new LinkedHashMap<>();
                 testErr.put("class", testFailMatcher.group(1));
                 testErr.put("test", testFailMatcher.group(2));
@@ -146,10 +149,14 @@ public class GradleOutputParser implements BuildOutputParser {
             // Parse task failures
             Matcher taskFailMatcher = TASK_FAILED_PATTERN.matcher(line);
             if (taskFailMatcher.find()) {
+                String failedTask = taskFailMatcher.group(1);
+                if (isTestTask(failedTask)) {
+                    hasTestDiagnostic = true;
+                }
                 Map<String, Object> taskErr = new LinkedHashMap<>();
-                taskErr.put("task", taskFailMatcher.group(1));
+                taskErr.put("task", failedTask);
                 taskErr.put("severity", "ERROR");
-                taskErr.put("message", "Task " + taskFailMatcher.group(1) + " FAILED");
+                taskErr.put("message", "Task " + failedTask + " FAILED");
                 errors.add(taskErr);
             }
 
@@ -180,6 +187,14 @@ public class GradleOutputParser implements BuildOutputParser {
                     execErr.put("severity", "ERROR");
                     execErr.put("message", detail.toString());
                     errors.add(execErr);
+                    Matcher failedTask = WHAT_WENT_WRONG_PATTERN.matcher(detail);
+                    // The model-output policy recognizes this exact root task
+                    // phrase as a test diagnostic. Module-qualified task names
+                    // currently classify as execution, so keep the generic test
+                    // diagnostic for those summaries.
+                    if (failedTask.find() && ":test".equals(failedTask.group(1))) {
+                        hasTestDiagnostic = true;
+                    }
                 }
             }
 
@@ -214,6 +229,17 @@ public class GradleOutputParser implements BuildOutputParser {
             testSummary.put("skipped", 0);
         }
 
+        if (failedTests > 0 && !hasTestDiagnostic) {
+            Map<String, Object> testError = new LinkedHashMap<>();
+            testError.put("severity", "ERROR");
+            testError.put("message", "Test assertion failed");
+            if (errors.size() >= BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+                errors.addFirst(testError);
+            } else {
+                errors.add(testError);
+            }
+        }
+
         result.put("success", success);
         result.put("testSummary", testSummary != null ? testSummary : emptyTestSummary());
         result.put("errors", errors);
@@ -224,6 +250,10 @@ public class GradleOutputParser implements BuildOutputParser {
         result.put("warningCount", warnings.size());
 
         return result;
+    }
+
+    private static boolean isTestTask(String task) {
+        return task.equals("test") || task.endsWith(":test");
     }
 
     private Map<String, Object> emptyTestSummary() {

@@ -228,6 +228,17 @@ public class SbtOutputParser implements BuildOutputParser {
             }
         }
 
+        if ((failedTests > 0 || errorTests > 0) && !hasUsefulTestDiagnostic(errors)) {
+            List<Map<String, Object>> testErrors = new ArrayList<>(2 + errors.size());
+            if (failedTests > 0) {
+                testErrors.add(testDiagnostic("Test assertion failed"));
+            }
+            if (errorTests > 0) {
+                testErrors.add(testDiagnostic("Test failed during execution"));
+            }
+            testErrors.addAll(errors);
+            errors = testErrors;
+        }
         result.put("success", success);
         result.put("testSummary", buildTestSummary(totalTests, passedTests, failedTests, errorTests, skippedTests));
         result.put("errors", errors);
@@ -238,6 +249,30 @@ public class SbtOutputParser implements BuildOutputParser {
         result.put("warningCount", warnings.size());
 
         return result;
+    }
+
+    private static boolean hasUsefulTestDiagnostic(List<Map<String, Object>> errors) {
+        for (Map<String, Object> error : errors) {
+            Object message = error.get("message");
+            if (message instanceof String text) {
+                String lower = text.toLowerCase(java.util.Locale.ROOT);
+                if (lower.contains("assertionerror")
+                        || lower.contains("assertion failed")
+                        || lower.contains("test failed")
+                        || lower.contains("tests failed")
+                        || lower.contains("() in ")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static Map<String, Object> testDiagnostic(String message) {
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("severity", "ERROR");
+        diagnostic.put("message", message);
+        return diagnostic;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────

@@ -42,7 +42,21 @@ def fixture(root, tool, case):
             "test.user@example.invalid token=SYNTHETIC_SECRET\\x1b[0m"
         )
     emitter = home / "emit.py"
-    if final_partial:
+    if case == "test-summary":
+        summary = (
+            "1 test completed, 1 failed\\nBUILD FAILED in 1s\\n"
+            if tool == "gradle" else
+            "[info] Passed: Total 1, Failed 1, Errors 0, Passed 0\\n[error] Total time: 1 s\\n"
+        )
+        program = (
+            "import sys\n"
+            f"out = sys.{'stdout' if tool == 'gradle' else 'stderr'}.buffer\n"
+            "out.write(b'[info] expected ready but was stale test.user@example.invalid SYNTHETIC_SECRET\\n')\n"
+            f"out.write(b'{summary}')\n"
+            "out.flush()\n"
+            "sys.exit(1)\n"
+        )
+    elif final_partial:
         program = (
             "import sys\n"
             "out = sys.stderr.buffer\n"
@@ -94,6 +108,22 @@ def assert_result(result, analysis):
         raise AssertionError("A synthetic private canary escaped the output policy")
 
 
+def assert_summary_result(result):
+    safe = result.get("structuredContent")
+    if not isinstance(safe, dict) or safe.get("success") is not False:
+        raise AssertionError("Failed test status was lost")
+    if safe.get("testSummary", {}).get("failed") != 1 or safe.get("errorCount") != 1:
+        raise AssertionError("Failed test summary lacks one generic diagnostic")
+    diagnostics = safe.get("diagnostics", [])
+    if len(diagnostics) != 1 or diagnostics[0].get("category") != "test":
+        raise AssertionError("Generic failed-test category was lost")
+    content = result.get("content", [])
+    if not content or json.loads(content[0].get("text", "")) != safe:
+        raise AssertionError("Failed-test structured and text results differ")
+    if any(canary in json.dumps(result) for canary in CANARIES + ("ready", "stale")):
+        raise AssertionError("Failed-test result exposed a synthetic private canary")
+
+
 def main():
     if not JAR.is_file():
         raise RuntimeError("Packaged server jar is missing")
@@ -107,6 +137,7 @@ def main():
             for case in (("middle", "final-partial", "colored-kotlin")
                          if tool == "gradle" else ("middle", "final-partial"))
         }
+        summary_fixtures = {tool: fixture(root, tool, "test-summary") for tool in ("gradle", "sbt")}
         env = os.environ.copy()
         env["BUILDTOOLS_PROJECTS_ALLOWED_ROOTS"] = str(root)
         port = release.free_port()
@@ -128,6 +159,14 @@ def main():
                         raise AssertionError("HTTP build request failed")
                     assert_result(release.json_rpc_reply(response, 1).get("result", {}), analysis)
                 print(f"PASS packaged HTTP {tool} {case}: analysis, execution, privacy and parity")
+            for tool, args in summary_fixtures.items():
+                body = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                                   "params": {"name": "analyze_build_output", "arguments": args}}).encode()
+                status, response = release.request(port, body)
+                if status != 200:
+                    raise AssertionError("HTTP test-summary request failed")
+                assert_summary_result(release.json_rpc_reply(response, 2).get("result", {}))
+                print(f"PASS packaged HTTP {tool} test summary: privacy and parity")
         finally:
             server.terminate()
             try:
@@ -147,6 +186,10 @@ def main():
                     result, _ = client.call("tools/call", {"name": method, "arguments": args})
                     assert_result(result, analysis)
                 print(f"PASS packaged stdio {tool} {case}: analysis, execution, privacy and parity")
+            for tool, args in summary_fixtures.items():
+                result, _ = client.call("tools/call", {"name": "analyze_build_output", "arguments": args})
+                assert_summary_result(result)
+                print(f"PASS packaged stdio {tool} test summary: privacy and parity")
         finally:
             client.close()
 
