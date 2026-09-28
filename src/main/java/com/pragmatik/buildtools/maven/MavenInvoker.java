@@ -52,25 +52,20 @@ public class MavenInvoker {
 
     static AnalysisResult executeForAnalysis(String mavenHome, String[] commands, String projectDir) {
         CompletedExecution completed = executeCompleted(mavenHome, commands, projectDir, true);
-        String output = completed.exitCode() == 0 || completed.stderr().isEmpty()
-                ? completed.stdout()
-                : completed.stderr() + "\n" + completed.stdout();
-        StringBuilder combined = new StringBuilder();
-        Set<String> appended = new HashSet<>();
         boolean diagnosticsTruncated = false;
+        String stdout = completed.stdout();
+        String stderr = completed.stderr();
         if (completed.exitCode() != 0) {
-            for (MavenDiagnosticOutput diagnostics : completed.execution().diagnosticStreams()) {
-                diagnosticsTruncated |= diagnostics.diagnosticsTruncated();
-                for (String line : diagnostics.diagnostics()) {
-                    if (!output.contains(line) && appended.add(line)) {
-                        combined.append(line).append('\n');
-                    }
-                }
-            }
+            List<MavenDiagnosticOutput> streams = completed.execution().diagnosticStreams();
+            String visibleOutput = stderr + "\n" + stdout;
+            Set<String> replayedCompilerLines = new HashSet<>();
+            stdout = streams.get(0).snapshotForAnalysis(visibleOutput, replayedCompilerLines);
+            stderr = streams.get(1).snapshotForAnalysis(visibleOutput, replayedCompilerLines);
+            diagnosticsTruncated =
+                    streams.get(0).diagnosticsTruncated() || streams.get(1).diagnosticsTruncated();
         }
-        combined.append(output);
-        return new AnalysisResult(
-                combined.toString(), completed.exitCode(), completed.outputTruncated(), diagnosticsTruncated);
+        String output = completed.exitCode() == 0 || stderr.isEmpty() ? stdout : stderr + "\n" + stdout;
+        return new AnalysisResult(output, completed.exitCode(), completed.outputTruncated(), diagnosticsTruncated);
     }
 
     private record CompletedExecution(

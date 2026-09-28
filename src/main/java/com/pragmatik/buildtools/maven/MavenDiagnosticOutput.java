@@ -20,27 +20,38 @@ import com.pragmatik.buildtools.build.BoundedProcessOutput;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Captures a few complete Maven compiler lines without retaining the intervening log. */
+/** Captures bounded Maven compiler lines and test totals without retaining the intervening log. */
 final class MavenDiagnosticOutput extends OutputStream {
     private static final int MAX_LINE_BYTES = 2_048;
     private static final int MAX_LINES = 13;
     private static final int MAX_ANSI_PREFIX_BYTES = 32;
-    private static final byte[] PREFIX = "[ERROR] ".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[][] PREFIXES = {
+        "[ERROR] ".getBytes(StandardCharsets.US_ASCII),
+        "[INFO] Tests run:".getBytes(StandardCharsets.US_ASCII),
+        "[ERROR] Tests run:".getBytes(StandardCharsets.US_ASCII)
+    };
     private static final Pattern ANSI_SGR = Pattern.compile("\u001b\\[[0-9;:]*m");
 
     private final BoundedProcessOutput capture;
     private final byte[] line = new byte[MAX_LINE_BYTES];
-    private final List<String> diagnostics = new ArrayList<>(MAX_LINES);
+    private final List<Candidate> diagnostics = new ArrayList<>(MAX_LINES);
+    private final List<Candidate> testSummaries = new ArrayList<>(MAX_LINES);
+    private long position;
     private int length;
     private int prefixLength;
+    private int possiblePrefixes = (1 << PREFIXES.length) - 1;
     private int ansiPrefixBytes;
     private int ansiState;
     private boolean candidate;
     private boolean overflow;
     private boolean diagnosticsTruncated;
+
+    private record Candidate(String text, long startByte, long endByte) {}
 
     MavenDiagnosticOutput(BoundedProcessOutput capture) {
         this.capture = capture;
@@ -58,14 +69,17 @@ final class MavenDiagnosticOutput extends OutputStream {
         int end = offset + count;
         for (int i = offset; i < end; ) {
             if (overflow) {
+                int start = i;
                 while (i < end && source[i] != '\n') {
                     i++;
                 }
+                position += i - start;
                 if (i < end) {
+                    position++;
                     finishLine();
                     i++;
                 }
-            } else if (prefixLength < PREFIX.length) {
+            } else if (!candidate) {
                 accept(source[i++]);
             } else {
                 int start = i;
@@ -73,6 +87,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     i++;
                 }
                 int segment = i - start;
+                position += segment;
                 if (segment > line.length - length) {
                     diagnosticsTruncated = true;
                     overflow = true;
@@ -81,6 +96,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     length += segment;
                 }
                 if (i < end) {
+                    position++;
                     finishLine();
                     i++;
                 }
@@ -89,7 +105,34 @@ final class MavenDiagnosticOutput extends OutputStream {
     }
 
     synchronized List<String> diagnostics() {
-        return List.copyOf(diagnostics);
+        return orderedCandidates().stream().map(Candidate::text).toList();
+    }
+
+    synchronized String snapshotForAnalysis(String visibleOutput, Set<String> replayedCompilerLines) {
+        if (!capture.truncated()) {
+            return capture.snapshot();
+        }
+        BoundedProcessOutput.TruncatedParts parts = capture.truncatedParts();
+        StringBuilder middle = new StringBuilder();
+        for (Candidate candidate : orderedCandidates()) {
+            if (candidate.endByte() <= parts.headEndByte() || candidate.startByte() >= parts.tailStartByte()) {
+                continue;
+            }
+            String text = candidate.text();
+            if (MavenOutputParser.isTestSummaryLine(text)
+                    || (!visibleOutput.contains(text) && replayedCompilerLines.add(text))) {
+                middle.append(text).append('\n');
+            }
+        }
+        return parts.head() + "\n" + middle + "\n" + parts.tail();
+    }
+
+    private List<Candidate> orderedCandidates() {
+        List<Candidate> retained = new ArrayList<>(diagnostics.size() + testSummaries.size());
+        retained.addAll(diagnostics);
+        retained.addAll(testSummaries);
+        retained.sort(Comparator.comparingLong(Candidate::startByte));
+        return retained;
     }
 
     synchronized boolean diagnosticsTruncated() {
@@ -97,6 +140,7 @@ final class MavenDiagnosticOutput extends OutputStream {
     }
 
     private void accept(byte value) {
+        position++;
         if (value == '\n') {
             finishLine();
             return;
@@ -104,7 +148,7 @@ final class MavenDiagnosticOutput extends OutputStream {
         if (overflow) {
             return;
         }
-        if (prefixLength < PREFIX.length) {
+        if (!candidate) {
             if (ansiState != 0 || (prefixLength == 0 && value == 0x1b)) {
                 if (++ansiPrefixBytes > MAX_ANSI_PREFIX_BYTES) {
                     overflow = true;
@@ -120,10 +164,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     overflow = true;
                     return;
                 }
-            } else if (value == PREFIX[prefixLength]) {
-                prefixLength++;
-                candidate = true;
-            } else {
+            } else if (!advanceCandidatePrefix(value)) {
                 overflow = true; // An ordinary log line never needs buffering.
                 return;
             }
@@ -141,19 +182,51 @@ final class MavenDiagnosticOutput extends OutputStream {
             int end = length > 0 && line[length - 1] == '\r' ? length - 1 : length;
             String text = ANSI_SGR.matcher(new String(line, 0, end, StandardCharsets.UTF_8))
                     .replaceAll("");
-            if (MavenOutputParser.isCompilerDiagnosticLine(text) && !diagnostics.contains(text)) {
+            Candidate retained = new Candidate(text, position - length - 1, position);
+            if (MavenOutputParser.isCompilerDiagnosticLine(text)
+                    && diagnostics.stream().noneMatch(d -> d.text().equals(text))) {
                 if (diagnostics.size() == MAX_LINES) {
                     diagnosticsTruncated = true;
                 } else {
-                    diagnostics.add(text);
+                    diagnostics.add(retained);
                 }
+            } else if (MavenOutputParser.isTestSummaryLine(text)) {
+                if (testSummaries.size() == MAX_LINES) {
+                    testSummaries.remove(0);
+                    diagnosticsTruncated = true;
+                }
+                testSummaries.add(retained);
             }
         }
         length = 0;
         prefixLength = 0;
+        possiblePrefixes = (1 << PREFIXES.length) - 1;
         ansiPrefixBytes = 0;
         ansiState = 0;
         candidate = false;
         overflow = false;
+    }
+
+    private boolean advanceCandidatePrefix(byte value) {
+        int next = 0;
+        for (int i = 0; i < PREFIXES.length; i++) {
+            byte[] prefix = PREFIXES[i];
+            int bit = 1 << i;
+            if ((possiblePrefixes & bit) != 0 && prefixLength < prefix.length && prefix[prefixLength] == value) {
+                next |= bit;
+            }
+        }
+        if (next == 0) {
+            return false;
+        }
+        possiblePrefixes = next;
+        prefixLength++;
+        for (int i = 0; i < PREFIXES.length; i++) {
+            if ((next & (1 << i)) != 0 && prefixLength == PREFIXES[i].length) {
+                candidate = true;
+                break;
+            }
+        }
+        return true;
     }
 }

@@ -50,6 +50,10 @@ public class MavenOutputParser implements BuildOutputParser {
         return ERROR_FILE_LINE_PATTERN.matcher(line).find();
     }
 
+    static boolean isTestSummaryLine(String line) {
+        return TEST_SUMMARY_PATTERN.matcher(line).find();
+    }
+
     // Build result: "BUILD SUCCESS" or "BUILD FAILURE"
     private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile("BUILD\\s+(SUCCESS|FAILURE)");
 
@@ -159,6 +163,26 @@ public class MavenOutputParser implements BuildOutputParser {
 
         completedTests.add(perClassFallback);
 
+        // Surefire/Failsafe summaries can report failed tests without a
+        // compiler-style [ERROR] file:line record. Keep one bounded, generic
+        // diagnostic per failure kind; assertion values and test names stay in
+        // private raw output.
+        List<Map<String, Object>> testErrors = new ArrayList<>(2 + errors.size());
+        if (completedTests.failures > 0) {
+            testErrors.add(testDiagnostic("Test assertion failed"));
+        }
+        if (completedTests.errors > 0) {
+            testErrors.add(testDiagnostic("Test failed during execution"));
+        }
+        // The model-visible policy keeps twelve diagnostics. Preserve compiler
+        // priority ordinarily, but keep the test result visible at that limit.
+        if (errors.size() + testErrors.size() > BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+            testErrors.addAll(errors);
+            errors = testErrors;
+        } else {
+            errors.addAll(testErrors);
+        }
+
         result.put("success", success);
         result.put("testSummary", completedTests.toSummary());
         result.put("errors", errors);
@@ -169,6 +193,13 @@ public class MavenOutputParser implements BuildOutputParser {
         result.put("warningCount", warnings.size());
 
         return result;
+    }
+
+    private static Map<String, Object> testDiagnostic(String message) {
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("severity", "ERROR");
+        diagnostic.put("message", message);
+        return diagnostic;
     }
 
     private Map<String, Object> emptyTestSummary() {

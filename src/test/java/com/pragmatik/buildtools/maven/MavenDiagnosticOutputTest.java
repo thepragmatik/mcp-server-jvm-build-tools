@@ -24,6 +24,65 @@ import org.junit.jupiter.api.Test;
 
 class MavenDiagnosticOutputTest {
     @Test
+    void replaysIdenticalClassResultsInOriginalHeadMiddleTailOrder() {
+        BoundedProcessOutput capture = new BoundedProcessOutput();
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(capture);
+        String perClass = "[INFO] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0 -- in example.PrivateSuiteCanary\n";
+        String finalTotal = "[INFO] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0\n";
+        String padding = "[INFO] noise\n".repeat(8_000);
+        byte[] source = (perClass + padding + perClass + finalTotal + padding + perClass + "[INFO] BUILD FAILURE\n")
+                .getBytes(StandardCharsets.UTF_8);
+        output.write(source, 0, source.length);
+        assertThat(capture.truncated()).isTrue();
+        String replay = output.snapshotForAnalysis(capture.snapshot(), new java.util.HashSet<>());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> summary = (java.util.Map<String, Object>)
+                new MavenOutputParser().parse(replay, 1, "test").get("testSummary");
+        assertThat(summary.get("total")).isEqualTo(3);
+        assertThat(summary.get("failed")).isEqualTo(3);
+        assertThat(output.diagnosticsTruncated()).isFalse();
+    }
+
+    @Test
+    void retainsMiddleTestTotalAlongsideFullCompilerCandidateBudget() {
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
+        for (int i = 1; i <= 13; i++) {
+            byte[] compiler = ("[ERROR] /synthetic/Sample.java:[" + i + ",1] cannot find symbol\n")
+                    .getBytes(StandardCharsets.UTF_8);
+            output.write(compiler, 0, compiler.length);
+        }
+        byte[] total = "[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\n".getBytes(StandardCharsets.UTF_8);
+        output.write(total, 0, total.length);
+        assertThat(output.diagnostics()).hasSize(14);
+        assertThat(output.diagnostics().getLast()).contains("Tests run: 3, Failures: 1");
+        assertThat(output.diagnosticsTruncated()).isFalse();
+    }
+
+    @Test
+    void retainsLastBoundedTestTotalsAndReportsOverflow() {
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
+        for (int i = 1; i <= 14; i++) {
+            byte[] total = ("[INFO] Tests run: " + i + ", Failures: 1, Errors: 0, Skipped: 0\n")
+                    .getBytes(StandardCharsets.UTF_8);
+            output.write(total, 0, total.length);
+        }
+        assertThat(output.diagnostics()).hasSize(13);
+        assertThat(output.diagnostics().getFirst()).contains("Tests run: 2,");
+        assertThat(output.diagnosticsTruncated()).isTrue();
+    }
+
+    @Test
+    void retainsColoredErrorLevelTestTotalWithoutControlSequences() {
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
+        byte[] total = "\u001b[31m[ERROR] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0\u001b[0m\n"
+                .getBytes(StandardCharsets.UTF_8);
+        for (byte value : total) {
+            output.write(value);
+        }
+        assertThat(output.diagnostics()).containsExactly("[ERROR] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0");
+    }
+
+    @Test
     void splitUtf8BytesFormOneCompleteDiagnostic() {
         MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
         byte[] bytes =

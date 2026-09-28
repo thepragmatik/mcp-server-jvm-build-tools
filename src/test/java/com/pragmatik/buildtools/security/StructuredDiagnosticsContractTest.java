@@ -72,6 +72,7 @@ class StructuredDiagnosticsContractTest {
         String output = """
                 [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.1 s -- in example.FirstTest
                 [INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s -- in example.SecondTest
+                [ERROR] synthetic assertion expected ready but was stale for test.user@example.invalid
                 [INFO] Results:
                 [INFO] Tests run: 7, Failures: 1, Errors: 0, Skipped: 1
                 [INFO] BUILD FAILURE
@@ -82,6 +83,11 @@ class StructuredDiagnosticsContractTest {
         assertEquals(7, safe.get("testSummary").get("total").intValue());
         assertEquals(1, safe.get("testSummary").get("failed").intValue());
         assertEquals(1, safe.get("testSummary").get("skipped").intValue());
+        assertEquals(1, safe.get("errorCount").intValue());
+        assertEquals("test", safe.get("diagnostics").get(0).get("category").asText());
+        assertFalse(safe.toString().contains("ready"));
+        assertFalse(safe.toString().contains("stale"));
+        assertFalse(safe.toString().contains("test.user"));
         assertPrivateDataAbsent(safe);
     }
 

@@ -80,6 +80,55 @@ public final class BoundedProcessOutput extends OutputStream {
         return bytesSeen > HEAD_BYTES + TAIL_BYTES;
     }
 
+    /** The captured leading bytes, decoded separately when a middle gap exists. */
+    public synchronized String headSnapshot() {
+        return new String(head, 0, headSize, StandardCharsets.UTF_8);
+    }
+
+    /** The captured trailing bytes, decoded separately when a middle gap exists. */
+    public synchronized String tailSnapshot() {
+        byte[] bytes = new byte[tailSize];
+        if (tailSize > 0) {
+            int start = tailSize == tail.length ? tailNext : 0;
+            int first = Math.min(tailSize, tail.length - start);
+            System.arraycopy(tail, start, bytes, 0, first);
+            System.arraycopy(tail, 0, bytes, first, tailSize - first);
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    /** Complete captured lines around a discarded middle, with original byte offsets. */
+    public record TruncatedParts(String head, String tail, long headEndByte, long tailStartByte) {}
+
+    public synchronized TruncatedParts truncatedParts() {
+        if (!truncated()) {
+            throw new IllegalStateException("Output has no discarded middle");
+        }
+        int headEnd = 0;
+        for (int i = 0; i < headSize; i++) {
+            if (head[i] == '\n') {
+                headEnd = i + 1;
+            }
+        }
+        byte[] tailBytes = new byte[tailSize];
+        int start = tailNext;
+        int first = Math.min(tailSize, tail.length - start);
+        System.arraycopy(tail, start, tailBytes, 0, first);
+        System.arraycopy(tail, 0, tailBytes, first, tailSize - first);
+        int tailStart = tailSize;
+        for (int i = 0; i < tailSize; i++) {
+            if (tailBytes[i] == '\n') {
+                tailStart = i + 1;
+                break;
+            }
+        }
+        return new TruncatedParts(
+                new String(head, 0, headEnd, StandardCharsets.UTF_8),
+                new String(tailBytes, tailStart, tailSize - tailStart, StandardCharsets.UTF_8),
+                headEnd,
+                bytesSeen - tailSize + tailStart);
+    }
+
     public synchronized String snapshot() {
         byte[] bytes = new byte[headSize + tailSize];
         System.arraycopy(head, 0, bytes, 0, headSize);

@@ -103,6 +103,31 @@ class BuildOutputParserTest {
             assertThat(testSummary.get("total")).isEqualTo(3);
             assertThat(testSummary.get("failed")).isEqualTo(1);
             assertThat(testSummary.get("passed")).isEqualTo(2);
+            assertThat(result.get("errorCount")).isEqualTo(1);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> errors = (List<Map<String, Object>>) result.get("errors");
+            assertThat(errors)
+                    .singleElement()
+                    .extracting(error -> error.get("message"))
+                    .isEqualTo("Test assertion failed");
+        }
+
+        @Test
+        @DisplayName("reports Maven test execution errors without raw failure text")
+        void reportsTestExecutionErrorsWithoutRawText() {
+            String output = """
+                    [ERROR] synthetic private exception detail
+                    [INFO] Tests run: 2, Failures: 0, Errors: 1, Skipped: 0
+                    [INFO] BUILD FAILURE
+                    """;
+            Map<String, Object> result = mavenParser.parse(output, 1, "test");
+            assertThat(result.get("errorCount")).isEqualTo(1);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> errors = (List<Map<String, Object>>) result.get("errors");
+            assertThat(errors)
+                    .singleElement()
+                    .extracting(error -> error.get("message"))
+                    .isEqualTo("Test failed during execution");
         }
 
         @Test
