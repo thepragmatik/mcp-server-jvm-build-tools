@@ -2,6 +2,7 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- CVE scan extraction now selects only project-level POM dependencies using a secure XML parser and ignores commented or quoted Gradle code. Inherited POM versions and dynamic supported Gradle calls fail incomplete before OSV egress instead of producing a misleading clean count.
 - The central project guard now checks build markers through one held, no-symlink project directory handle where Java `SecureDirectoryStream` is available. Providers without it keep canonical-path compatibility checks; those checks still have a path-swap race, so untrusted projects require isolation.
 - OSV batch scans now bound requests and response bodies, remove sequential retry storms, and fail incomplete without counts when a dependency was not checked. Sparse OSV matches retain an affected-dependency count and explicit unknown-severity status instead of passing the default HIGH filter as clean. Scan file reads reject nonregular markers and use a bounded worker/deadline; a final-file swap race still requires isolation for hostile projects. The scan remains limited to recognized direct declarations; CVSS vectors require future vetted scoring.
 - Gradle and sbt test-summary parsers now saturate oversized or inconsistent counts at 1,000,000 and mark `countsCapped`, matching Maven's bounded result contract without overflow or negative passed counts.

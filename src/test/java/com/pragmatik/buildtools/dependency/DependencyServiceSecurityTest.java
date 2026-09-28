@@ -190,6 +190,161 @@ class DependencyServiceSecurityTest {
         }
 
         @Test
+        void managedBlockBeforeDirectDependenciesQueriesOnlyProjectLevelDeclarations() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), """
+                    <project><dependencyManagement><dependencies><dependency>
+                    <groupId>org.example</groupId><artifactId>managed</artifactId><version>9.9</version>
+                    </dependency></dependencies></dependencyManagement>
+                    <dependencies><dependency><groupId>org.example</groupId>
+                    <artifactId>direct</artifactId><version>1.0</version></dependency></dependencies></project>
+                    """);
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "direct", "1.0"));
+            assertThat(result).contains("\"totalDeps\":1", "\"scanStatus\":\"complete\"");
+        }
+
+        @Test
+        void managedOnlyPomHasNoProjectLevelDeclarationsOrEgress() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), """
+                    <project><dependencyManagement><dependencies><dependency>
+                    <groupId>org.example</groupId><artifactId>managed</artifactId><version>9.9</version>
+                    </dependency></dependencies></dependencyManagement></project>
+                    """);
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).isEmpty();
+            assertThat(result).contains("\"totalDeps\":0", "\"scanStatus\":\"complete\"");
+        }
+
+        @Test
+        void namespacedPomDirectDeclarationIsRecognized() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0"><dependencies><dependency>
+                    <groupId>org.example</groupId><artifactId>namespaced</artifactId><version>2.0</version>
+                    </dependency></dependencies></project>
+                    """);
+            CountingLookup lookup = new CountingLookup();
+            new DependencyService(new BuildToolProvider(), lookup).scanDependencyCves(project.toString(), "HIGH");
+            assertThat(lookup.queried)
+                    .containsExactly(new CveLookupService.PackageRef("org.example", "namespaced", "2.0"));
+        }
+
+        @Test
+        void malformedDtdAndInheritedVersionPomFailBeforeLookup() throws Exception {
+            List<String> unsafe = List.of(
+                    "<project><dependencies><dependency>",
+                    "<!DOCTYPE project [<!ENTITY secret SYSTEM 'file:///synthetic/private'>]><project>&secret;</project>",
+                    """
+                    <project><dependencyManagement><dependencies><dependency>
+                    <groupId>org.example</groupId><artifactId>managed</artifactId><version>1.0</version>
+                    </dependency></dependencies></dependencyManagement><dependencies><dependency>
+                    <groupId>org.example</groupId><artifactId>managed</artifactId>
+                    </dependency></dependencies></project>
+                    """);
+            for (int i = 0; i < unsafe.size(); i++) {
+                Path project = Files.createDirectory(temporary.toRealPath().resolve("project" + i));
+                Files.writeString(project.resolve("pom.xml"), unsafe.get(i));
+                CountingLookup lookup = new CountingLookup();
+                String result = new DependencyService(new BuildToolProvider(), lookup)
+                        .scanDependencyCves(project.toString(), "HIGH");
+                assertThat(lookup.calls).hasValue(0);
+                assertThat(result)
+                        .contains("Dependency vulnerability scan incomplete")
+                        .doesNotContain("scanSummary", "synthetic/private", project.toString());
+            }
+        }
+
+        @Test
+        void gradleCommentsAndQuotedCodeDoNotBecomeOutboundDependencies() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle.kts"), """
+                    // implementation("org.example:line-comment:1.0")
+                    /* implementation("org.example:block-comment:1.0") */
+                    val note = "// implementation(\\"org.example:quoted-code:1.0\\")"
+                    val url = "https://example.invalid/path"
+                    dependencies { implementation("org.example:real:2.0") }
+                    """);
+            CountingLookup lookup = new CountingLookup();
+
+            new DependencyService(new BuildToolProvider(), lookup).scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "real", "2.0"));
+        }
+
+        @Test
+        void commentOnlyGradleFileHasNoCoordinatesToSend() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle.kts"), """
+                    // implementation("org.example:ignored:1.0")
+                    /* api("org.example:also-ignored:1.0") */
+                    val sample = "implementation(\\"org.example:quoted:1.0\\")"
+                    """);
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried).isEmpty();
+            assertThat(result).contains("\"totalDeps\":0", "\"scanStatus\":\"complete\"");
+        }
+
+        @Test
+        void dynamicGradleVersionFailsBeforeLookup() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle"), "implementation 'org.example:dynamic:1.+' ");
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result)
+                    .contains("Dependency vulnerability scan incomplete")
+                    .doesNotContain("scanSummary");
+        }
+
+        @Test
+        void unsupportedGradleCallFailsBeforeLookup() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle.kts"), "dependencies { implementation(libs.guava) }");
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.calls).hasValue(0);
+            assertThat(result)
+                    .contains("Dependency vulnerability scan incomplete")
+                    .doesNotContain("scanSummary");
+        }
+
+        @Test
+        void slashyAndBacktickSyntaxFailBeforeLookup() throws Exception {
+            List<String> scripts = List.of(
+                    "def note = /implementation('org.example:quoted:1.0')/",
+                    "val `implementation(\"org.example:quoted:1.0\")` = 1");
+            for (int i = 0; i < scripts.size(); i++) {
+                Path project = Files.createDirectory(temporary.toRealPath().resolve("project" + i));
+                Files.writeString(project.resolve("build.gradle.kts"), scripts.get(i));
+                CountingLookup lookup = new CountingLookup();
+                String result = new DependencyService(new BuildToolProvider(), lookup)
+                        .scanDependencyCves(project.toString(), "HIGH");
+                assertThat(lookup.calls).hasValue(0);
+                assertThat(result).contains("Dependency vulnerability scan incomplete");
+            }
+        }
+
+        @Test
         void uncheckedDependencyReturnsFixedIncompleteErrorWithoutCounts() throws Exception {
             Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
             Files.writeString(project.resolve("pom.xml"), POM);
@@ -250,6 +405,20 @@ class DependencyServiceSecurityTest {
             new DependencyService(new BuildToolProvider(), lookup).scanDependencyCves(project.toString(), "HIGH");
 
             assertThat(lookup.queried).containsExactly(new CveLookupService.PackageRef("org.example", "groovy", "3.0"));
+        }
+
+        @Test
+        void groovySpaceDoubleQuotedDependencyIsRecognized() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("build.gradle"), "implementation \"org.example:groovy-double:3.1\"");
+            CountingLookup lookup = new CountingLookup();
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(lookup.queried)
+                    .containsExactly(new CveLookupService.PackageRef("org.example", "groovy-double", "3.1"));
+            assertThat(result).contains("\"totalDeps\":1", "\"scanStatus\":\"complete\"");
         }
 
         @Test

@@ -66,7 +66,8 @@ class HttpMcpProtocolDispatchTest {
         assertThat(tools).contains("\"tools\"").contains("detect_build_tool").doesNotContain("Method not found");
         assertThat(tools)
                 .contains("Return dependency, managed-entry, and BOM counts")
-                .contains("Return recognized-declaration and affected-dependency counts with scan status");
+                .contains(
+                        "Return project-level POM or selected Gradle literal-declaration and affected-dependency counts with scan status");
 
         String result = client.postForObject(
                 endpoint,

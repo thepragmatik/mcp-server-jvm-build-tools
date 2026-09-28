@@ -67,6 +67,8 @@ public class CveLookupService {
     private static final int MAX_GROUP_ID_LENGTH = 256;
     private static final int MAX_ARTIFACT_ID_LENGTH = 128;
     private static final int MAX_VERSION_LENGTH = 128;
+    private static final Set<String> DYNAMIC_VERSIONS =
+            Set.of("LATEST", "RELEASE", "latest.release", "latest.integration");
     public static final int MAX_SCAN_PACKAGES = 500;
     static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
@@ -192,6 +194,11 @@ public class CveLookupService {
                 && matches(pkg.version(), VERSION_PART, MAX_VERSION_LENGTH);
     }
 
+    /** Whether a literal Maven coordinate can be sent to OSV without transformation. */
+    public static boolean supports(PackageRef pkg) {
+        return valid(pkg) && !pkg.version().endsWith("+") && !DYNAMIC_VERSIONS.contains(pkg.version());
+    }
+
     private static boolean matches(String value, Pattern pattern, int maxLength) {
         return value != null
                 && value.length() <= maxLength
@@ -209,7 +216,7 @@ public class CveLookupService {
      */
     public List<VulnerabilityEntry> lookup(String groupId, String artifactId, String version) throws IOException {
         PackageRef pkg = new PackageRef(groupId, artifactId, version);
-        if (!valid(pkg)) {
+        if (!supports(pkg)) {
             throw new IOException("Invalid package coordinates for OSV query");
         }
         String cacheKey = groupId + ":" + artifactId + ":" + version;
@@ -273,7 +280,7 @@ public class CveLookupService {
         // Serve cache hits first; collect the rest for batching
         List<PackageRef> pending = new ArrayList<>();
         for (PackageRef pkg : packages) {
-            if (!valid(pkg)) {
+            if (!supports(pkg)) {
                 // A malformed coordinate must never reach the outbound transport or logs.
                 continue;
             }

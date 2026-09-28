@@ -574,7 +574,7 @@ public class DependencyService {
     @Tool(
             name = "scan_dependency_cves",
             description =
-                    "Scan recognized direct Maven or Gradle dependency declarations for known vulnerabilities using OSV.dev. "
+                    "Scan project-level Maven dependencies with explicit literal versions or selected literal Gradle dependency calls using OSV.dev. "
                             + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
                             + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
                             + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
@@ -689,6 +689,8 @@ public class DependencyService {
             return JsonUtils.errorJson("Build configuration exceeds the 1 MiB scan limit");
         } catch (CharacterCodingException e) {
             return JsonUtils.errorJson("Build configuration is not valid UTF-8");
+        } catch (IncompleteDependencyScanException e) {
+            return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
         } catch (IOException | InvalidPathException | UnsupportedOperationException | SecurityException e) {
             return JsonUtils.errorJson("Cannot safely read build configuration");
         }
@@ -743,46 +745,10 @@ public class DependencyService {
      * Extract package references from build files.
      */
     private List<CveLookupService.PackageRef> extractPackages(String content, String tool) {
-        List<CveLookupService.PackageRef> packages = new ArrayList<>();
-
-        if ("maven".equals(tool)) {
-            // Extract <dependency> blocks from POM
-            String depsBlock = extractTag(content, "dependencies");
-            if (depsBlock == null) return packages;
-
-            String[] depSections = depsBlock.split("</dependency>");
-            for (String section : depSections) {
-                int start = section.indexOf("<dependency>");
-                if (start < 0) continue;
-                String depXml = section.substring(start);
-                String g = extractTag(depXml, "groupId");
-                String a = extractTag(depXml, "artifactId");
-                String v = extractTag(depXml, "version");
-                if (g != null && a != null && v != null && !v.contains("${")) {
-                    packages.add(new CveLookupService.PackageRef(g, a, v));
-                }
-            }
-        } else if ("gradle".equals(tool)) {
-            // Extract dependency declarations from Gradle build file
-            // Match implementation('group:artifact:version') patterns
-            java.util.regex.Pattern depPattern = java.util.regex.Pattern.compile(
-                    "(?:implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s*[(']\"?"
-                            + "([^:'\"\\s]+):([^:'\"\\s]+):([^:'\"\\s)]+)\"?[')]");
-            java.util.regex.Matcher m = depPattern.matcher(content);
-            while (m.find()) {
-                String g = m.group(1);
-                String a = m.group(2);
-                String v = m.group(3);
-                if (!v.contains("$") && !v.startsWith("+")) {
-                    packages.add(new CveLookupService.PackageRef(g, a, v));
-                }
-            }
-        }
-
-        return packages;
+        if ("maven".equals(tool)) return MavenPomScanParser.parse(content);
+        if ("gradle".equals(tool)) return GradleDependencyScanner.parse(content);
+        throw new IncompleteDependencyScanException();
     }
-
-    // ─── Supporting enums ───────────────────────────────────────────────
 
     public enum VersionPreference {
         /** Stable releases only — no snapshots, no milestones/RCs */

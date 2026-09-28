@@ -34,7 +34,7 @@ and [2.0 security design](design-v2.md) before granting execution access.
 | `prompt_build_and_test` | `prompt:read` | Return a server-authored build-and-test workflow without echoing user inputs. |
 | `prompt_build_diagnosis` | `prompt:read` | Return a server-authored diagnosis workflow without echoing user inputs. |
 | `prompt_dependency_audit` | `prompt:read` | Return a server-authored dependency-audit workflow without echoing user inputs. |
-| `scan_dependency_cves` | `dependency:read` | Return recognized-declaration and affected-dependency counts with scan status. Sparse OSV matches have unknown severity; high and critical counts appear only when known. Incomplete scans have no counts. Dependency and CVE identities are withheld. |
+| `scan_dependency_cves` | `dependency:read` | Return project-level POM or selected Gradle literal-declaration and affected-dependency counts with scan status. Sparse OSV matches have unknown severity; high and critical counts appear only when known. Incomplete scans have no counts. Dependency and CVE identities are withheld. |
 | `validate_build_configuration` | `build:read` | Return validity, counts, and bounded redacted diagnostics. |
 | `validate_ci_flow` | `ci:read` | Return validity with bounded redacted errors and warnings; raw configuration is withheld. |
 
