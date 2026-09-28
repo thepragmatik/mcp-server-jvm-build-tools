@@ -89,6 +89,12 @@ class NumericTestSummaryBoundsTest {
                 sbt.parse("[info] Test run finished: 3 failed, 4 ignored, 2 total\n", 1, "test"), 7, 0, 3, 0, 4, true);
     }
 
+    @Test
+    void sbtDoesNotInventPassedTestsWhenSummaryLeavesOneUnclassified() {
+        assertSummary(
+                sbt.parse("[info] Passed: Total 5, Failed 0, Errors 0, Passed 4\n", 1, "test"), 5, 4, 0, 0, 0, true);
+    }
+
     @SuppressWarnings("unchecked")
     private static void assertSummary(
             Map<String, Object> parsed, int total, int passed, int failed, int errors, int skipped, boolean capped) {

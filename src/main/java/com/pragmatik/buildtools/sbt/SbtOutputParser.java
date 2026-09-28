@@ -301,20 +301,29 @@ public class SbtOutputParser implements BuildOutputParser {
 
     private static Map<String, Object> buildTestSummary(
             BoundedTestCounts counts, int total, int reportedPassed, int failed, int error, int skipped) {
-        total = counts.atLeast(total, counts.add(failed, counts.add(error, skipped)));
-        failed = Math.min(failed, total);
-        error = Math.min(error, total - failed);
-        skipped = Math.min(skipped, total - failed - error);
-        int passed = total - failed - error - skipped;
-        if (passed != reportedPassed) {
+        int categorySum = counts.add(counts.add(failed, error), counts.add(skipped, reportedPassed));
+        total = counts.atLeast(total, categorySum);
+        int remaining = total;
+        int boundedFailed = Math.min(failed, remaining);
+        remaining -= boundedFailed;
+        int boundedError = Math.min(error, remaining);
+        remaining -= boundedError;
+        int boundedSkipped = Math.min(skipped, remaining);
+        remaining -= boundedSkipped;
+        int passed = Math.min(reportedPassed, remaining);
+        if (boundedFailed != failed
+                || boundedError != error
+                || boundedSkipped != skipped
+                || passed != reportedPassed
+                || passed < remaining) {
             counts.markInconsistent();
         }
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("total", total);
         summary.put("passed", passed);
-        summary.put("failed", failed);
-        summary.put("errors", error);
-        summary.put("skipped", skipped);
+        summary.put("failed", boundedFailed);
+        summary.put("errors", boundedError);
+        summary.put("skipped", boundedSkipped);
         if (counts.wasCapped()) {
             summary.put("countsCapped", true);
         }
