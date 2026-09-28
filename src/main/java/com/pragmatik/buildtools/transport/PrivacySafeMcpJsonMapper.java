@@ -18,11 +18,14 @@ package com.pragmatik.buildtools.transport;
 
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.TypeRef;
+import io.modelcontextprotocol.spec.McpSchema.JSONRPCRequest;
 import io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse;
 import io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse.JSONRPCError;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,9 +40,17 @@ public final class PrivacySafeMcpJsonMapper implements McpJsonMapper {
     private static final Logger log = LoggerFactory.getLogger(PrivacySafeMcpJsonMapper.class);
 
     private final McpJsonMapper delegate;
+    private final boolean recoverStdioSyntax;
+    private static final String STDIO_PARSE_ERROR_ID = UUID.randomUUID().toString();
+    private static final String STDIO_PARSE_ERROR_METHOD = "internal/stdio-parse-error";
 
     public PrivacySafeMcpJsonMapper(McpJsonMapper delegate) {
+        this(delegate, false);
+    }
+
+    PrivacySafeMcpJsonMapper(McpJsonMapper delegate, boolean recoverStdioSyntax) {
         this.delegate = delegate;
+        this.recoverStdioSyntax = recoverStdioSyntax;
     }
 
     @Override
@@ -54,7 +65,19 @@ public final class PrivacySafeMcpJsonMapper implements McpJsonMapper {
 
     @Override
     public <T> T readValue(String content, TypeRef<T> type) throws IOException {
-        return delegate.readValue(content, type);
+        try {
+            return delegate.readValue(content, type);
+        } catch (IOException e) {
+            if (!recoverStdioSyntax) {
+                throw e;
+            }
+            // The SDK's stdio reader otherwise closes the entire session on a
+            // Jackson syntax error. Its bounded line reader remains in charge of
+            // input; this marker lets the session answer through its own transport.
+            @SuppressWarnings("unchecked")
+            T marker = (T) new StdioParseErrorMarker();
+            return marker;
+        }
     }
 
     @Override
@@ -64,7 +87,21 @@ public final class PrivacySafeMcpJsonMapper implements McpJsonMapper {
 
     @Override
     public <T> T convertValue(Object value, Class<T> type) {
+        if (recoverStdioSyntax && value instanceof StdioParseErrorMarker && type == JSONRPCRequest.class) {
+            return type.cast(new JSONRPCRequest("2.0", STDIO_PARSE_ERROR_METHOD, STDIO_PARSE_ERROR_ID, null));
+        }
         return delegate.convertValue(value, type);
+    }
+
+    static boolean isStdioParseError(JSONRPCRequest request) {
+        return STDIO_PARSE_ERROR_METHOD.equals(request.method()) && request.id() == STDIO_PARSE_ERROR_ID;
+    }
+
+    private static final class StdioParseErrorMarker extends HashMap<String, Object> {
+        private StdioParseErrorMarker() {
+            put("method", STDIO_PARSE_ERROR_METHOD);
+            put("id", STDIO_PARSE_ERROR_ID);
+        }
     }
 
     @Override

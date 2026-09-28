@@ -89,11 +89,19 @@ public class StdioDiscoverSession extends McpServerSession {
      */
     @Override
     public Mono<Void> handle(McpSchema.JSONRPCMessage message) {
+        if (message instanceof McpSchema.JSONRPCRequest request
+                && PrivacySafeMcpJsonMapper.isStdioParseError(request)) {
+            return sessionTransport.sendMessage(new StdioParseErrorResponse(
+                    "2.0", null, new McpSchema.JSONRPCResponse.JSONRPCError(-32700, "Parse error", null)));
+        }
         if (message instanceof McpSchema.JSONRPCRequest request && METHOD_SERVER_DISCOVER.equals(request.method())) {
             return handleDiscover(request);
         }
         return delegate.handle(message);
     }
+
+    private record StdioParseErrorResponse(String jsonrpc, Object id, McpSchema.JSONRPCResponse.JSONRPCError error)
+            implements McpSchema.JSONRPCMessage {}
 
     private Mono<Void> handleDiscover(McpSchema.JSONRPCRequest request) {
         McpSchema.JSONRPCResponse response;

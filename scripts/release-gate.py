@@ -250,7 +250,8 @@ def stdio_check():
     pending = bytearray()
 
     def exchange(message, identifier, *, expect_error=False):
-        process.stdin.write(json.dumps(message).encode() + b"\n")
+        payload = message if isinstance(message, bytes) else json.dumps(message).encode()
+        process.stdin.write(payload + b"\n")
         process.stdin.flush()
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
@@ -308,6 +309,14 @@ def stdio_check():
         reply = exchange(invalid_shape, 25, expect_error=True)
         assert_safe_error(json.dumps(reply).encode(), 25, canary, "stdio malformed shape")
         print("PASS stdio malformed shape: generic bounded error")
+        malformed_syntax = (b'{"jsonrpc":"2.0","id":26,"method":"ping","params":{"text":"'
+                            + canary.encode() + b'"}')
+        reply = exchange(malformed_syntax, None, expect_error=True)
+        assert_safe_error(json.dumps(reply).encode(), None, canary, "stdio malformed syntax")
+        if reply["error"]["code"] != -32700:
+            raise AssertionError("Stdio malformed syntax returned the wrong error code")
+        exchange({"jsonrpc": "2.0", "id": 27, "method": "ping"}, 27)
+        print("PASS stdio malformed syntax: generic parse error and same-session ping")
     finally:
         process.terminate()
         try:

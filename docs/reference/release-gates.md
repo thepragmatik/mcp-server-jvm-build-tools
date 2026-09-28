@@ -36,7 +36,9 @@ The black-box adversarial probes send only synthetic data. They require:
 - A valid bearer limited to `build:read` to receive HTTP 403 for
   `execute_build_command` and successfully call `list_build_tools` with the
   same key.
-- Stdio to negotiate `2025-11-25` and answer `ping` and `tools/list`.
+- Stdio to negotiate `2025-11-25`, answer `ping` and `tools/list`, then
+  return a bounded generic parse error for one malformed JSON line and still
+  answer a subsequent `ping` in the same session.
 
 The full Maven verification suite exercises structured diagnostic redaction,
 prompt-injection suppression, authorization, and allowed-root/symlink handling.
@@ -50,6 +52,12 @@ while exception data and caller-derived error messages are replaced with fixed
 phrases. Successful tool responses, including projected diagnostics, keep their
 normal format. This is a wire-output policy; operators should still investigate
 server errors using local logs.
+The stdio recovery adapter uses the SDK's existing line reader and session
+transport, so valid messages get no second parse and responses stay serialized
+by the SDK. Its input limit is set to 1 MiB of decoded characters; an
+oversized line ends the stdio session. The SDK decodes UTF-8 with replacement
+for malformed byte sequences, so this gate does not claim strict byte-level
+UTF-8 rejection.
 These checks do not prove that an arbitrary build script is safe. A filesystem
 symlink can change after Java validates its path and before a child process uses
 it; run untrusted workspaces in a container or equivalent OS sandbox without

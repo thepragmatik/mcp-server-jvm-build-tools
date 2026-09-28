@@ -17,9 +17,11 @@
 package com.pragmatik.buildtools.transport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse;
 import io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse.JSONRPCError;
 import org.junit.jupiter.api.Test;
@@ -57,5 +59,20 @@ class PrivacySafeMcpJsonMapperTest {
 
         assertThat(text).contains("Internal error");
         assertThat(text).doesNotContain("synthetic-private-canary.invalid", "stackTrace", "cause");
+    }
+
+    @Test
+    void stdioRecoversSyntaxWithoutChangingValidInputOrHttpParsing() throws Exception {
+        McpJsonMapper stdio = new PrivacySafeMcpJsonMapper(new JacksonMcpJsonMapper(new JsonMapper()), true);
+        String malformed = "{\"jsonrpc\":\"2.0\",\"method\":\"ping\"";
+
+        McpSchema.JSONRPCMessage recovered = McpSchema.deserializeJsonRpcMessage(stdio, malformed);
+        assertThat(recovered).isInstanceOf(McpSchema.JSONRPCRequest.class);
+        assertThat(PrivacySafeMcpJsonMapper.isStdioParseError((McpSchema.JSONRPCRequest) recovered))
+                .isTrue();
+        assertThat(McpSchema.deserializeJsonRpcMessage(stdio, "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":7}"))
+                .isInstanceOf(McpSchema.JSONRPCRequest.class);
+        assertThatThrownBy(() -> McpSchema.deserializeJsonRpcMessage(mapper, malformed))
+                .isInstanceOf(java.io.IOException.class);
     }
 }
