@@ -1,5 +1,7 @@
 # Test Results — JVM Build Tools MCP Server (Docker)
 
+> **Historical 1.x test report:** The counts and transport findings below describe the dated run, not the current 2.0 release candidate. See [current release gates](release-gates.md) and [protocol evidence](../EVIDENCE.md) for current verification.
+
 > **Document:** ENG-5 + ENG-6 test execution report
 > **Date:** 2026-07-23
 > **Author:** ENG-5 / ENG-6 (hswarm-eng)

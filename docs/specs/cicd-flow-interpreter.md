@@ -1,5 +1,7 @@
 # CI/CD Flow Interpreter — Design Spec
 
+> **Historical 1.x proposal:** This specification is not a public 2.0 feature contract. See the [current tool catalog](../reference/tool-catalog.md), [architecture](../reference/architecture.md), and [roadmap](../ROADMAP.md).
+
 **Date:** 2026-07-26  
 **Target Release:** v1.2.0  
 **Status:** Draft  

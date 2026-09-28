@@ -1,5 +1,8 @@
 # Tools Reference — mcp-server-jvm-build-tools
 
+
+> **Historical 1.x reference:** This file contains old commands, tool counts, or response shapes. Use the [current 2.0 documentation](reference/tool-catalog.md) for the supported release-candidate contract.
+
 > **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
 
 Complete reference for all 28 MCP tools exposed by the server. Each tool is an `@Tool`-annotated method on a Spring service bean, automatically discovered by Spring AI's `MethodToolCallbackProvider` and exposed via MCP stdio transport.

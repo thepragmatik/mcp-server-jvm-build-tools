@@ -118,13 +118,13 @@ extra:
       name: Source on GitHub
 
 nav:
+  - Home: index.md
   - User Guide:
       - Overview: user-guide/overview.md
       - Quickstart 2.0: user-guide/quickstart-v2.md
+      - Migration to 2.0: user-guide/migration-v2.md
       - Installation: user-guide/installation.md
       - Configuration: user-guide/configuration.md
-      - Usage: user-guide/usage.md
-      - Examples: user-guide/examples.md
   - Reference:
       - Architecture: reference/architecture.md
       - Design 2.0: reference/design-v2.md
@@ -132,23 +132,24 @@ nav:
       - Configuration 2.0: reference/configuration-v2.md
       - Legacy Tools (1.x): reference/tools.md
       - Legacy Configuration (1.x): reference/configuration.md
-      - Security: reference/security.md
-      - Design v1.1.0: reference/design-v1.1.0.md
-      - Design v1.2.0: reference/design-v1.2.0.md
-      - CI/CD Flow Interpreter: specs/cicd-flow-interpreter.md
-      - Build Plan Authoring: specs/build-plan-authoring.md
-      - OAuth 2.1 Credentials: specs/oauth-client-credentials.md
-      - Observability: specs/observability.md
+      - Legacy Security (1.x): reference/security.md
+      - Historical Design v1.1.0: reference/design-v1.1.0.md
+      - Historical Design v1.2.0: reference/design-v1.2.0.md
+      - Historical CI/CD Flow Interpreter: specs/cicd-flow-interpreter.md
+      - Historical Build Plan Authoring: specs/build-plan-authoring.md
+      - Historical OAuth 2.1 Credentials: specs/oauth-client-credentials.md
+      - Historical Observability: specs/observability.md
       - Protocol Evidence: EVIDENCE.md
   - Testing:
-      - Test Results: reference/test-results.md
+      - Historical Test Results (1.x): reference/test-results.md
       - Historical Test Plan (1.x): reference/test-plan.md
       - Test Tools: reference/test-tools-recommendations.md
   - FAQ: FAQ.md
   - Project:
-      - Mission: MISSION.md
+      - Historical Mission (1.x): MISSION.md
       - Roadmap: ROADMAP.md
-      - Migration to 2.0: user-guide/migration-v2.md
+      - Historical Usage (1.x): user-guide/usage.md
+      - Historical Examples (1.x): user-guide/examples.md
       - Workflow: WORKFLOW.md
       - Agent Guide: AGENTS.md
       - Release Notes: RELEASE_NOTES.md

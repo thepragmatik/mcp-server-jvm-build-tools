@@ -2,7 +2,7 @@
 
 This is the active 2.0 roadmap. The 1.x research history remains in Git history and release notes; its tool counts and 2026 draft claims are not the current contract.
 
-## Current candidate: 2.0.0-rc.1
+## Current line: 2.0.0-rc.1 candidate
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.
@@ -20,7 +20,7 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 2. Red-team prompt injection, path races, scope bypass, malformed and oversized JSON-RPC, and synthetic privacy canaries through both transports.
 3. Reconcile every public tool description and configuration page with the 24-tool runtime catalog; generate a machine-checked catalog in CI.
 4. Measure callback overhead, process memory, bounded output behavior, and build latency on synthetic Maven, Gradle, and sbt fixtures. Set budgets only from measured baselines.
-5. Run the two independent PR reviews and address every inline finding. Keep the prerelease untagged until all checks are green.
+5. Run two independent exact-head PR reviews and address every inline finding. Tag the prerelease only when all final-head gates are green; record the tag and release outcome separately.
 
 The release evidence matrix is a living gate, not a list of assumed passes. Attach the exact commit, environment, command, and summarized result to the release PR; a result on one machine is not a universal performance guarantee.
 
@@ -30,11 +30,11 @@ The release evidence matrix is a living gate, not a list of assumed passes. Atta
 | MCP protocol | Pinned official runner, advertised-capability scenarios and DNS-rebinding case on final jar | Recheck on final release head | Protocol engineer |
 | Privacy and adversarial cases | Synthetic canary matrix on both transports; counts/status only | Implemented; recheck on final release head | Security reviewer |
 | Public contract | Generated runtime catalog and docs drift check | Implemented in CI; recheck on final release head | Docs engineer |
-| Performance | `scripts/benchmark-release-gate.py` aggregates for Maven, Gradle, sbt, callback and bounded-output stress, with warm-cache/offline provenance | Exploratory baseline recorded; final release-head rerun and runner budget pending | Performance engineer |
+| Performance | `scripts/benchmark-release-gate.py` aggregates for Maven, Gradle, sbt, callback and bounded-output stress, with warm-cache/offline provenance | Five-run offline candidate-tree baseline recorded in [workflow](WORKFLOW.md#reproducible-performance-baseline); pinned-runner budget still pending | Performance engineer |
 | Dependencies | Green keyless PR Dependency Review, then 0 open Dependabot alerts on the final default-branch commit using an authorized maintainer credential | Keyless gate implemented; recheck after final merge | Release engineer |
 | PR review | Two fresh-checkout role-tagged reviews on final SHA; all inline threads answered | Pending final SHA | Quality and adversarial reviewers |
 
-The release engineer must not tag `v2.0.0-rc.1` while a required row is failed, unknown, or blocked. A PR dependency review is not the final-branch alert audit; record both on the release head, and fail closed if alert access is unavailable. The performance script deliberately has no invented latency or memory budget. Compare repeated runs on a pinned runner and cache state before proposing one.
+Before any release tag, the release engineer checks this matrix against the exact final default-branch commit and records the outcome. Do not infer a pass from an earlier PR head. A PR dependency review is not the final-branch alert audit; record both on the release head, and fail closed if alert access is unavailable. The performance script deliberately has no invented latency or memory budget. Compare repeated runs on a pinned runner and cache state before proposing one.
 
 ## Stable 2.0 gate
 

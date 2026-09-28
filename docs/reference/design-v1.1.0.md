@@ -1,5 +1,7 @@
 # Design Specification — mcp-server-jvm-build-tools v1.1.0
 
+> **Historical 1.x design:** This document records an earlier proposal, not the current 2.0 contract. Use the [2.0 architecture](architecture.md), [design review](design-v2.md), and [public tool catalog](tool-catalog.md) for current behavior.
+
 **Task:** ARCH-1 Gap Analysis & Design for Next Iteration
 **Date:** 2026-07-23
 **Author:** hswarm-arch

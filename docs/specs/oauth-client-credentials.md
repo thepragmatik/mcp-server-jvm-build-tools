@@ -1,5 +1,7 @@
 # OAuth 2.1 Client Credentials Grant — Design Spec
 
+> **Historical 1.x proposal:** This specification is not a public 2.0 feature contract. For current HTTP access controls, see [2.0 configuration](../reference/configuration-v2.md) and the [public tool catalog](../reference/tool-catalog.md).
+
 **Date:** 2026-07-26  
 **Target Release:** v1.2.0  
 **Status:** Draft  

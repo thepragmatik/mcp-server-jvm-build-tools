@@ -1,5 +1,8 @@
 # Quick Start — mcp-server-jvm-build-tools
 
+
+> **Historical 1.x reference:** This file contains old commands, tool counts, or response shapes. Use the [current 2.0 documentation](user-guide/quickstart-v2.md) for the supported release-candidate contract.
+
 Get the MCP server running in 5 minutes. For detailed docs, see [README.md](README.md).
 
 ## Prerequisites

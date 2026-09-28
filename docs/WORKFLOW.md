@@ -55,17 +55,17 @@ BENCHMARK_CACHE_STATE=warm sh scripts/benchmark-docker.sh offline --runs 5 --war
 
 The script runs as a nonroot UID with a read-only root filesystem, a tmpfs for generated projects, CPU/memory limits, no host secrets, and no Docker socket. To reuse an existing host `.m2` repository, set `BENCHMARK_OFFLINE_MAVEN_REPOSITORY` to that artifact directory **only for the offline command**; it is mounted read-only and is never visible to a networked bootstrap. Otherwise the dedicated Maven volume avoids repeated downloads. Gradle/sbt runtime caches remain writable. If an offline case needs a missing public artifact, repeat the bootstrap and record that cache change. Never label the network-bootstrap result an offline baseline. The `/tmp` JSON files contain aggregate metrics only; inspect them before publishing. On an existing warmed volume, mark the bootstrap cache state `warm` rather than `cold`.
 
-An exploratory offline run on the merged server source at `eb14e06` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, warm dedicated public-artifact volumes, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. Each Maven/Gradle/sbt sample recompiled a changed Java class, verified by a changed class hash; each stress sample verified its emitted byte count. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
+An offline Docker run on the **release-candidate source tree** used candidate PR head `596a88370ba872d5d5c3abaff34e882aec9137d4`; its source tree matches merged main `e1cb0d1966e0ee11815b2b4732b879968dd34adb`. The environment was Linux/aarch64, Java 21.0.12.1, three CPU cores, a 4 GiB memory limit, network disabled for measured runs, and warm dedicated public-artifact volumes. It used two warmups and five measured runs per case. The Maven, Gradle, and sbt samples recompiled changed Java classes and verified distinct class fingerprints. Both synthetic output cases verified the emitted byte counts. Results below are end-to-end packaged-server stdio calls; p95 is directional with only five samples, and 100 ms RSS sampling can miss short peaks.
 
-| Synthetic case | p50 latency (ms) | p95 latency (ms) | p95 sampled RSS (MiB) | Max MCP response (bytes) |
+| Synthetic case | p50 latency (ms) | p95 latency (ms) | p95 sampled process-tree RSS (MiB) | Max MCP response (bytes) |
 | --- | ---: | ---: | ---: | ---: |
-| `list_build_tools` callback | 1.73 | 2.22 | 195.81 | 123 |
-| Maven `compile` | 834.04 | 834.26 | 356.88 | 304 |
-| Gradle `compileJava` | 2115.85 | 2140.55 | 681.17 | 128 |
-| sbt `compile` | 7053.01 | 7073.97 | 513.83 | 152 |
-| Synthetic 1 MiB output | 25.11 | 25.12 | 200.21 | 152 |
-| Synthetic 24 MiB output | 32.83 | 33.03 | 200.20 | 152 |
+| `list_build_tools` callback | 1.44 | 2.38 | 195.88 | 152 |
+| Maven `compile` | 898.37 | 909.64 | 364.58 | 304 |
+| Gradle `compileJava` | 2294.08 | 2325.28 | 684.33 | 128 |
+| sbt `compile` | 7655.69 | 7801.43 | 561.86 | 152 |
+| Synthetic 1 MiB output | 24.98 | 28.56 | 205.23 | 152 |
+| Synthetic 24 MiB output | 32.83 | 33.16 | 215.46 | 152 |
 
-The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.01 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
+The response sizes stayed bounded in both stress cases despite the larger process output. These figures are evidence for this source tree and environment, not a latency budget or a regression claim. Repeat on a pinned CI runner and matched cache state before setting thresholds. The previous three-sample exploratory run is preserved in Git history for comparison, but its setup and sample count differ.
 
 The [2.0 release gates](reference/release-gates.md) record the exact packaged-server protocol checks, adversarial probes, and remaining security-scan prerequisite.
