@@ -81,7 +81,7 @@ public final class ModelOutputPolicy {
     private static final Pattern VERSION = Pattern.compile("\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?\\b");
 
     private static final Pattern DIAGNOSTIC_LINE =
-            Pattern.compile("(?i).*(?:\\berror\\b|\\bfailed\\b|\\bwarn(?:ing)?\\b|\\bexception\\b).*");
+            Pattern.compile("(?i)(?:\\s*e:.*|.*(?:\\berror\\b|\\bfailed\\b|\\bwarn(?:ing)?\\b|\\bexception\\b).*)");
     private static final Pattern WARNING_PREFIX =
             Pattern.compile("(?i)^\\s*(?:\\[(?:warn|warning)]|(?:warn|warning)\\b).*");
     private static final Pattern FILE_LOCATION = Pattern.compile(
@@ -263,6 +263,9 @@ public final class ModelOutputPolicy {
             }
             if (!safe.containsKey("diagnostics")) {
                 copyPlainDiagnostics(executionOutput, safe);
+            }
+            if (parsed != null && parsed.path("diagnosticsTruncated").asBoolean(false)) {
+                safe.put("diagnosticsTruncated", true);
             }
             if (exitCode != null) {
                 safe.put("success", exitCode == 0);

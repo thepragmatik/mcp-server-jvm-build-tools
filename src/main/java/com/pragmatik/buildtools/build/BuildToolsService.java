@@ -183,9 +183,11 @@ public class BuildToolsService {
     static String boundedMcpExecutionResult(BuildExecutionResult result) {
         String output = result.output();
         boolean truncated = result.outputTruncated();
+        boolean diagnosticsTruncated = result.diagnosticsTruncated();
         if (output.length() > BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS) {
             output = retainOutputEdges(output, BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS);
             truncated = true;
+            diagnosticsTruncated = true;
         }
         for (; ; ) {
             Map<String, Object> privateResult = new LinkedHashMap<>();
@@ -196,12 +198,16 @@ public class BuildToolsService {
             if (truncated) {
                 privateResult.put("outputTruncated", true);
             }
+            if (diagnosticsTruncated) {
+                privateResult.put("diagnosticsTruncated", true);
+            }
             String json = JsonUtils.toJson(privateResult);
             if (json.length() <= BuildResultLimits.MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS) {
                 return json;
             }
             output = retainOutputEdges(output, Math.max(3, output.length() / 2));
             truncated = true;
+            diagnosticsTruncated = true;
         }
     }
 
@@ -449,13 +455,22 @@ public class BuildToolsService {
                 authoritativeExitCode = true;
                 outputTruncated = analysis.outputTruncated();
                 diagnosticsTruncated = analysis.diagnosticsTruncated();
-            } else if (tool instanceof GradleBuildTool || tool instanceof SbtBuildTool) {
+            } else if (tool instanceof GradleBuildTool gradle) {
                 BuildExecutionResult execution =
-                        tool.executeForMcp(validatedHome, validatedProject.toString(), command);
+                        gradle.analyzeCommand(validatedHome, validatedProject.toString(), command);
                 rawOutput = execution.output();
-                exitCode = execution.exitCode() == null ? 0 : execution.exitCode();
-                authoritativeExitCode = execution.exitCode() != null;
+                exitCode = execution.exitCode();
+                authoritativeExitCode = true;
                 outputTruncated = execution.outputTruncated();
+                diagnosticsTruncated = execution.diagnosticsTruncated();
+            } else if (tool instanceof SbtBuildTool sbt) {
+                BuildExecutionResult execution =
+                        sbt.analyzeCommand(validatedHome, validatedProject.toString(), command);
+                rawOutput = execution.output();
+                exitCode = execution.exitCode();
+                authoritativeExitCode = true;
+                outputTruncated = execution.outputTruncated();
+                diagnosticsTruncated = execution.diagnosticsTruncated();
             } else {
                 rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
                 exitCode = 0;

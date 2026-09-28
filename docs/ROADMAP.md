@@ -62,13 +62,7 @@ see the [result contract](reference/structured-build-results.md).
 The assertion-versus-compilation classification bug was also fixed and tested
 for Maven, Gradle, and sbt.
 
-A synthetic 25.4 MB Maven failure showed that the old 32 KiB head / 96 KiB tail
-capture omitted the sole compiler error in the middle, leaving a failed build
-with `errorCount: 0`. The Maven-only analysis path now captures at most 13
-complete compiler lines of 2 KiB each while draining, then applies the shared
-privacy projection. The unchanged head/tail capture and a separate
-`outputTruncated` signal remain; evaluate Gradle and sbt against matching
-fixtures before extending this mechanism.
+A synthetic 25.4 MB Maven failure showed that the old 32 KiB head / 96 KiB tail capture omitted the sole compiler error in the middle, leaving a failed build with errorCount: 0. Maven analysis captures at most 13 complete compiler lines of 2 KiB each while draining. Matching 28 MB synthetic Gradle/sbt failures now exercise bounded middle-candidate capture for execution and analysis, with both streams and the shared privacy projection. The unchanged head/tail capture and separate outputTruncated and diagnosticsTruncated signals remain.
 
 The first feature slice exposes three new static native workflows through `prompts/list` and `prompts/get` on both transports, while retaining the legacy `prompt_*` tools. HTTP requires `prompt:read`; prompt messages never interpolate paths, commands, arguments, or logs. The empty native resources capability remains advertised because its selected official conformance scenario failed when it was removed; `resources/list` returns no entries. Both-transport protocol, argument, scope, and synthetic privacy tests now cover the slice.
 
@@ -77,6 +71,6 @@ The first feature slice exposes three new static native workflows through `promp
 3. **Improve hot-path cost with evidence.** Use the release-gate fixture and recorded workloads to profile subprocess capture, Maven/Gradle cache behavior, and parallel dependency lookup before tuning. Acceptance: the same tests and security/privacy cases pass, with an environment-matched latency/RSS comparison; no global budget inferred from a developer laptop.
 4. **Adopt official Tasks when stable in the Java SDK.** The 2026-07-28 core revision is published, while Tasks now lives in a separate extension. Wait for suitable Java SDK support and official conformance before replacing the dormant custom async protocol. Acceptance: cancellation, ownership, expiry, interoperability, and migration tests with real clients.
 5. **Carry authoritative execution status (implemented after RC1).** Built-in Maven, Gradle, and sbt `execute_build_command` results now derive `success` from the completed subprocess exit code, including when retained markers disagree. Plugins without a typed process result expose unknown status. The typed Gradle/sbt path also preserves bounded stdout diagnostics on failure, which the legacy Java method previously discarded when stderr was empty. The legacy method remains available for plans and async callers.
-6. **Preserve Gradle/sbt and async middle diagnostics.** A synthetic 28 MB Gradle/sbt output can still place its sole root cause outside the retained head/tail; the async path has the same class of loss. Extend a private bounded diagnostic collector only after tool-specific recognition tests and an environment-matched latency/RSS comparison. Keep the captured candidate count and line length bounded and project through the existing privacy filter.
+6. **Preserve async middle diagnostics.** Gradle/sbt synchronous capture now retains bounded middle candidates on failed calls. The dormant async path has the same class of loss. Extend its private collector only with tool-specific recognition, cancellation and ownership tests, and an environment-matched latency/RSS comparison. Reuse the existing privacy projection.
 
 Architecture debt stays visible alongside features: the 11 annotations on unregistered service methods have been removed, while their ordinary methods and beans remain for a separately justified deletion decision. Consolidate process execution and cache policies where measured duplication exists; preserve the single authorization/output-policy boundary for new tools; and keep the generated public catalog as the docs drift check. Each decision needs a failing test, a specific user or maintenance cost, or a measured hot path rather than a speculative rewrite.

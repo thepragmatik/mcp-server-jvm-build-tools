@@ -109,10 +109,25 @@ public class SbtBuildTool implements BuildTool {
 
     @Override
     public BuildExecutionResult executeForMcp(String buildToolHome, String projectDir, String command) {
+        return completedResult(buildToolHome, projectDir, command, false);
+    }
+
+    public BuildExecutionResult analyzeCommand(String buildToolHome, String projectDir, String command) {
+        return completedResult(buildToolHome, projectDir, command, true);
+    }
+
+    private BuildExecutionResult completedResult(
+            String buildToolHome, String projectDir, String command, boolean analysis) {
         SyncProcessRunner.Result result = runCommand(buildToolHome, projectDir, command);
         String output = result.stderr().isEmpty() ? result.stdout() : result.stderr() + "\n" + result.stdout();
+        if (result.exitCode() != 0) {
+            output = analysis ? result.withMissingDiagnostics(output) : result.withDiagnostics(output);
+        }
         return new BuildExecutionResult(
-                output, result.exitCode(), result.stdoutTruncated() || result.stderrTruncated());
+                output,
+                result.exitCode(),
+                result.stdoutTruncated() || result.stderrTruncated(),
+                result.diagnosticsTruncated());
     }
 
     private SyncProcessRunner.Result runCommand(String buildToolHome, String projectDir, String command) {
@@ -134,7 +149,7 @@ public class SbtBuildTool implements BuildTool {
             // Drain stdout and stderr concurrently with a bounded execution timeout
             // to avoid the pipe-buffer deadlock that occurs when one stream is read
             // to EOF before the other is drained.
-            SyncProcessRunner.Result result = SyncProcessRunner.run(process, "sbt");
+            SyncProcessRunner.Result result = SyncProcessRunner.runWithDiagnostics(process, "sbt");
             return result;
         } catch (IOException e) {
             throw new RuntimeException("Unable to invoke sbt command: " + e.getMessage(), e);

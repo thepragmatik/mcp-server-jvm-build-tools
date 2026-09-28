@@ -40,3 +40,5 @@ jobs:
         run: ./mvnw -B package -DskipTests --no-transfer-progress
       - name: Run pinned official scenarios and adversarial requests
         run: python3 scripts/release-gate.py
+      - name: Verify Gradle and sbt middle diagnostics on both transports
+        run: python3 scripts/gradle-sbt-middle-protocol-gate.py
