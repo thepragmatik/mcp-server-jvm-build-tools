@@ -162,6 +162,9 @@ warnings.
 For Maven, `testSummary` uses each Surefire/Failsafe execution's final total
 when present. If the output ends before that total, it sums the per-class
 results instead. Per-class lines and their final total are never added together.
+When a count exceeds the model-visible limit of 1,000,000, or Maven reports
+inconsistent categories, the summary remains nonnegative and includes
+`countsCapped: true`; treat its numbers as bounded approximations.
 
 ### `validate_build_configuration`
 

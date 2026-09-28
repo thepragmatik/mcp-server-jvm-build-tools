@@ -69,6 +69,18 @@ class StructuredDiagnosticsContractTest {
     }
 
     @Test
+    void cappedMavenCountsRemainVisibleWithExplicitApproximationSignal() {
+        String output = "[INFO] Tests run: 9999999999999999999999, Failures: 0, Errors: 0, Skipped: 0";
+
+        JsonNode safe = project(JsonUtils.toJson(new MavenOutputParser().parse(output, 0, "test")));
+
+        assertEquals(1_000_000, safe.get("testSummary").get("total").intValue());
+        assertEquals(1_000_000, safe.get("testSummary").get("passed").intValue());
+        assertTrue(safe.get("testSummary").get("countsCapped").booleanValue());
+        assertPrivateDataAbsent(safe);
+    }
+
+    @Test
     void gradleFailureIdentifiesCompileTaskWithoutEchoingCommandOrSecret() {
         String output = """
                 > Task :compileJava FAILED

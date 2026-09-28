@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.security;
 
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -205,6 +206,10 @@ public final class ModelOutputPolicy {
                         for (String key : COUNTERS) {
                             copyCounter(tests, key, counts);
                         }
+                        JsonNode countsCapped = tests.get("countsCapped");
+                        if (countsCapped != null && countsCapped.isBoolean() && countsCapped.booleanValue()) {
+                            counts.put("countsCapped", true);
+                        }
                         if (!counts.isEmpty()) {
                             safe.put("testSummary", counts);
                         }
@@ -353,7 +358,10 @@ public final class ModelOutputPolicy {
 
     private static void copyCounter(JsonNode source, String key, Map<String, Object> target) {
         JsonNode value = source.get(key);
-        if (value != null && value.isIntegralNumber() && value.longValue() >= 0 && value.longValue() <= 1_000_000) {
+        if (value != null
+                && value.isIntegralNumber()
+                && value.longValue() >= 0
+                && value.longValue() <= BuildResultLimits.MAX_VISIBLE_COUNTER) {
             target.put(key, value.longValue());
         }
     }

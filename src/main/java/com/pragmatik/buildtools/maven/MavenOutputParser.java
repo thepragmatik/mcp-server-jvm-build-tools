@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.maven;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -181,19 +182,21 @@ public class MavenOutputParser implements BuildOutputParser {
         private int failures;
         private int errors;
         private int skipped;
+        private boolean capped;
 
         void add(Matcher matcher) {
-            total += Integer.parseInt(matcher.group(1));
-            failures += Integer.parseInt(matcher.group(2));
-            errors += Integer.parseInt(matcher.group(3));
-            skipped += Integer.parseInt(matcher.group(4));
+            total = cappedAdd(total, boundedCount(matcher.group(1)));
+            failures = cappedAdd(failures, boundedCount(matcher.group(2)));
+            errors = cappedAdd(errors, boundedCount(matcher.group(3)));
+            skipped = cappedAdd(skipped, boundedCount(matcher.group(4)));
         }
 
         void add(TestCounts other) {
-            total += other.total;
-            failures += other.failures;
-            errors += other.errors;
-            skipped += other.skipped;
+            total = cappedAdd(total, other.total);
+            failures = cappedAdd(failures, other.failures);
+            errors = cappedAdd(errors, other.errors);
+            skipped = cappedAdd(skipped, other.skipped);
+            capped |= other.capped;
         }
 
         void clear() {
@@ -201,16 +204,44 @@ public class MavenOutputParser implements BuildOutputParser {
             failures = 0;
             errors = 0;
             skipped = 0;
+            capped = false;
         }
 
         Map<String, Object> toSummary() {
+            int boundedFailures = Math.min(failures, total);
+            int boundedErrors = Math.min(errors, total - boundedFailures);
+            int boundedSkipped = Math.min(skipped, total - boundedFailures - boundedErrors);
             Map<String, Object> summary = new LinkedHashMap<>();
             summary.put("total", total);
-            summary.put("passed", total - failures - errors - skipped);
-            summary.put("failed", failures);
-            summary.put("errors", errors);
-            summary.put("skipped", skipped);
+            summary.put("passed", total - boundedFailures - boundedErrors - boundedSkipped);
+            summary.put("failed", boundedFailures);
+            summary.put("errors", boundedErrors);
+            summary.put("skipped", boundedSkipped);
+            if (capped || boundedFailures != failures || boundedErrors != errors || boundedSkipped != skipped) {
+                summary.put("countsCapped", true);
+            }
             return summary;
+        }
+
+        private int boundedCount(String digits) {
+            int value = 0;
+            for (int i = 0; i < digits.length(); i++) {
+                int digit = digits.charAt(i) - '0';
+                if (value > (BuildResultLimits.MAX_VISIBLE_COUNTER - digit) / 10) {
+                    capped = true;
+                    return BuildResultLimits.MAX_VISIBLE_COUNTER;
+                }
+                value = value * 10 + digit;
+            }
+            return value;
+        }
+
+        private int cappedAdd(int left, int right) {
+            if (left > BuildResultLimits.MAX_VISIBLE_COUNTER - right) {
+                capped = true;
+                return BuildResultLimits.MAX_VISIBLE_COUNTER;
+            }
+            return left + right;
         }
     }
 }
