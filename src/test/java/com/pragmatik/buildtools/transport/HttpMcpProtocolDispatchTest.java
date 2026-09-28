@@ -88,6 +88,37 @@ class HttpMcpProtocolDispatchTest {
         assertThat(result.get("tools").size()).isEqualTo(3);
     }
 
+    @Test
+    void analysisSchemaAndStructuredResultReachHttpTransport() {
+        RestTemplate client = new RestTemplate();
+        String endpoint = "http://127.0.0.1:" + port + "/mcp";
+        var json = new tools.jackson.databind.json.JsonMapper();
+        var listed = json.readTree(client.postForObject(endpoint, rpc("tools/list", "{}"), String.class));
+        var catalogue = listed.get("result").get("tools");
+        tools.jackson.databind.JsonNode schema = null;
+        for (var tool : catalogue) {
+            if ("analyze_build_output".equals(tool.get("name").asText())) {
+                schema = tool.get("outputSchema");
+            }
+        }
+        assertThat(schema).isNotNull();
+        assertThat(schema.get("required").get(0).asText()).isEqualTo("completed");
+        assertThat(schema.get("additionalProperties").booleanValue()).isFalse();
+
+        String response = client.postForObject(
+                endpoint,
+                rpc(
+                        "tools/call",
+                        "{\"name\":\"analyze_build_output\",\"arguments\":{\"buildToolName\":\"maven\",\"projectDir\":\".\",\"command\":\"validate\"}}"),
+                String.class);
+        var result = json.readTree(response).get("result");
+        assertThat(result.get("structuredContent").get("completed").booleanValue())
+                .isTrue();
+        assertThat(json.readTree(result.get("content").get(0).get("text").asText()))
+                .isEqualTo(result.get("structuredContent"));
+        assertThat(response).doesNotContain(System.getProperty("user.home"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"-f=", "--file=", "-s=", "--settings=", "--global-settings=", "--toolchains="})
     void mavenFileSelectorsAreDeniedWithoutEchoingPrivateInput(String option) {

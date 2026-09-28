@@ -40,6 +40,10 @@ and [2.0 security design](design-v2.md) before granting execution access.
 
 For exact input parameters and JSON schemas, ask the running server for
 `tools/list`; that response is authoritative for the version you installed.
+In builds after `v2.0.0-rc.1`, `analyze_build_output` also advertises an
+`outputSchema` and returns the same safe JSON object in `structuredContent`
+and legacy text; see
+[structured build results](structured-build-results.md).
 Results are bounded and privacy-filtered. Raw build logs and commands stay local;
 diagnostics include at most 12 structured, redacted entries. The older
 [1.x tool reference](tools.md) is retained as an archive and does not describe

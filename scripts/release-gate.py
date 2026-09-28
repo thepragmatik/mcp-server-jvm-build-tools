@@ -293,6 +293,24 @@ def stdio_check():
             raise AssertionError("Stdio tools/list returned an empty catalog")
         print("PASS packaged stdio: initialize, ping, tools/list")
         canary = "synthetic-private-canary.invalid"
+        analysis = next((tool for tool in listed["tools"]
+                         if tool.get("name") == "analyze_build_output"), None)
+        if not analysis or analysis.get("outputSchema", {}).get("required") != ["completed"]:
+            raise AssertionError("Stdio analysis tool lacks its declared output schema")
+        denied = exchange({
+            "jsonrpc": "2.0", "id": 20, "method": "tools/call",
+            "params": {"name": "analyze_build_output", "arguments": {
+                "buildToolName": "maven", "projectDir": "/private/tmp/" + canary,
+                "command": "validate"}},
+        }, 20)
+        structured = denied.get("structuredContent")
+        content = denied.get("content", [])
+        if (not denied.get("isError") or not isinstance(structured, dict)
+                or structured.get("completed") is not True
+                or not content or json.loads(content[0].get("text", "")) != structured
+                or canary in json.dumps(denied)):
+            raise AssertionError("Stdio analysis result lost structure, text parity, or privacy")
+        print("PASS packaged stdio analysis: schema, structured/text parity, safe denied path")
         for label, message in (
             ("method", {"jsonrpc": "2.0", "id": 21, "method": canary}),
             ("tool", {"jsonrpc": "2.0", "id": 22, "method": "tools/call",
