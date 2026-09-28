@@ -23,19 +23,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 /**
- * MCP service for analyzing and optimizing build caching across JVM build tools.
+ * Internal service for analyzing and optimizing build caching across JVM build tools.
  * <p>
  * Analyzes Gradle (config cache, build cache, task output caching),
  * SBT (execution log, incremental compilation, Coursier cache),
  * and Maven (mvnd, build cache extensions). Reports cache effectiveness
  * and generates optimization configuration snippets.
  * <p>
- * Registered MCP tools:
+ * Internal operations (not exposed as MCP tools):
  * <ul>
  *   <li>{@code analyze_cache_health} — audit caching configuration and effectiveness</li>
  *   <li>{@code optimize_build_cache} — generate cache optimization configuration snippets</li>
@@ -86,17 +84,8 @@ public class BuildCacheService {
      * opportunities. For Gradle, parses --info output for cache hit/miss
      * statistics when available.
      */
-    @Tool(
-            name = "analyze_cache_health",
-            description = "Analyze build caching health across Maven, Gradle, and SBT projects. "
-                    + "Checks configuration for cache settings, detects cache-related plugins, "
-                    + "and identifies optimization opportunities. Returns JSON with "
-                    + "{tool, cacheHealth: {status, findings, recommendations, score}}.")
     public String analyzeCacheHealth(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
-            @Schema(allowableValues = {"maven", "gradle", "sbt"})
-                    @ToolParam(required = false, description = "Build tool to analyze. Omit to auto-detect.")
-                    String buildToolName) {
+            String projectDir, @Schema(allowableValues = {"maven", "gradle", "sbt"}) String buildToolName) {
 
         Path dir;
         try {
@@ -131,17 +120,8 @@ public class BuildCacheService {
      * enabling and optimizing build caching, parallel execution,
      * incremental compilation, and daemon usage.
      */
-    @Tool(
-            name = "optimize_build_cache",
-            description = "Generate cache optimization config snippets for a project. "
-                    + "Produces build-tool-specific recommendations for caching, "
-                    + "parallel execution, incremental compilation, and daemon usage. "
-                    + "Returns JSON with {tool, optimizations: [{area, recommendation, config}]}.")
     public String optimizeBuildCache(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
-            @Schema(allowableValues = {"maven", "gradle", "sbt"})
-                    @ToolParam(required = false, description = "Build tool. Omit to auto-detect.")
-                    String buildToolName) {
+            String projectDir, @Schema(allowableValues = {"maven", "gradle", "sbt"}) String buildToolName) {
 
         Path dir;
         try {

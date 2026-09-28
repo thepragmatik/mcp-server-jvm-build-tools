@@ -19,6 +19,8 @@ package com.pragmatik.buildtools.transport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pragmatik.buildtools.application.BuildToolsApplication;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -71,6 +73,36 @@ class HttpMcpProtocolDispatchTest {
                 rpc("tools/call", "{\"name\":\"detect_build_tool\",\"arguments\":{\"projectDir\":\".\"}}"),
                 String.class);
         assertThat(result).contains("detectedTools").contains("maven").doesNotContain(System.getProperty("user.home"));
+    }
+
+    @Test
+    void dormantServiceMethodsRemainAbsentFromPublicMcpToolList() {
+        String response = new RestTemplate()
+                .postForObject("http://127.0.0.1:" + port + "/mcp", rpc("tools/list", "{}"), String.class);
+        var catalog = new tools.jackson.databind.json.JsonMapper()
+                .readTree(response)
+                .get("result")
+                .get("tools");
+        List<String> names = new ArrayList<>();
+        for (var tool : catalog) {
+            names.add(tool.get("name").asText());
+        }
+
+        assertThat(names)
+                .hasSize(24)
+                .doesNotHaveDuplicates()
+                .doesNotContain(
+                        "execute_build_async",
+                        "get_build_task",
+                        "cancel_build_task",
+                        "list_build_tasks",
+                        "analyze_cache_health",
+                        "optimize_build_cache",
+                        "generate_sbom",
+                        "audit_supply_chain",
+                        "check_license_compliance",
+                        "detect_flaky_tests",
+                        "analyze_test_history");
     }
 
     @Test
