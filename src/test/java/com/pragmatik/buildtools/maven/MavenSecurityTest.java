@@ -95,6 +95,15 @@ class MavenSecurityTest {
             String[] result = MavenInvoker.getCommands("mvn clean install -DskipTests");
             assertThat(result).containsExactly("clean", "install", "-DskipTests");
         }
+
+        @Test
+        @DisplayName("remote deploy is unavailable under ordinary build execution")
+        void remoteDeployIsRejected() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean deploy"))
+                    .withMessageContaining("Command not allowed");
+            assertThat(new MavenBuildTool().getSupportedCommands()).doesNotContain("deploy");
+        }
     }
 
     // ──────────────────────────────────────────────

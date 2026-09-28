@@ -108,7 +108,6 @@ public class MavenInvoker {
             "test",
             "package",
             "install",
-            "deploy",
             "validate",
             "--version",
             "-v",

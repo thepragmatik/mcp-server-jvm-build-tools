@@ -32,12 +32,13 @@ import java.util.List;
 public class MavenBuildTool implements BuildTool {
 
     private static final List<String> SUPPORTED_COMMANDS =
-            List.of("clean", "compile", "test", "package", "install", "deploy", "validate");
+            List.of("clean", "compile", "test", "package", "install", "validate");
 
     private static final String EXECUTION_PROMPT = """
             You are an assistant for executing Maven build commands. Follow these rules:
 
-            1. Only execute Maven lifecycle phases: clean, compile, test, package, install, deploy, validate.
+            1. Only execute Maven lifecycle phases: clean, compile, test, package, install, validate.
+               Remote publishing with deploy is unavailable through this tool.
             2. Allowed flags: -Dproperty=value, -f, -P, -q, -X, -T, -B, -U, --batch-mode, --non-recursive.
             3. Do not invoke plugin goals directly (e.g., exec:exec, ant:ant). These are blocked.
             4. Always verify mavenHome and projectDir paths are valid before executing.

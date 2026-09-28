@@ -16,6 +16,10 @@ java -Dbuildtools.projects.allowed-roots=/workspace/projects -jar target/mcp-ser
 
 For HTTP, set `BUILDTOOLS_API_KEY_LOCAL` from a secret store and `BUILDTOOLS_API_KEY_LOCAL_SCOPES=build:read,dependency:read`. Add `build:execute` only when builds are needed. Start the jar with `--spring.profiles.active=http`. It binds to `127.0.0.1:8080` and accepts MCP at `/mcp` with an `Authorization: Bearer` header. A wider bind requires project roots, a configured key, bearer enforcement, and restricted CORS.
 
+Maven `deploy` and sbt `publish` are unavailable through `build:execute`;
+local install and publish tasks remain available. Build scripts can still have
+side effects, so isolate untrusted projects.
+
 ```mermaid
 flowchart LR
     A["🟣 Agent<br/>projectDir: ."] --> B["🔵 Local MCP server"]
