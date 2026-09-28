@@ -64,6 +64,12 @@ public class MavenBuildTool implements BuildTool {
         return MavenInvoker.executeCommand(home, MavenInvoker.getCommands(command), projectDir);
     }
 
+    /** Run once and retain bounded compiler diagnostics that head/tail capture would discard. */
+    public MavenInvoker.AnalysisResult analyzeCommand(String buildToolHome, String projectDir, String command) {
+        String home = requireMavenHome(buildToolHome);
+        return MavenInvoker.executeForAnalysis(home, MavenInvoker.getCommands(command), projectDir);
+    }
+
     /**
      * Resolve the effective Maven home for a command execution.
      * <p>

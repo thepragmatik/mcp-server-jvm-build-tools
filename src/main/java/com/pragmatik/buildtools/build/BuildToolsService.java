@@ -18,6 +18,8 @@ package com.pragmatik.buildtools.build;
 
 import com.pragmatik.buildtools.gradle.GradleBuildTool;
 import com.pragmatik.buildtools.gradle.GradleOutputParser;
+import com.pragmatik.buildtools.maven.MavenBuildTool;
+import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
 import com.pragmatik.buildtools.sbt.SbtOutputParser;
 import com.pragmatik.buildtools.tool.JsonUtils;
@@ -386,9 +388,20 @@ public class BuildToolsService {
         // correlated under the inbound trace (SEP-414) when one is present.
         String rawOutput;
         int exitCode;
+        boolean outputTruncated = false;
+        boolean diagnosticsTruncated = false;
         try (TraceScope span = BuildTracer.startSpan("analyze_build_output")) {
-            rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
-            exitCode = 0;
+            if (tool instanceof MavenBuildTool maven) {
+                MavenInvoker.AnalysisResult analysis =
+                        maven.analyzeCommand(validatedHome, validatedProject.toString(), command);
+                rawOutput = analysis.output();
+                exitCode = analysis.exitCode();
+                outputTruncated = analysis.outputTruncated();
+                diagnosticsTruncated = analysis.diagnosticsTruncated();
+            } else {
+                rawOutput = tool.executeCommand(validatedHome, validatedProject.toString(), command);
+                exitCode = 0;
+            }
         } catch (RuntimeException e) {
             rawOutput = e.getMessage();
             exitCode = 1;
@@ -397,6 +410,12 @@ public class BuildToolsService {
         // Parse output using the appropriate parser
         BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
         Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
+        if (outputTruncated) {
+            result.put("outputTruncated", true);
+        }
+        if (diagnosticsTruncated) {
+            result.put("diagnosticsTruncated", true);
+        }
 
         return modelVisibleBuildResult(result);
     }

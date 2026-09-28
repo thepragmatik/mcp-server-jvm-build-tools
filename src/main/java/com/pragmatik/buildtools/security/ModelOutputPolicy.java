@@ -223,6 +223,10 @@ public final class ModelOutputPolicy {
                             copyDiagnostics(root.get("errors"), "error", diagnostics, fileRefs, seen);
                     diagnosticsTruncated |=
                             copyDiagnostics(root.get("warnings"), "warning", diagnostics, fileRefs, seen);
+                    diagnosticsTruncated |= root.path("diagnosticsTruncated").asBoolean(false);
+                    if (root.path("outputTruncated").asBoolean(false)) {
+                        safe.put("outputTruncated", true);
+                    }
                     putDiagnostics(safe, diagnostics, diagnosticsTruncated);
                 } else {
                     copyPlainDiagnostics(output, safe);

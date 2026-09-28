@@ -30,8 +30,49 @@ import org.apache.maven.cli.MavenCli;
 public class MavenInvoker {
 
     static String executeCommand(String mavenHome, String[] commands, String currentProjectDirectory) {
+        CompletedExecution completed = executeCompleted(mavenHome, commands, currentProjectDirectory, false);
+        if (completed.exitCode() != 0) {
+            throw new RuntimeException("Maven exited with code " + completed.exitCode() + ":\n"
+                    + (completed.stderr().isEmpty()
+                            ? completed.stdout()
+                            : completed.stderr() + "\n" + completed.stdout()));
+        }
+        return completed.stdout();
+    }
+
+    public record AnalysisResult(String output, int exitCode, boolean outputTruncated, boolean diagnosticsTruncated) {}
+
+    static AnalysisResult executeForAnalysis(String mavenHome, String[] commands, String projectDir) {
+        CompletedExecution completed = executeCompleted(mavenHome, commands, projectDir, true);
+        String output = completed.exitCode() == 0 || completed.stderr().isEmpty()
+                ? completed.stdout()
+                : completed.stderr() + "\n" + completed.stdout();
+        StringBuilder combined = new StringBuilder();
+        Set<String> appended = new HashSet<>();
+        boolean diagnosticsTruncated = false;
+        if (completed.exitCode() != 0) {
+            for (MavenDiagnosticOutput diagnostics : completed.execution().diagnosticStreams()) {
+                diagnosticsTruncated |= diagnostics.diagnosticsTruncated();
+                for (String line : diagnostics.diagnostics()) {
+                    if (!output.contains(line) && appended.add(line)) {
+                        combined.append(line).append('\n');
+                    }
+                }
+            }
+        }
+        combined.append(output);
+        return new AnalysisResult(
+                combined.toString(), completed.exitCode(), completed.outputTruncated(), diagnosticsTruncated);
+    }
+
+    private record CompletedExecution(
+            MavenProcessExecution execution, int exitCode, String stdout, String stderr, boolean outputTruncated) {}
+
+    private static CompletedExecution executeCompleted(
+            String mavenHome, String[] commands, String currentProjectDirectory, boolean collectDiagnostics) {
         try {
-            MavenProcessExecution execution = executeWithProcessCapture(mavenHome, commands, currentProjectDirectory);
+            MavenProcessExecution execution =
+                    executeWithProcessCapture(mavenHome, commands, currentProjectDirectory, collectDiagnostics);
             Process process = execution.process();
             boolean finished;
             try {
@@ -57,14 +98,12 @@ public class MavenInvoker {
                 SyncProcessRunner.terminateTree(process);
                 throw new IOException("Maven output collector did not finish");
             }
-            String stdout = execution.output().snapshot();
-            if (process.exitValue() != 0) {
-                // Maven compile and test failures commonly appear on stdout.
-                String stderr = execution.errors().snapshot();
-                throw new RuntimeException("Maven exited with code " + process.exitValue() + ":\n"
-                        + (stderr.isEmpty() ? stdout : stderr + "\n" + stdout));
-            }
-            return stdout;
+            return new CompletedExecution(
+                    execution,
+                    process.exitValue(),
+                    execution.output().snapshot(),
+                    execution.errors().snapshot(),
+                    execution.output().truncated() || execution.errors().truncated());
         } catch (IOException e) {
             throw new RuntimeException("Unable to invoke Maven command", e);
         }
@@ -213,8 +252,46 @@ public class MavenInvoker {
      * A cancellable Maven execution that exposes the underlying {@link Process}
      * so the async build service can destroy it on task cancellation.
      */
-    public record MavenProcessExecution(
-            Process process, Thread outputCollector, BoundedProcessOutput output, BoundedProcessOutput errors) {}
+    public static final class MavenProcessExecution {
+        private final Process process;
+        private final Thread outputCollector;
+        private final BoundedProcessOutput output;
+        private final BoundedProcessOutput errors;
+        private final List<MavenDiagnosticOutput> diagnosticStreams;
+
+        private MavenProcessExecution(
+                Process process,
+                Thread outputCollector,
+                BoundedProcessOutput output,
+                BoundedProcessOutput errors,
+                List<MavenDiagnosticOutput> diagnosticStreams) {
+            this.process = process;
+            this.outputCollector = outputCollector;
+            this.output = output;
+            this.errors = errors;
+            this.diagnosticStreams = diagnosticStreams;
+        }
+
+        public Process process() {
+            return process;
+        }
+
+        public Thread outputCollector() {
+            return outputCollector;
+        }
+
+        public BoundedProcessOutput output() {
+            return output;
+        }
+
+        public BoundedProcessOutput errors() {
+            return errors;
+        }
+
+        private List<MavenDiagnosticOutput> diagnosticStreams() {
+            return diagnosticStreams;
+        }
+    }
 
     /**
      * Execute a Maven command using {@link ProcessBuilder} so the caller can
@@ -235,6 +312,11 @@ public class MavenInvoker {
      */
     public static MavenProcessExecution executeWithProcessCapture(
             String mavenHome, String[] commands, String projectDir) throws IOException {
+        return executeWithProcessCapture(mavenHome, commands, projectDir, false);
+    }
+
+    private static MavenProcessExecution executeWithProcessCapture(
+            String mavenHome, String[] commands, String projectDir, boolean collectDiagnostics) throws IOException {
         Path homePath = Path.of(mavenHome);
         Path mvnw = homePath.resolve("mvnw");
         Path mvnBin = homePath.resolve("bin/mvn");
@@ -259,6 +341,8 @@ public class MavenInvoker {
 
         BoundedProcessOutput output = new BoundedProcessOutput();
         BoundedProcessOutput errors = new BoundedProcessOutput();
+        MavenDiagnosticOutput diagnosticOutput = collectDiagnostics ? new MavenDiagnosticOutput(output) : null;
+        MavenDiagnosticOutput diagnosticErrors = collectDiagnostics ? new MavenDiagnosticOutput(errors) : null;
 
         // Drain stdout and stderr concurrently to avoid the pipe-buffer deadlock that
         // occurs when one stream is read to EOF before the other is drained. The
@@ -266,8 +350,10 @@ public class MavenInvoker {
         // can still join one handle to know when all output has been captured.
         Thread collector = new Thread(
                 () -> {
-                    Thread outThread = SyncProcessRunner.drain(process.getInputStream(), output, "maven-stdout");
-                    Thread errThread = SyncProcessRunner.drain(process.getErrorStream(), errors, "maven-stderr");
+                    Thread outThread = SyncProcessRunner.drain(
+                            process.getInputStream(), collectDiagnostics ? diagnosticOutput : output, "maven-stdout");
+                    Thread errThread = SyncProcessRunner.drain(
+                            process.getErrorStream(), collectDiagnostics ? diagnosticErrors : errors, "maven-stderr");
                     try {
                         outThread.join();
                         errThread.join();
@@ -279,6 +365,11 @@ public class MavenInvoker {
         collector.setDaemon(true);
         collector.start();
 
-        return new MavenProcessExecution(process, collector, output, errors);
+        return new MavenProcessExecution(
+                process,
+                collector,
+                output,
+                errors,
+                collectDiagnostics ? List.of(diagnosticOutput, diagnosticErrors) : List.of());
     }
 }

@@ -444,6 +444,12 @@ def main():
             process.wait(timeout=5)
     scope_check()
     stdio_check()
+    probe = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("maven-middle-protocol-gate.py"))],
+        capture_output=True, text=True, check=False)
+    if probe.returncode != 0:
+        raise RuntimeError("Maven middle protocol probe failed; details withheld")
+    print(probe.stdout, end="")
     return 0
 
 

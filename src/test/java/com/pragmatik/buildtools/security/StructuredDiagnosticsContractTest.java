@@ -51,6 +51,23 @@ class StructuredDiagnosticsContractTest {
     }
 
     @Test
+    void mavenCaptureSignalsRemainVisibleAfterPrivacyProjection() {
+        var parsed = new MavenOutputParser()
+                .parse(
+                        "[ERROR] /synthetic/Sample.java:[42,1] cannot find symbol\n[INFO] BUILD FAILURE\n",
+                        1,
+                        "compile");
+        parsed.put("outputTruncated", true);
+        parsed.put("diagnosticsTruncated", true);
+        JsonNode safe = project(JsonUtils.toJson(parsed));
+
+        assertTrue(safe.get("outputTruncated").booleanValue());
+        assertTrue(safe.get("diagnosticsTruncated").booleanValue());
+        assertEquals(1, safe.get("errorCount").intValue());
+        assertPrivateDataAbsent(safe);
+    }
+
+    @Test
     void mavenSurefireAggregateReachesModelVisibleSummaryOnce() {
         String output = """
                 [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.1 s -- in example.FirstTest

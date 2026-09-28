@@ -46,6 +46,10 @@ public class MavenOutputParser implements BuildOutputParser {
     private static final Pattern ERROR_FILE_LINE_PATTERN =
             Pattern.compile("\\[ERROR]\\s+(\\S+\\.java):?\\[?(\\d+)(?:,\\d+)?]?\\s*(.*)");
 
+    static boolean isCompilerDiagnosticLine(String line) {
+        return ERROR_FILE_LINE_PATTERN.matcher(line).find();
+    }
+
     // Build result: "BUILD SUCCESS" or "BUILD FAILURE"
     private static final Pattern BUILD_RESULT_PATTERN = Pattern.compile("BUILD\\s+(SUCCESS|FAILURE)");
 
