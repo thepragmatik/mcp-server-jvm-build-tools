@@ -119,9 +119,11 @@ public final class ModelOutputPolicy {
             output = output.substring(output.length() - MAX_RESULT_CHARS);
             safe.put("truncated", true);
         }
+        JsonNode parsed = null;
         if (output != null) {
             try {
                 JsonNode root = mapper.readTree(output);
+                parsed = root;
                 if (root != null && root.isObject()) {
                     JsonNode success = root.get("success");
                     JsonNode error = root.get("error");
@@ -236,25 +238,7 @@ public final class ModelOutputPolicy {
             }
         }
         if ("list_build_tools".equals(toolName) && output != null) {
-            // String-returning callbacks can reach this boundary as a JSON
-            // string literal. Decode that wrapper before matching line starts;
-            // still emit only names from the fixed public allowlist.
-            String listing = output;
-            try {
-                JsonNode value = mapper.readTree(output);
-                if (value != null && value.isTextual()) {
-                    listing = value.asText();
-                }
-            } catch (tools.jackson.core.JacksonException ignored) {
-                // A direct, unquoted tool response remains valid input.
-            }
-            List<String> names = new ArrayList<>();
-            for (String name : BUILD_TOOLS) {
-                if (listing.lines().anyMatch(line -> line.startsWith(name + ":"))) {
-                    names.add(name);
-                }
-            }
-            safe.put("tools", names);
+            safe.put("tools", PublicBuildToolListing.from(parsed, output).tools());
         }
         if ("list_available_scopes".equals(toolName)) {
             safe.put("scopes", ToolPermission.allScopes());
