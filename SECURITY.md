@@ -147,7 +147,8 @@ The scan reads the first present POM or Gradle build file through one held,
 no-symlink project directory handle. An unsafe path, unsupported filesystem,
 file over 1 MiB, or invalid UTF-8 fails before any OSV request. OSV receives
 valid dependency coordinates by design; run the scan only when that egress is
-acceptable for the project.
+acceptable for the project. The OSV HTTP client does not follow redirects, so
+dependency coordinates are not forwarded to a redirect target.
 
 The server holds its **own** dependencies to the same bar as the SBOM /
 supply-chain tooling it ships to users (issue #78). The keyless

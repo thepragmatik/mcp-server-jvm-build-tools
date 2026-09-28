@@ -67,9 +67,10 @@ public class CveLookupService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public CveLookupService() {
+        // A redirect must not forward dependency coordinates to another host.
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NORMAL)
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build());
     }
 
