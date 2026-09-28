@@ -37,4 +37,4 @@ flowchart LR
     class X reject
 ```
 
-Results contain bounded, redacted diagnostics and aggregate counts. Redaction is best effort for arbitrary compiler text. Build scripts can run other programs and make network calls, so use the [container workflow](../reference/design-v2.md#container-isolation) for untrusted projects.
+Results contain aggregate counts and up to 12 structured diagnostics, with errors before warnings. Each diagnostic has `severity`, `category`, an optional file type and positive line number, and a bounded message describing a known failure; raw paths, source text, commands, dependency identities, and logs are withheld. For example, a compiler error can return `{"severity":"error","category":"compilation","fileType":"java","line":42,"message":"Compiler cannot find a symbol; check local imports and declarations near the reported line."}`. Unknown text gets a generic local-inspection hint. Build scripts can run other programs and make network calls, so use the [container workflow](../reference/design-v2.md#container-isolation) for untrusted projects.

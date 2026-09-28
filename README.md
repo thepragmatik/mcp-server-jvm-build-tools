@@ -47,11 +47,11 @@ Send MCP requests to `POST /mcp` with the configured bearer key in the Authoriza
 
 - Every path-bearing tool call is checked against canonical allowed roots. Relative project aliases resolve under the first root. Missing roots deny project access.
 - HTTP bearer enforcement is on by default; keys have no scopes unless granted explicitly. Every exposed tool has an assigned scope and catalog drift fails a test.
-- MCP tool results emit bounded, redacted diagnostics and selected aggregate counts. Credential inspection, token validation, audit reading, and plan execution are withheld from the model-visible catalog while their ownership and privacy contracts are redesigned.
+- MCP tool results emit selected aggregate counts and up to 12 structured diagnostics with severity, failure category, optional file type and line, and bounded server-authored messages. Credential inspection, token validation, audit reading, and plan execution are withheld from the model-visible catalog while their ownership and privacy contracts are redesigned.
 - Dependency analysis returns counts of dependencies, managed entries, and imported BOMs. CVE scanning returns scan and severity counts. Dependency coordinates, per-dependency classifications, and CVE identities stay local.
 - Static tool callbacks and credential digests are cached. The container build reuses Maven dependencies, verifies downloaded Gradle/sbt archives, and runs as a nonroot user.
 
-Pattern redaction handles common paths, emails, and secrets; it cannot prove arbitrary build text contains no personal data. Review generated diagnostics before sharing them outside your trusted MCP client. For stronger isolation, run the server and builds in a container with a dedicated project mount and restricted network.
+Build diagnostics use bounded, server-authored messages rather than copying arbitrary compiler text. Other model-visible text still uses pattern redaction, which cannot prove arbitrary text contains no personal data. Review results before sharing them outside your trusted MCP client. For stronger isolation, run the server and builds in a container with a dedicated project mount and restricted network.
 
 Read the [basic quickstart](docs/user-guide/quickstart-v2.md), [architecture and design review](docs/reference/design-v2.md), [security model](docs/reference/security.md), and [agent contribution workflow](docs/AGENTS.md). The [release plan](docs/ROADMAP.md) tracks what remains before a stable 2.0 release.
 

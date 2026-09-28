@@ -18,7 +18,7 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 
 1. Finish full Java 21/23/25 verification, packaged stdio and HTTP protocol smoke, and strict MkDocs build.
 2. Red-team prompt injection, path races, scope bypass, malformed and oversized JSON-RPC, and synthetic privacy canaries through both transports.
-3. Reconcile every public tool description and configuration page with the 30-tool runtime catalog; generate a machine-checked catalog in CI.
+3. Reconcile every public tool description and configuration page with the 24-tool runtime catalog; generate a machine-checked catalog in CI.
 4. Measure callback overhead, process memory, bounded output behavior, and build latency on synthetic Maven, Gradle, and sbt fixtures. Set budgets only from measured baselines.
 5. Run the two independent PR reviews and address every inline finding. Keep the prerelease untagged until all checks are green.
 

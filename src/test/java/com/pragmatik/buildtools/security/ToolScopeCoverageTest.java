@@ -70,4 +70,18 @@ class ToolScopeCoverageTest {
         assertTrue(descriptions.get("scan_dependency_cves").contains("counts"));
         assertTrue(descriptions.get("scan_dependency_cves").contains("withheld"));
     }
+
+    @Test
+    void buildToolMetadataMatchesStructuredDiagnosticContract() {
+        for (var callback : callbacks.getToolCallbacks()) {
+            String name = callback.getToolDefinition().name();
+            if ("execute_build_command".equals(name) || "analyze_build_output".equals(name)) {
+                String description = callback.getToolDefinition().description();
+                assertTrue(description.contains("12 structured"));
+                assertTrue(description.contains("severity"));
+                assertTrue(description.contains("category"));
+                assertTrue(description.contains("not raw logs"));
+            }
+        }
+    }
 }

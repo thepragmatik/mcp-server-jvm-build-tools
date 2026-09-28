@@ -16,6 +16,10 @@ contents. Output may become a PUBLIC PR — treat everything as publishable. Use
 environment variables for keys and generic placeholders otherwise. When in doubt,
 leave it out.
 
+For build-result changes, keep raw logs and commands out of model-visible JSON.
+Diagnostics must remain bounded structured objects with server-authored messages;
+test them with synthetic path, email, secret, and prompt-injection canaries.
+
 ## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
 1. **Branch** off `main` (`fix/<issue>-<slug>` or `feat/<issue>-<slug>`). Never
    commit to `main`. Never merge your own work outside the gates below.

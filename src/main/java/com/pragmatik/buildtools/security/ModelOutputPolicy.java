@@ -376,18 +376,21 @@ public final class ModelOutputPolicy {
     private static void copyPlainDiagnostics(String output, Map<String, Object> safe) {
         List<Map<String, Object>> diagnostics = new ArrayList<>();
         boolean truncated = false;
-        for (String line : output.split("\\R")) {
-            if (!DIAGNOSTIC_LINE.matcher(line).matches()) {
-                continue;
-            }
-            String severity = line.toLowerCase(java.util.Locale.ROOT).contains("warn") ? "warning" : "error";
-            Map<String, Object> diagnostic = diagnostic(severity, line, null);
-            if (!diagnostics.contains(diagnostic)) {
-                if (diagnostics.size() == MAX_DIAGNOSTICS) {
-                    truncated = true;
-                    break;
+        String[] lines = output.split("\\R");
+        for (String severity : List.of("error", "warning")) {
+            for (String line : lines) {
+                if (!DIAGNOSTIC_LINE.matcher(line).matches()
+                        || line.toLowerCase(java.util.Locale.ROOT).contains("warn") != "warning".equals(severity)) {
+                    continue;
                 }
-                diagnostics.add(diagnostic);
+                Map<String, Object> diagnostic = diagnostic(severity, line, null);
+                if (!diagnostics.contains(diagnostic)) {
+                    if (diagnostics.size() == MAX_DIAGNOSTICS) {
+                        truncated = true;
+                        break;
+                    }
+                    diagnostics.add(diagnostic);
+                }
             }
         }
         putDiagnostics(safe, diagnostics, truncated);
@@ -405,26 +408,80 @@ public final class ModelOutputPolicy {
 
     private static Map<String, Object> diagnostic(String severity, String text, JsonNode item) {
         String lower = text.toLowerCase(java.util.Locale.ROOT);
+        String fileType = fileType(item, text);
         String category;
         String message;
-        if (containsAny(lower, "cannot find symbol", "compilation failure", "compilejava", "compilescala",
-                "unresolved reference", "not found: value", "type mismatch", "compilation failed", "compiling ")) {
+        if (lower.contains("cannot find symbol")) {
+            category = "compilation";
+            message = "Compiler cannot find a symbol; check local imports and declarations near the reported line.";
+        } else if (containsAny(lower, "unresolved reference", "not found: value")) {
+            category = "compilation";
+            message = "Compiler cannot resolve a reference; check local imports and declarations.";
+        } else if (containsAny(lower, "type mismatch", "incompatible types")) {
+            category = "compilation";
+            message = "Compiler found a type mismatch near the reported line.";
+        } else if (containsAny(
+                lower,
+                "compilation failure",
+                "compilejava",
+                "compilescala",
+                "unresolved reference",
+                "not found: value",
+                "type mismatch",
+                "compilation failed",
+                "compiling ")) {
             category = "compilation";
             message = "Compilation failed; inspect the indicated source line locally.";
-        } else if (containsAny(lower, "test failed", "tests failed", "there are test failures", "assertionerror",
-                "assertion failed", "execution failed for task ':test", "() in ")) {
+        } else if (containsAny(lower, "expected", "illegal start", "not a statement")
+                && fileType != null
+                && List.of("java", "kt", "scala").contains(fileType)) {
+            category = "compilation";
+            message = "Compiler reported a syntax error near the indicated line.";
+        } else if (containsAny(lower, "assertionerror", "assertion failed")) {
+            category = "test";
+            message = "A test assertion failed; inspect the local test report.";
+        } else if (containsAny(
+                lower,
+                "test failed",
+                "tests failed",
+                "there are test failures",
+                "assertionerror",
+                "assertion failed",
+                "execution failed for task ':test",
+                "() in ")) {
             category = "test";
             message = "A test failed; inspect the local test report.";
-        } else if (containsAny(lower, "could not resolve", "failed to resolve", "could not find artifact",
-                "dependency resolution", "non-resolvable", "unresolved dependency")) {
+        } else if (containsAny(
+                lower,
+                "could not resolve",
+                "failed to resolve",
+                "could not find artifact",
+                "dependency resolution",
+                "non-resolvable",
+                "unresolved dependency")) {
             category = "dependency";
             message = "Dependency resolution failed; inspect local dependency settings.";
-        } else if (containsAny(lower, "non-parseable pom", "malformed pom", "build.gradle", "build.sbt",
-                "unknown lifecycle phase", "task not found", "plugin configuration", "configuration failed")) {
+        } else if (containsAny(
+                lower,
+                "non-parseable pom",
+                "malformed pom",
+                "build.gradle",
+                "build.sbt",
+                "unknown lifecycle phase",
+                "task not found",
+                "plugin configuration",
+                "configuration failed")) {
             category = "configuration";
             message = "Build configuration failed; inspect the local build file.";
-        } else if (containsAny(lower, "execution failed", "build failed", "build failure", "exception",
-                "timeout", "timed out", "failed")) {
+        } else if (containsAny(
+                lower,
+                "execution failed",
+                "build failed",
+                "build failure",
+                "exception",
+                "timeout",
+                "timed out",
+                "failed")) {
             category = "execution";
             message = "Build execution failed; inspect the local build output.";
         } else {
@@ -434,7 +491,6 @@ public final class ModelOutputPolicy {
         Map<String, Object> safe = new LinkedHashMap<>();
         safe.put("severity", severity);
         safe.put("category", category);
-        String fileType = fileType(item, text);
         if (fileType != null) {
             safe.put("fileType", fileType);
         }
@@ -442,7 +498,7 @@ public final class ModelOutputPolicy {
         if (line != null) {
             safe.put("line", line);
         }
-        safe.put("message", message);
+        safe.put("message", redact(message));
         return safe;
     }
 
