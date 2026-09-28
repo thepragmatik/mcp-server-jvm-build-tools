@@ -42,6 +42,10 @@ final class GradleDependencyScanner {
             if (argument >= tokens.size() || !tokens.get(argument).quoted()) {
                 throw new IncompleteDependencyScanException();
             }
+            if (tokens.get(argument).value().indexOf('\\') >= 0) {
+                // Decoding build-language escapes here could change the queried version.
+                throw new IncompleteDependencyScanException();
+            }
             String[] coordinate = tokens.get(argument).value().split(":", -1);
             if (coordinate.length != 3) throw new IncompleteDependencyScanException();
             CveLookupService.PackageRef pkg =
@@ -106,6 +110,7 @@ final class GradleDependencyScanner {
                         break;
                     }
                     if (!triple && script.charAt(i) == '\\' && i + 1 < script.length()) {
+                        value.append('\\');
                         i++;
                     }
                     value.append(script.charAt(i++));

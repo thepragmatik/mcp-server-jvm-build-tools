@@ -329,6 +329,27 @@ class DependencyServiceSecurityTest {
         }
 
         @Test
+        void escapedGradleCoordinateFailsBeforeLookup() throws Exception {
+            String escape = "\\" + "u0031";
+            List<String> scripts = List.of(
+                    "implementation(\"org.example:kotlin:" + escape + "\")",
+                    "implementation 'org.example:groovy:" + escape + "'");
+            for (int i = 0; i < scripts.size(); i++) {
+                Path project = Files.createDirectory(temporary.toRealPath().resolve("project" + i));
+                Files.writeString(project.resolve(i == 0 ? "build.gradle.kts" : "build.gradle"), scripts.get(i));
+                CountingLookup lookup = new CountingLookup();
+
+                String result = new DependencyService(new BuildToolProvider(), lookup)
+                        .scanDependencyCves(project.toString(), "HIGH");
+
+                assertThat(lookup.calls).hasValue(0);
+                assertThat(result)
+                        .contains("Dependency vulnerability scan incomplete")
+                        .doesNotContain("scanSummary", "u0031");
+            }
+        }
+
+        @Test
         void slashyAndBacktickSyntaxFailBeforeLookup() throws Exception {
             List<String> scripts = List.of(
                     "def note = /implementation('org.example:quoted:1.0')/",
