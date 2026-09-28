@@ -44,6 +44,7 @@ Before any release tag, the release engineer checks this matrix against the exac
 
 - Publish a migration guide for required roots, HTTP keys and scopes, catalog removals, result shape, and supported protocol revision.
 - Verify official MCP 2025-11-25 conformance with real stdio and Streamable HTTP clients. Treat custom 2026 features as experiments until the SDK and tests cover that revision.
+- Use the [optional full requirement audit](reference/release-gates.md) to track this gap: the current packaged HTTP baseline passes 6 of 30 scored server scenarios, fails 23, and has one warning; three other server scenarios are unscored. This audit is nonblocking and is not a conformance claim. The six selected official scenarios plus adversarial probes remain the release gate.
 - Test the published Docker image with a clean project mount, no host secrets, nonroot UID, and a read-only Maven cache.
 - Decide whether to keep or remove the dormant 11 tool methods; do not advertise unregistered tools.
 - Ensure privacy scanning on changed files and generated docs, without printing matched values to CI output.

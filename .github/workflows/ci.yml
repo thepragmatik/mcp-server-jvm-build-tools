@@ -95,6 +95,8 @@ jobs:
         run: python3 -m unittest -v scripts/test_benchmark_release_gate.py
       - name: Verify release alert audit
         run: python3 -m unittest -v scripts/test_dependabot_release_gate.py
+      - name: Verify optional requirement audit privacy
+        run: python3 -m unittest -v tests/test_conformance_matrix_audit.py
       - name: Build documentation strictly
         run: |
           python3 -m pip install -r docs/requirements.txt
