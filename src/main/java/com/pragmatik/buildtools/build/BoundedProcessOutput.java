@@ -80,6 +80,23 @@ public final class BoundedProcessOutput extends OutputStream {
         return bytesSeen > HEAD_BYTES + TAIL_BYTES;
     }
 
+    /** The captured leading bytes, decoded separately when a middle gap exists. */
+    public synchronized String headSnapshot() {
+        return new String(head, 0, headSize, StandardCharsets.UTF_8);
+    }
+
+    /** The captured trailing bytes, decoded separately when a middle gap exists. */
+    public synchronized String tailSnapshot() {
+        byte[] bytes = new byte[tailSize];
+        if (tailSize > 0) {
+            int start = tailSize == tail.length ? tailNext : 0;
+            int first = Math.min(tailSize, tail.length - start);
+            System.arraycopy(tail, start, bytes, 0, first);
+            System.arraycopy(tail, 0, bytes, first, tailSize - first);
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
     public synchronized String snapshot() {
         byte[] bytes = new byte[headSize + tailSize];
         System.arraycopy(head, 0, bytes, 0, headSize);

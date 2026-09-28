@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
 import org.apache.maven.cli.MavenCli;
 
 public class MavenInvoker {
-    private static final Pattern ANSI_SGR = Pattern.compile("\u001b\\[[0-9;:]*m");
 
     static String executeCommand(String mavenHome, String[] commands, String currentProjectDirectory) {
         CompletedExecution completed = executeCompleted(mavenHome, commands, currentProjectDirectory, false);
@@ -53,50 +52,20 @@ public class MavenInvoker {
 
     static AnalysisResult executeForAnalysis(String mavenHome, String[] commands, String projectDir) {
         CompletedExecution completed = executeCompleted(mavenHome, commands, projectDir, true);
-        String output = completed.exitCode() == 0 || completed.stderr().isEmpty()
-                ? completed.stdout()
-                : completed.stderr() + "\n" + completed.stdout();
-        StringBuilder combined = new StringBuilder();
-        Set<String> appended = new HashSet<>();
-        Map<String, Integer> retainedSummaryCounts = new HashMap<>();
         boolean diagnosticsTruncated = false;
+        String stdout = completed.stdout();
+        String stderr = completed.stderr();
         if (completed.exitCode() != 0) {
-            Set<String> summaryCandidates = new HashSet<>();
-            for (MavenDiagnosticOutput diagnostics : completed.execution().diagnosticStreams()) {
-                for (String line : diagnostics.diagnostics()) {
-                    if (MavenOutputParser.isTestSummaryLine(line)) {
-                        summaryCandidates.add(line);
-                    }
-                }
-            }
-            Map<String, Integer> visibleSummaryCounts = new HashMap<>();
-            if (!summaryCandidates.isEmpty()) {
-                // A retained total may also be present in the head or tail.
-                // Count occurrences so identical module totals are not collapsed.
-                for (String visibleLine : output.split("\\R")) {
-                    String normalized = ANSI_SGR.matcher(visibleLine).replaceAll("");
-                    if (summaryCandidates.contains(normalized)) {
-                        visibleSummaryCounts.merge(normalized, 1, Integer::sum);
-                    }
-                }
-            }
-            for (MavenDiagnosticOutput diagnostics : completed.execution().diagnosticStreams()) {
-                diagnosticsTruncated |= diagnostics.diagnosticsTruncated();
-                for (String line : diagnostics.diagnostics()) {
-                    if (MavenOutputParser.isTestSummaryLine(line)) {
-                        int seen = retainedSummaryCounts.merge(line, 1, Integer::sum);
-                        if (seen > visibleSummaryCounts.getOrDefault(line, 0)) {
-                            combined.append(line).append('\n');
-                        }
-                    } else if (!output.contains(line) && appended.add(line)) {
-                        combined.append(line).append('\n');
-                    }
-                }
-            }
+            List<MavenDiagnosticOutput> streams = completed.execution().diagnosticStreams();
+            String visibleOutput = stderr + "\n" + stdout;
+            Set<String> replayedCompilerLines = new HashSet<>();
+            stdout = streams.get(0).snapshotForAnalysis(visibleOutput, replayedCompilerLines);
+            stderr = streams.get(1).snapshotForAnalysis(visibleOutput, replayedCompilerLines);
+            diagnosticsTruncated =
+                    streams.get(0).diagnosticsTruncated() || streams.get(1).diagnosticsTruncated();
         }
-        combined.append(output);
-        return new AnalysisResult(
-                combined.toString(), completed.exitCode(), completed.outputTruncated(), diagnosticsTruncated);
+        String output = completed.exitCode() == 0 || stderr.isEmpty() ? stdout : stderr + "\n" + stdout;
+        return new AnalysisResult(output, completed.exitCode(), completed.outputTruncated(), diagnosticsTruncated);
     }
 
     private record CompletedExecution(

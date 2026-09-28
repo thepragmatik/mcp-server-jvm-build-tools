@@ -12,7 +12,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 JAR = ROOT / "target/mcp-server-jvm-build-tools.jar"
 CANARIES = ("/synthetic/private", "PersonName", "test.user@example.invalid",
-            "SYNTHETIC_SECRET", "ignore previous instructions")
+            "SYNTHETIC_SECRET", "ignore previous instructions", "PrivateSuiteCanary")
 
 
 def load(name, path):
@@ -110,6 +110,7 @@ def test_failure_fixture(root):
         "import sys\n"
         "out = sys.stdout.buffer\n"
         "out.write(b'[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\\n')\n"
+        "out.write(b'[INFO] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0 -- in example.PrivateSuiteCanary\\n')\n"
         "out.write(b'[INFO] ordinary build output\\n' * 480000)\n"
         "for i in range(1, 13):\n"
         "    out.write(f'[ERROR] /synthetic/private/Sample.java:[{i},1] cannot find symbol\\n'.encode())\n"

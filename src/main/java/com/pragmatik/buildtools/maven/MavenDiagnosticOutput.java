@@ -20,7 +20,11 @@ import com.pragmatik.buildtools.build.BoundedProcessOutput;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /** Captures bounded Maven compiler lines and test totals without retaining the intervening log. */
@@ -98,6 +102,35 @@ final class MavenDiagnosticOutput extends OutputStream {
         retained.addAll(diagnostics);
         retained.addAll(testSummaries);
         return List.copyOf(retained);
+    }
+
+    synchronized String snapshotForAnalysis(String visibleOutput, Set<String> replayedCompilerLines) {
+        if (!capture.truncated()) {
+            return capture.snapshot();
+        }
+        String head = capture.headSnapshot();
+        String tail = capture.tailSnapshot();
+        List<String> candidates = diagnostics();
+        Set<String> candidateSet = new HashSet<>(candidates);
+        Map<String, Integer> visible = new HashMap<>();
+        for (String capturedLine : (head + "\n" + tail).split("\\R")) {
+            String normalized = ANSI_SGR.matcher(capturedLine).replaceAll("");
+            if (candidateSet.contains(normalized)) {
+                visible.merge(normalized, 1, Integer::sum);
+            }
+        }
+        Map<String, Integer> seen = new HashMap<>();
+        StringBuilder middle = new StringBuilder();
+        for (String line : candidates) {
+            if (MavenOutputParser.isTestSummaryLine(line)) {
+                if (seen.merge(line, 1, Integer::sum) > visible.getOrDefault(line, 0)) {
+                    middle.append(line).append('\n');
+                }
+            } else if (!visibleOutput.contains(line) && replayedCompilerLines.add(line)) {
+                middle.append(line).append('\n');
+            }
+        }
+        return head + "\n" + middle + "\n" + tail;
     }
 
     synchronized boolean diagnosticsTruncated() {

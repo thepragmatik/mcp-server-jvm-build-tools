@@ -33,6 +33,8 @@ class BoundedProcessOutputTest {
 
         assertThat(output.truncated()).isTrue();
         assertThat(output.snapshot()).startsWith("BEGIN").endsWith("END");
+        assertThat(output.headSnapshot()).startsWith("BEGIN").hasSize(BoundedProcessOutput.HEAD_BYTES);
+        assertThat(output.tailSnapshot()).endsWith("END").hasSize(BoundedProcessOutput.TAIL_BYTES);
         assertThat(output.snapshot().getBytes(StandardCharsets.UTF_8).length)
                 .isEqualTo(BoundedProcessOutput.HEAD_BYTES + BoundedProcessOutput.TAIL_BYTES);
     }
