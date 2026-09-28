@@ -39,19 +39,17 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Enforces the MCP server's role as an <b>OAuth 2.1 resource server</b> on the Streamable HTTP
- * transport: it validates the {@code Authorization: Bearer} access token (RFC6750) presented on
+ * Enforces local opaque bearer-key authentication on the Streamable HTTP
+ * transport: it validates the {@code Authorization: Bearer} credential presented on
  * {@code POST/GET /mcp/**} and, when a token is missing or invalid, replies {@code 401} with a
  * {@code WWW-Authenticate: Bearer resource_metadata="..."} challenge that points at this server's
- * RFC9728 Protected Resource Metadata ({@link OAuthProtectedResourceMetadataController}).
+ * RFC9728 Protected Resource Metadata ({@link OAuthProtectedResourceMetadataController}) only
+ * when an authorization-server issuer is configured.
  *
  * <h2>Backward compatibility (opt-in)</h2>
  *
- * Enforcement is <b>disabled by default</b> ({@code buildtools.oauth.resource-server.enabled=false}).
- * With it off, this filter is inert — every request passes through untouched, so existing MCP
- * clients (which present no {@code Authorization} header) are entirely unaffected. Only when an
- * operator explicitly opts in does the filter begin challenging unauthenticated requests. The
- * Protected Resource Metadata document is published regardless of this flag.
+ * The HTTP profile enables enforcement by default. The base properties disable it for stdio,
+ * where no servlet container starts. The metadata document requires a configured issuer.
  *
  * <h2>Discovery stays reachable</h2>
  *
@@ -62,7 +60,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <h2>Token validation</h2>
  *
- * Tokens are validated locally (RFC7662-style introspection against the configured credential
+ * Credentials are validated locally against the configured credential
  * store, {@link ToolAuthorizationService#isAccessTokenValid(String)}). This server's resource-server
  * profile uses opaque bearer tokens minted out of band as {@code BUILDTOOLS_API_KEY_*} credentials;
  * see {@code docs/AUTHORIZATION.md} for the recorded posture, including delegating full
@@ -180,7 +178,7 @@ public class OAuthResourceServerFilter implements Filter {
                 httpRes.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 httpRes.setHeader(
                         "WWW-Authenticate",
-                        buildChallenge("insufficient_scope", "Tool scope required", config.metadataUrl(httpReq)));
+                        buildChallenge("insufficient_scope", "Tool scope required", metadataUrlIfConfigured(httpReq)));
                 httpRes.setContentType("application/json");
                 httpRes.getWriter().write("{\"error\":\"insufficient_scope\"}");
                 return;
@@ -294,7 +292,7 @@ public class OAuthResourceServerFilter implements Filter {
     }
 
     /**
-     * Writes a {@code 401} response carrying the RFC6750 / RFC9728 {@code WWW-Authenticate} challenge
+     * Writes a {@code 401} response carrying a bearer challenge
      * and a small JSON error body.
      *
      * @param req the current request (used to build the {@code resource_metadata} URL)
@@ -305,39 +303,44 @@ public class OAuthResourceServerFilter implements Filter {
      */
     private void challenge(HttpServletRequest req, HttpServletResponse res, String error, String description)
             throws IOException {
-        String metadataUrl = config.metadataUrl(req);
+        String metadataUrl = metadataUrlIfConfigured(req);
         res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         res.setHeader("WWW-Authenticate", buildChallenge(error, description, metadataUrl));
         res.setContentType("application/json");
         res.setCharacterEncoding(StandardCharsets.UTF_8.name());
         String body = "{\"error\":\"" + JsonUtils.escapeJson(error == null ? "unauthorized" : error)
-                + "\",\"error_description\":\"" + JsonUtils.escapeJson(description)
-                + "\",\"resource_metadata\":\"" + JsonUtils.escapeJson(metadataUrl) + "\"}";
+                + "\",\"error_description\":\"" + JsonUtils.escapeJson(description) + "\""
+                + (metadataUrl == null ? "" : ",\"resource_metadata\":\"" + JsonUtils.escapeJson(metadataUrl) + "\"")
+                + "}";
         res.getWriter().write(body);
-        log.debug(
-                "OAuth resource-server challenge issued ({}): {}",
-                error == null ? "missing token" : error,
-                description);
+        log.debug("HTTP bearer challenge issued ({}): {}", error == null ? "missing token" : error, description);
     }
 
     /**
-     * Builds the {@code WWW-Authenticate} header value. Always advertises {@code resource_metadata}
-     * (RFC9728 §5.1); includes {@code error}/{@code error_description} only when a token was
+     * Builds the {@code WWW-Authenticate} header value. Advertises {@code resource_metadata}
+     * only in configured issuer mode; includes {@code error}/{@code error_description} when a token was
      * presented and rejected (RFC6750 §3). Visible for testing.
      *
      * @param error the OAuth error code, or {@code null}
      * @param description a human-readable explanation
-     * @param metadataUrl the absolute Protected Resource Metadata URL
+     * @param metadataUrl the absolute Protected Resource Metadata URL, or null in API-key mode
      * @return the header value
      */
     static String buildChallenge(String error, String description, String metadataUrl) {
-        StringBuilder sb = new StringBuilder("Bearer ");
+        StringBuilder sb = new StringBuilder("Bearer");
         if (error != null && !error.isEmpty()) {
-            sb.append("error=\"").append(quoteSafe(error)).append("\", ");
-            sb.append("error_description=\"").append(quoteSafe(description)).append("\", ");
+            sb.append(" error=\"").append(quoteSafe(error)).append("\"");
+            sb.append(", error_description=\"").append(quoteSafe(description)).append("\"");
         }
-        sb.append("resource_metadata=\"").append(quoteSafe(metadataUrl)).append('"');
+        if (metadataUrl != null) {
+            sb.append(error == null || error.isEmpty() ? " " : ", ");
+            sb.append("resource_metadata=\"").append(quoteSafe(metadataUrl)).append('"');
+        }
         return sb.toString();
+    }
+
+    private String metadataUrlIfConfigured(HttpServletRequest request) {
+        return config.oauthDiscoveryEnabled() ? config.metadataUrl(request) : null;
     }
 
     /**

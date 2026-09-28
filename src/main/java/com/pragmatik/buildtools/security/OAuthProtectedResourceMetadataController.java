@@ -21,13 +21,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
- * OAuth 2.0 Protected Resource Metadata endpoint (RFC9728), as required of an MCP server
- * acting in its role as an OAuth 2.1 resource server.
+ * OAuth 2.0 Protected Resource Metadata endpoint (RFC9728) for enforced bearer mode
+ * with configured issuers.
  *
  * <p>Exposed at {@code GET /.well-known/oauth-protected-resource} when the Streamable HTTP
  * transport is active. The document lets OAuth-capable MCP clients discover the resource
@@ -35,20 +37,17 @@ import org.springframework.web.bind.annotation.RestController;
  * scopes it understands) without first connecting via the MCP protocol — mirroring the
  * existing {@code /.well-known/mcp-server} server card.
  *
- * <h2>Backward compatibility</h2>
- *
- * This endpoint is purely <b>additive</b>. It is always reachable (it is a discovery
- * surface and must be unauthenticated, so a client can learn <i>how</i> to authenticate),
- * and existing MCP clients that do not speak OAuth simply never request it. Publishing the
- * metadata does <b>not</b> by itself require any client to present a token; bearer-token
- * enforcement is the separate, opt-in concern of {@link OAuthResourceServerFilter}.
+ * <p>Without an issuer or active enforcement this endpoint returns 404 rather than claiming
+ * OAuth discovery with an unusable document. Issuer configuration enables the
+ * document but does not enable validation of issuer-issued tokens; the deployment must arrange
+ * that separately.
  *
  * <h2>Spec conformance</h2>
  *
  * <ul>
  *   <li>{@code resource} — the canonical resource identifier this server protects
  *       ({@link OAuthResourceServerConfig#resourceIdentifier(HttpServletRequest)}).</li>
- *   <li>{@code authorization_servers} — optional; emitted only when configured.</li>
+ *   <li>{@code authorization_servers} — at least one configured issuer.</li>
  *   <li>{@code scopes_supported} — this server's fine-grained {@link ToolPermission} scopes.
  *       Per the spec, {@code offline_access} is never advertised.</li>
  *   <li>{@code bearer_methods_supported} — {@code ["header"]}; tokens are carried in the
@@ -83,15 +82,15 @@ public class OAuthProtectedResourceMetadataController {
             value = OAuthResourceServerConfig.PROTECTED_RESOURCE_METADATA_PATH,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> protectedResourceMetadata(HttpServletRequest request) {
+        if (!config.oauthDiscoveryEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         Map<String, Object> metadata = new LinkedHashMap<>();
 
         metadata.put("resource", config.resourceIdentifier(request));
 
         List<String> authorizationServers = config.authorizationServers();
-        if (!authorizationServers.isEmpty()) {
-            // RFC9728: optional. Emit only when configured, so clients are never handed an empty list.
-            metadata.put("authorization_servers", authorizationServers);
-        }
+        metadata.put("authorization_servers", authorizationServers);
 
         metadata.put("scopes_supported", config.scopesSupported());
         metadata.put("bearer_methods_supported", List.of("header"));

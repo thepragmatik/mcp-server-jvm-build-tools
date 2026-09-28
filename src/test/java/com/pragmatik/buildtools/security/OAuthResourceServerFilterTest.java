@@ -98,7 +98,7 @@ class OAuthResourceServerFilterTest {
     class Enabled {
 
         @Test
-        @DisplayName("missing token -> 401 with resource_metadata challenge, no error code")
+        @DisplayName("default API-key mode challenges without OAuth discovery")
         void missingTokenChallenged() throws Exception {
             MockHttpServletResponse res = new MockHttpServletResponse();
             MockFilterChain chain = new MockFilterChain();
@@ -108,11 +108,22 @@ class OAuthResourceServerFilterTest {
             assertThat(chain.getRequest()).as("downstream NOT reached").isNull();
             assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
             String challenge = res.getHeader("WWW-Authenticate");
-            assertThat(challenge)
-                    .startsWith("Bearer ")
+            assertThat(challenge).isEqualTo("Bearer");
+            assertThat(res.getContentAsString()).doesNotContain("resource_metadata");
+        }
+
+        @Test
+        @DisplayName("configured issuer enables the RFC9728 discovery challenge")
+        void issuerChallenged() throws Exception {
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            new OAuthResourceServerFilter(
+                            new OAuthResourceServerConfig(true, "", List.of("https://as.example.com")), authService)
+                    .doFilter(mcpPost(null), res, new MockFilterChain());
+
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            assertThat(res.getHeader("WWW-Authenticate"))
                     .contains("resource_metadata=\"http://localhost:8080"
                             + OAuthResourceServerConfig.PROTECTED_RESOURCE_METADATA_PATH + "\"");
-            assertThat(challenge).doesNotContain("error=");
         }
 
         @Test
@@ -127,7 +138,7 @@ class OAuthResourceServerFilterTest {
             assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
             assertThat(res.getHeader("WWW-Authenticate"))
                     .contains("error=\"invalid_token\"")
-                    .contains("resource_metadata=\"");
+                    .doesNotContain("resource_metadata");
             assertThat(res.getContentAsString()).contains("\"error\":\"invalid_token\"");
         }
 
@@ -155,6 +166,9 @@ class OAuthResourceServerFilterTest {
             MockFilterChain deniedChain = new MockFilterChain();
             filter(true).doFilter(denied, deniedResponse, deniedChain);
             assertThat(deniedResponse.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
+            assertThat(deniedResponse.getHeader("WWW-Authenticate"))
+                    .contains("error=\"insufficient_scope\"")
+                    .doesNotContain("resource_metadata");
             assertThat(deniedChain.getRequest()).isNull();
 
             MockHttpServletRequest allowed = mcpPost(VALID_TOKEN);
@@ -198,6 +212,14 @@ class OAuthResourceServerFilterTest {
     @Nested
     @DisplayName("WWW-Authenticate challenge formatting")
     class ChallengeFormat {
+
+        @Test
+        void opaqueKeyChallengeHasNoOAuthMetadata() {
+            assertThat(OAuthResourceServerFilter.buildChallenge(null, "Bearer access token required", null))
+                    .isEqualTo("Bearer");
+            assertThat(OAuthResourceServerFilter.buildChallenge("invalid_token", "bad", null))
+                    .isEqualTo("Bearer error=\"invalid_token\", error_description=\"bad\"");
+        }
 
         @Test
         @DisplayName("missing-token challenge advertises only resource_metadata")
