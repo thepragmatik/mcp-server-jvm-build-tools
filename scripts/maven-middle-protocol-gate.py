@@ -52,6 +52,22 @@ def assert_execution(result):
         raise AssertionError("Maven execution exposed a synthetic private canary")
 
 
+def assert_test_failure(result):
+    safe = result.get("structuredContent")
+    if not isinstance(safe, dict) or safe.get("success") is not False:
+        raise AssertionError("Maven test failure was not reported")
+    if safe.get("testSummary", {}).get("failed") != 1 or safe.get("errorCount") != 1:
+        raise AssertionError("Maven test failure lacked a bounded diagnostic")
+    diagnostics = safe.get("diagnostics", [])
+    if len(diagnostics) != 1 or diagnostics[0].get("category") != "test":
+        raise AssertionError("Maven test failure category was lost")
+    content = result.get("content", [])
+    if not content or json.loads(content[0].get("text", "")) != safe:
+        raise AssertionError("Maven test structured and text results differ")
+    if any(canary in json.dumps(result) for canary in CANARIES + ("ready", "stale")):
+        raise AssertionError("Maven test result exposed a synthetic private canary")
+
+
 def fixture(root):
     project = root / "project"
     project.mkdir()
@@ -79,6 +95,28 @@ def fixture(root):
             "projectDir": str(project), "command": "compile"}
 
 
+def test_failure_fixture(root):
+    project = root / "test-project"
+    project.mkdir()
+    (project / "pom.xml").write_text("<project/>", encoding="utf-8")
+    home = root / "test-home"
+    (home / "bin").mkdir(parents=True)
+    emitter = home / "emit.py"
+    emitter.write_text(
+        "import sys\n"
+        "print('[ERROR] expected ready but was stale for test.user@example.invalid SYNTHETIC_SECRET')\n"
+        "print('[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0')\n"
+        "print('[INFO] BUILD FAILURE')\n"
+        "sys.exit(1)\n",
+        encoding="utf-8",
+    )
+    executable = home / "bin" / "mvn"
+    executable.write_text('#!/bin/sh\nexec python3 "$(dirname "$0")/../emit.py"\n', encoding="utf-8")
+    executable.chmod(0o700)
+    return {"buildToolName": "maven", "buildToolHome": str(home),
+            "projectDir": str(project), "command": "test"}
+
+
 def main():
     if not JAR.is_file():
         raise RuntimeError("Packaged server jar is missing")
@@ -87,6 +125,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mcp-middle-gate-") as temporary:
         root = Path(temporary)
         arguments = fixture(root)
+        test_arguments = test_failure_fixture(root)
         env = os.environ.copy()
         env["BUILDTOOLS_PROJECTS_ALLOWED_ROOTS"] = str(root)
         port = release.free_port()
@@ -111,6 +150,13 @@ def main():
             if execute_status != 200:
                 raise AssertionError("HTTP Maven execution request failed")
             assert_execution(release.json_rpc_reply(execute_response, 2).get("result", {}))
+            test_body = json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                    "params": {"name": "analyze_build_output",
+                                               "arguments": test_arguments}}).encode()
+            test_status, test_response = release.request(port, test_body)
+            if test_status != 200:
+                raise AssertionError("HTTP Maven test analysis request failed")
+            assert_test_failure(release.json_rpc_reply(test_response, 3).get("result", {}))
             print("PASS Maven middle diagnostic: HTTP privacy and result parity")
         finally:
             server.terminate()
@@ -131,6 +177,9 @@ def main():
             execution, _ = client.call("tools/call", {"name": "execute_build_command",
                                                        "arguments": arguments})
             assert_execution(execution)
+            test_result, _ = client.call("tools/call", {"name": "analyze_build_output",
+                                                        "arguments": test_arguments})
+            assert_test_failure(test_result)
             print("PASS Maven middle diagnostic: stdio privacy and result parity")
         finally:
             client.close()

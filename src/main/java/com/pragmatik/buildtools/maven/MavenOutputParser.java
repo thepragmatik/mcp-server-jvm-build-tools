@@ -159,6 +159,17 @@ public class MavenOutputParser implements BuildOutputParser {
 
         completedTests.add(perClassFallback);
 
+        // Surefire/Failsafe summaries can report failed tests without a
+        // compiler-style [ERROR] file:line record. Keep one bounded, generic
+        // diagnostic per failure kind; assertion values and test names stay in
+        // private raw output.
+        if (completedTests.failures > 0) {
+            errors.add(testDiagnostic("Test assertion failed"));
+        }
+        if (completedTests.errors > 0) {
+            errors.add(testDiagnostic("Test failed during execution"));
+        }
+
         result.put("success", success);
         result.put("testSummary", completedTests.toSummary());
         result.put("errors", errors);
@@ -169,6 +180,13 @@ public class MavenOutputParser implements BuildOutputParser {
         result.put("warningCount", warnings.size());
 
         return result;
+    }
+
+    private static Map<String, Object> testDiagnostic(String message) {
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("severity", "ERROR");
+        diagnostic.put("message", message);
+        return diagnostic;
     }
 
     private Map<String, Object> emptyTestSummary() {

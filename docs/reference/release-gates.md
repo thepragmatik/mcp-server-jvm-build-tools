@@ -9,9 +9,10 @@ prints only pass/fail labels; server logs and protocol responses stay out of CI
 output.
 
 The packaged Maven synthetic probe exercises both transports for a retained
-middle compiler diagnostic and a failed `execute_build_command` whose output
-also claims success. It checks authoritative `exitCode`, structured/text
-parity, and private canary suppression without printing build logs.
+middle compiler diagnostic, a failed `execute_build_command` whose output
+also claims success, and a Surefire test failure without a compiler-style
+error. It checks authoritative `exitCode`, a bounded generic test diagnostic,
+structured/text parity, and private canary suppression without printing build logs.
 
 The release workflow also runs the packaged Gradle/sbt middle-diagnostic probe
 on HTTP and stdio. It drives a 28 MiB synthetic failure on stdout or stderr, plus a competing-stream
@@ -135,6 +136,7 @@ Local repeat command after packaging:
 ```sh
 ./mvnw -B package -DskipTests --no-transfer-progress
 python3 scripts/release-gate.py
+python3 scripts/maven-middle-protocol-gate.py
 python3 scripts/gradle-sbt-middle-protocol-gate.py
 ```
 

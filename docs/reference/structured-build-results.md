@@ -30,6 +30,8 @@ For example, a synthetic compilation failure can produce:
 }
 ```
 
+For a failed Maven Surefire/Failsafe run, `testSummary.failed` gives the failed-test count. A generic `test` diagnostic appears even when the build prints no compiler-style error line; it does not include test names or assertion values. The generic assertion-failure and execution-error diagnostics contribute at most two entries to `errorCount`, regardless of how many test cases failed. Inspect the local test report for private details.
+
 The server forms both MCP result fields from the same result after the shared model-output privacy policy removes raw logs, source symbols, credentials, email addresses, and absolute paths. The adapter checks the advertised schema before sending either structured build result; an out-of-contract result becomes a generic error. This contract is shared by the stdio and HTTP transports.
 
 ```mermaid
