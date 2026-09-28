@@ -56,7 +56,9 @@ def assert_test_failure(result):
     safe = result.get("structuredContent")
     if not isinstance(safe, dict) or safe.get("success") is not False:
         raise AssertionError("Maven test failure was not reported")
-    if safe.get("testSummary", {}).get("failed") != 1 or safe.get("errorCount") != 13:
+    if (safe.get("testSummary", {}).get("total") != 9
+            or safe.get("testSummary", {}).get("failed") != 3
+            or safe.get("errorCount") != 13):
         raise AssertionError("Maven test failure lacked a bounded diagnostic")
     diagnostics = safe.get("diagnostics", [])
     if not diagnostics or diagnostics[0].get("category") != "test":
@@ -107,10 +109,12 @@ def test_failure_fixture(root):
     emitter.write_text(
         "import sys\n"
         "out = sys.stdout.buffer\n"
+        "out.write(b'[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\\n')\n"
         "out.write(b'[INFO] ordinary build output\\n' * 480000)\n"
         "for i in range(1, 13):\n"
         "    out.write(f'[ERROR] /synthetic/private/Sample.java:[{i},1] cannot find symbol\\n'.encode())\n"
         "out.write(b'[ERROR] expected ready but was stale for test.user@example.invalid SYNTHETIC_SECRET\\n')\n"
+        "out.write(b'[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\\n')\n"
         "out.write(b'[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\\n')\n"
         "out.write(b'[INFO] ordinary build output\\n' * 480000)\n"
         "out.write(b'[INFO] BUILD FAILURE\\n')\n"
