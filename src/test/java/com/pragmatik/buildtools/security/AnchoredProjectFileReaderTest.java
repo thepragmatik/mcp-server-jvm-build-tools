@@ -75,6 +75,15 @@ class AnchoredProjectFileReaderTest {
                 .isInstanceOf(IOException.class);
     }
 
+    @Test
+    void rejectsInvalidFileNames() throws IOException {
+        Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+        for (String filename : new String[] {"", ".", "..", "child/file", "child\\file"}) {
+            assertThatThrownBy(() -> AnchoredProjectFileReader.read(project, filename, 100))
+                    .isInstanceOf(IOException.class);
+        }
+    }
+
     private void assumeSecureDirectories() throws IOException {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(temporary.getRoot())) {
             assumeTrue(stream instanceof SecureDirectoryStream<?>);
