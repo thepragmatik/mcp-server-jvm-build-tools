@@ -23,15 +23,18 @@ import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
 import com.pragmatik.buildtools.sbt.SbtBuildTool;
 import com.pragmatik.buildtools.sbt.SbtOutputParser;
+import com.pragmatik.buildtools.security.AnchoredProjectFileReader;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tracing.BuildTracer;
 import com.pragmatik.buildtools.tracing.TraceScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.ai.tool.annotation.Tool;
@@ -62,6 +65,7 @@ import org.springframework.stereotype.Service;
 public class BuildToolsService {
 
     private static final int MAX_COMMAND_LENGTH = 500;
+    private static final int MAX_GRADLE_CONFIG_BYTES = 1_048_576;
     private static final Pattern COMMAND_PATTERN = Pattern.compile("^(gradle\\w*\\s+)?[a-zA-Z0-9\\s._=/:@;\\-]+$");
 
     private final BuildToolProvider provider;
@@ -259,14 +263,14 @@ public class BuildToolsService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("projectDir", dir.toString());
+        result.put("projectDir", "[REDACTED_PATH]");
         result.put("status", "success");
 
         List<Map<String, Object>> detections = new ArrayList<>();
@@ -425,10 +429,10 @@ public class BuildToolsService {
         try {
             validatedProject = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(validatedProject)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid");
         }
 
         // Resolve the build tool
@@ -549,56 +553,67 @@ public class BuildToolsService {
      */
     @Tool(
             name = "validate_build_configuration",
-            description = "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) "
-                    + "for correctness. Checks XML well-formedness, required elements, plugin version "
-                    + "consistency for Maven, and basic syntax for Gradle. Returns structured JSON with "
-                    + "{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}. "
-                    + "Use this before executing builds to catch configuration errors early.")
+            description = "Check Maven POM structure and basic Gradle syntax without running a build. "
+                    + "Caps input at 1 MiB per file and rejects build-file symlinks; secure directory "
+                    + "access must be supported by the local filesystem and JDK. Returns validity, "
+                    + "issue count, and up to 12 fixed configuration diagnostics without paths, "
+                    + "coordinates, raw XML, or parser exception text. This is not Maven model resolution.")
     public String validateBuildConfiguration(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir) {
 
         Path dir;
         try {
-            dir = Path.of(projectDir).toRealPath();
-        } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            // The guarded callback already supplied a canonical allowed path. Resolving it
+            // again after authorization would follow a newly swapped project symlink.
+            dir = Path.of(projectDir).toAbsolutePath().normalize();
+        } catch (java.nio.file.InvalidPathException e) {
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
-        if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
-        }
-
         List<Map<String, Object>> allIssues = new ArrayList<>();
         String detectedTool = null;
+        // Marker checks and reads must share the same held handle. A path-based
+        // existence check could follow a project symlink swapped after access control.
+        try (AnchoredProjectFileReader.ProjectDirectory project = AnchoredProjectFileReader.open(dir)) {
+            try {
+                byte[] pom = project.readIfPresent("pom.xml", PomXmlValidator.MAX_POM_BYTES);
+                if (pom != null) {
+                    detectedTool = "maven";
+                    allIssues.addAll(validatePomXml(pom));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("pom.xml", "Cannot read pom.xml"));
+            }
 
-        // Validate pom.xml if present
-        Path pomXml = dir.resolve("pom.xml");
-        if (Files.exists(pomXml)) {
-            detectedTool = "maven";
-            List<Map<String, Object>> issues = validatePomXml(pomXml);
-            allIssues.addAll(issues);
-        }
+            try {
+                byte[] gradle = project.readIfPresent("build.gradle", MAX_GRADLE_CONFIG_BYTES);
+                if (gradle != null) {
+                    if (detectedTool == null) detectedTool = "gradle";
+                    allIssues.addAll(validateBuildGradle("build.gradle", gradle, false));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("build.gradle", "Cannot read build file"));
+            }
 
-        // Validate build.gradle if present
-        Path buildGradle = dir.resolve("build.gradle");
-        if (Files.exists(buildGradle)) {
-            if (detectedTool == null) detectedTool = "gradle";
-            List<Map<String, Object>> issues = validateBuildGradle(buildGradle, false);
-            allIssues.addAll(issues);
-        }
-
-        // Validate build.gradle.kts if present
-        Path buildGradleKts = dir.resolve("build.gradle.kts");
-        if (Files.exists(buildGradleKts)) {
-            if (detectedTool == null) detectedTool = "gradle";
-            List<Map<String, Object>> issues = validateBuildGradle(buildGradleKts, true);
-            allIssues.addAll(issues);
+            try {
+                byte[] gradleKts = project.readIfPresent("build.gradle.kts", MAX_GRADLE_CONFIG_BYTES);
+                if (gradleKts != null) {
+                    if (detectedTool == null) detectedTool = "gradle";
+                    allIssues.addAll(validateBuildGradle("build.gradle.kts", gradleKts, true));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("build.gradle.kts", "Cannot read build file"));
+            }
+        } catch (UnsupportedOperationException e) {
+            return validationFailure("Validation unavailable on this filesystem");
+        } catch (IOException e) {
+            return validationFailure("Cannot access project directory");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valid", allIssues.stream().noneMatch(i -> "ERROR".equals(i.get("severity"))));
         result.put("tool", detectedTool);
-        result.put("projectDir", dir.toString());
+        result.put("projectDir", "[REDACTED_PATH]");
 
         if (detectedTool != null) {
             result.put("file", "maven".equals(detectedTool) ? "pom.xml" : "build.gradle");
@@ -633,141 +648,53 @@ public class BuildToolsService {
     /**
      * Validate a pom.xml file for structural and content issues.
      */
-    private List<Map<String, Object>> validatePomXml(Path pomXml) {
-        List<Map<String, Object>> issues = new ArrayList<>();
-
+    private List<Map<String, Object>> validatePomXml(byte[] pomXml) {
         try {
-            String content = Files.readString(pomXml);
-
-            // Check XML well-formedness with basic heuristics
-            // Check for unmatched tags
-            if (!content.contains("<project") || !content.contains("</project>")) {
-                Map<String, Object> issue = new LinkedHashMap<>();
-                issue.put("severity", "ERROR");
-                issue.put("path", "pom.xml");
-                issue.put("message", "Missing <project> root element");
-                issue.put("suggestion", "Add <project> root element with correct namespace");
-                issues.add(issue);
-                return issues;
-            }
-
-            // Check required elements, accounting for parent POM inheritance
-            // Extract the parent block if present
-            String contentOutsideParent = content;
-            boolean hasParentBlock = content.contains("<parent>") && content.contains("</parent>");
-            if (hasParentBlock) {
-                int parentStart = content.indexOf("<parent>");
-                int parentEnd = content.indexOf("</parent>") + "</parent>".length();
-                contentOutsideParent = content.substring(0, parentStart) + content.substring(parentEnd);
-            }
-
-            String[] requiredElements = {"modelVersion", "groupId", "artifactId", "version"};
-            for (String element : requiredElements) {
-                boolean hasOpen = contentOutsideParent.contains("<" + element + ">");
-                boolean hasClose = contentOutsideParent.contains("</" + element + ">");
-
-                // groupId and version can be inherited from parent POM
-                boolean canBeInherited = element.equals("groupId") || element.equals("version");
-
-                if (!hasOpen && canBeInherited && hasParentBlock) {
-                    // Check if it's present in the parent block
-                    String parentBlock = content.substring(
-                            content.indexOf("<parent>"), content.indexOf("</parent>") + "</parent>".length());
-                    if (parentBlock.contains("<" + element + ">")) {
-                        // Inherited from parent — valid
-                        continue;
-                    }
-                }
-
-                if (!hasOpen) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "ERROR");
-                    issue.put("path", "pom.xml");
-                    issue.put("message", "Missing required element: <" + element + ">");
-                    issue.put("suggestion", "Add <" + element + "> element inside <project>");
-                    issues.add(issue);
-                } else if (!hasClose) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "ERROR");
-                    issue.put("path", "pom.xml");
-                    issue.put("message", "Unclosed element: <" + element + ">");
-                    issue.put("suggestion", "Add closing </" + element + "> tag");
-                    issues.add(issue);
-                }
-            }
-
-            // Check for duplicate dependency declarations
-            Map<String, Integer> depCounts = new LinkedHashMap<>();
-            Pattern depPattern = Pattern.compile("<artifactId>([^<]+)</artifactId>");
-            Matcher depMatcher = depPattern.matcher(content);
-            while (depMatcher.find()) {
-                String artifactId = depMatcher.group(1);
-                depCounts.merge(artifactId, 1, Integer::sum);
-            }
-            for (Map.Entry<String, Integer> entry : depCounts.entrySet()) {
-                if (entry.getValue() > 1) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "WARNING");
-                    issue.put("path", "pom.xml");
-                    issue.put(
-                            "message",
-                            "Duplicate dependency declaration: " + entry.getKey() + " (declared " + entry.getValue()
-                                    + " times)");
-                    issue.put("suggestion", "Remove duplicate <dependency> entry for " + entry.getKey());
-                    issues.add(issue);
-                }
-            }
-
-            // Check plugin version consistency (warn if multiple versions of same plugin)
-            Map<String, Set<String>> pluginVersions = new LinkedHashMap<>();
-            Pattern pluginPattern = Pattern.compile(
-                    "<plugin>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>\\s*(?:<version>([^<]+)</version>)?",
-                    Pattern.DOTALL);
-            Matcher pluginMatcher = pluginPattern.matcher(content);
-            while (pluginMatcher.find()) {
-                String groupId = pluginMatcher.group(1);
-                String artifactId = pluginMatcher.group(2);
-                String version = pluginMatcher.group(3) != null ? pluginMatcher.group(3) : "UNSPECIFIED";
-                String key = groupId + ":" + artifactId;
-                pluginVersions.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(version);
-            }
-            for (Map.Entry<String, Set<String>> entry : pluginVersions.entrySet()) {
-                if (entry.getValue().size() > 1) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "WARNING");
-                    issue.put("path", "pom.xml");
-                    issue.put(
-                            "message",
-                            "Inconsistent plugin versions for " + entry.getKey() + ": "
-                                    + String.join(", ", entry.getValue()));
-                    issue.put(
-                            "suggestion",
-                            "Use <pluginManagement> to centralize plugin version for "
-                                    + entry.getKey().split(":")[1]);
-                    issues.add(issue);
-                }
-            }
-
-        } catch (IOException e) {
-            Map<String, Object> issue = new LinkedHashMap<>();
-            issue.put("severity", "ERROR");
-            issue.put("path", "pom.xml");
-            issue.put("message", "Cannot read pom.xml: " + e.getMessage());
-            issues.add(issue);
+            return PomXmlValidator.validate(pomXml);
+        } catch (IllegalArgumentException e) {
+            return List.of(validationIssue("pom.xml", "Cannot read pom.xml"));
         }
+    }
 
-        return issues;
+    private static Map<String, Object> validationIssue(String filename, String message) {
+        Map<String, Object> issue = new LinkedHashMap<>();
+        issue.put("severity", "ERROR");
+        issue.put("path", filename);
+        issue.put("message", message);
+        return issue;
+    }
+
+    private static String validationFailure(String message) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", false);
+        result.put("tool", null);
+        result.put("projectDir", "[REDACTED_PATH]");
+        result.put("error", message);
+        result.put("issueCount", 1);
+        result.put("issues", List.of(validationIssue("projectDir", message)));
+        return JsonUtils.toJson(result);
     }
 
     /**
      * Validate a build.gradle or build.gradle.kts file for basic syntax.
      */
-    private List<Map<String, Object>> validateBuildGradle(Path buildFile, boolean isKotlin) {
+    private List<Map<String, Object>> validateBuildGradle(String filename, byte[] bytes, boolean isKotlin) {
         List<Map<String, Object>> issues = new ArrayList<>();
-        String filename = buildFile.getFileName().toString();
 
         try {
-            String content = Files.readString(buildFile);
+            if (bytes.length > MAX_GRADLE_CONFIG_BYTES) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", filename);
+                issue.put("message", "Build file is too large to validate");
+                issues.add(issue);
+                return issues;
+            }
+            String content = StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
 
             if (content.isBlank()) {
                 Map<String, Object> issue = new LinkedHashMap<>();
@@ -848,11 +775,11 @@ public class BuildToolsService {
                 }
             }
 
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             Map<String, Object> issue = new LinkedHashMap<>();
             issue.put("severity", "ERROR");
             issue.put("path", filename);
-            issue.put("message", "Cannot read build file: " + e.getMessage());
+            issue.put("message", "Cannot read build file");
             issues.add(issue);
         }
 

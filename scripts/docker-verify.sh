@@ -24,9 +24,9 @@ docker run --rm -i \
   --memory 4g --cpus 3 --pids-limit 512 \
   --cap-drop ALL --security-opt no-new-privileges \
   --read-only \
-  --tmpfs /tmp:rw,exec,size=1g,uid=100,gid=101 \
-  --tmpfs /work:rw,exec,size=2g,uid=100,gid=101 \
-  --tmpfs /home/buildtools:rw,exec,size=512m,uid=100,gid=101 \
+  --tmpfs /tmp:rw,exec,size=1g,uid=10001,gid=10001 \
+  --tmpfs /work:rw,exec,size=2g,uid=10001,gid=10001 \
+  --tmpfs /home/buildtools:rw,exec,size=512m,uid=10001,gid=10001 \
   --mount "type=bind,src=$repo,dst=/m2,readonly" \
   --entrypoint sh "$image" -c '
     set -eu
