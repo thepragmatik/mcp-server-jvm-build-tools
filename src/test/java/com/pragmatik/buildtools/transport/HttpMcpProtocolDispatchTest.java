@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pragmatik.buildtools.application.BuildToolsApplication;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
@@ -69,6 +71,37 @@ class HttpMcpProtocolDispatchTest {
                 rpc("tools/call", "{\"name\":\"detect_build_tool\",\"arguments\":{\"projectDir\":\".\"}}"),
                 String.class);
         assertThat(result).contains("detectedTools").contains("maven").doesNotContain(System.getProperty("user.home"));
+    }
+
+    @Test
+    void listBuildToolsReturnsRegisteredNamesThroughMcp() {
+        String response = new RestTemplate()
+                .postForObject(
+                        "http://127.0.0.1:" + port + "/mcp",
+                        rpc("tools/call", "{\"name\":\"list_build_tools\",\"arguments\":{}}"),
+                        String.class);
+        assertThat(response).contains("maven", "gradle", "sbt").doesNotContain(System.getProperty("user.home"));
+        assertThat(response).doesNotContain("clean, compile", "deploy", "install");
+        var json = new tools.jackson.databind.json.JsonMapper().readTree(response);
+        var content = json.get("result").get("content").get(0).get("text").asText();
+        var result = new tools.jackson.databind.json.JsonMapper().readTree(content);
+        assertThat(result.get("tools").size()).isEqualTo(3);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-f=", "--file=", "-s=", "--settings=", "--global-settings=", "--toolchains="})
+    void mavenFileSelectorsAreDeniedWithoutEchoingPrivateInput(String option) {
+        String canary = "../outside/private-canary/pom.xml";
+        String response = new RestTemplate()
+                .postForObject(
+                        "http://127.0.0.1:" + port + "/mcp",
+                        rpc(
+                                "tools/call",
+                                "{\"name\":\"execute_build_command\",\"arguments\":{\"buildToolName\":\"maven\",\"projectDir\":\".\",\"command\":\"validate "
+                                        + option
+                                        + canary + "\"}}"),
+                        String.class);
+        assertThat(response).contains("isError").doesNotContain(canary, "private-canary");
     }
 
     @Test

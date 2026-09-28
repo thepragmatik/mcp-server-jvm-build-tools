@@ -46,17 +46,7 @@ import java.util.regex.Pattern;
 public class SbtBuildTool implements BuildTool {
 
     private static final Set<String> ALLOWED_TASKS = Set.of(
-            "compile",
-            "test",
-            "run",
-            "package",
-            "clean",
-            "assembly",
-            "publishLocal",
-            "publish",
-            "update",
-            "doc",
-            "console");
+            "compile", "test", "run", "package", "clean", "assembly", "publishLocal", "update", "doc", "console");
 
     private static final List<String> SUPPORTED_COMMANDS = List.copyOf(ALLOWED_TASKS);
 
@@ -75,7 +65,7 @@ public class SbtBuildTool implements BuildTool {
             You are an assistant for executing SBT build commands. Follow these rules:
 
             1. Only execute SBT lifecycle tasks: compile, test, run, package, clean, assembly,
-               publishLocal, publish, update, doc, console.
+               publishLocal, update, doc, console. Remote publish is unavailable.
             2. Supported flags: --no-colors (always added for machine-readable output).
             3. Use semicolons to chain multiple tasks (e.g., "clean;compile;test").
             4. Do not execute arbitrary system commands or shell scripts.

@@ -39,10 +39,10 @@ import org.springframework.stereotype.Service;
 public class BuildPlanService {
 
     private static final Set<String> KNOWN_KEYWORDS =
-            Set.of("clean", "compile", "build", "test", "package", "install", "deploy", "validate");
+            Set.of("clean", "compile", "build", "test", "package", "install", "validate");
 
     private static final List<String> PHASE_ORDER =
-            List.of("clean", "validate", "compile", "build", "test", "package", "install", "deploy");
+            List.of("clean", "validate", "compile", "build", "test", "package", "install");
 
     private final BuildToolsService buildToolsService;
     private final BuildToolProvider buildToolProvider;
@@ -68,6 +68,9 @@ public class BuildPlanService {
         Set<String> keywords = new LinkedHashSet<>();
         String[] words = description.toLowerCase().split("[\\s,;.]+");
         for (String word : words) {
+            if (word.equals("deploy") || word.equals("publish")) {
+                throw new IllegalArgumentException("Remote publishing is unavailable in build plans");
+            }
             if (KNOWN_KEYWORDS.contains(word)) {
                 keywords.add(word);
             }
@@ -278,7 +281,6 @@ public class BuildPlanService {
             case "test" -> "Run tests";
             case "package" -> "Package artifacts";
             case "install" -> "Install to local repository";
-            case "deploy" -> "Deploy to remote repository";
             case "validate" -> "Validate project structure";
             default -> "Execute " + keyword;
         };

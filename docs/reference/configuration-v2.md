@@ -35,7 +35,17 @@ system permissions. Isolate untrusted projects in a container.
 The HTTP profile binds to loopback and enforces bearer authentication by
 default. Set a key and scopes before starting it. For example, a read-only
 client could have `build:read,dependency:read`; add `build:execute` only for
-build execution. The `buildtools.auth.enabled` and `buildtools.auth.mode`
+build execution. This scope permits local Maven `install`, Gradle
+`publishToMavenLocal`, and sbt `publishLocal`, but rejects Maven `deploy` and
+sbt `publish` as direct command names. This is not a no-publish guarantee:
+an allowed phase can run POM-configured plugins or build scripts that publish
+using inherited environment variables or Maven settings. Run untrusted builds
+in an isolated, credential-free environment; disable its network if possible.
+Maven project, reactor, settings, and toolchains selectors (such as `-f` and
+`--file`) are rejected; select the project with the validated `projectDir`
+argument instead. Maven's direct path-override properties are also rejected.
+
+The `buildtools.auth.enabled` and `buildtools.auth.mode`
 properties belong to the older in-process authorization service; HTTP
 `tools/call` scope checks happen in the bearer filter independently of
 those properties. Do not disable HTTP bearer enforcement for a shared server.

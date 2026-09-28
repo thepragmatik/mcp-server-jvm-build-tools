@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.security;
 
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -205,6 +206,10 @@ public final class ModelOutputPolicy {
                         for (String key : COUNTERS) {
                             copyCounter(tests, key, counts);
                         }
+                        JsonNode countsCapped = tests.get("countsCapped");
+                        if (countsCapped != null && countsCapped.isBoolean() && countsCapped.booleanValue()) {
+                            counts.put("countsCapped", true);
+                        }
                         if (!counts.isEmpty()) {
                             safe.put("testSummary", counts);
                         }
@@ -231,9 +236,21 @@ public final class ModelOutputPolicy {
             }
         }
         if ("list_build_tools".equals(toolName) && output != null) {
+            // String-returning callbacks can reach this boundary as a JSON
+            // string literal. Decode that wrapper before matching line starts;
+            // still emit only names from the fixed public allowlist.
+            String listing = output;
+            try {
+                JsonNode value = mapper.readTree(output);
+                if (value != null && value.isTextual()) {
+                    listing = value.asText();
+                }
+            } catch (tools.jackson.core.JacksonException ignored) {
+                // A direct, unquoted tool response remains valid input.
+            }
             List<String> names = new ArrayList<>();
             for (String name : BUILD_TOOLS) {
-                if (output.lines().anyMatch(line -> line.startsWith(name + ":"))) {
+                if (listing.lines().anyMatch(line -> line.startsWith(name + ":"))) {
                     names.add(name);
                 }
             }
@@ -353,7 +370,10 @@ public final class ModelOutputPolicy {
 
     private static void copyCounter(JsonNode source, String key, Map<String, Object> target) {
         JsonNode value = source.get(key);
-        if (value != null && value.isIntegralNumber() && value.longValue() >= 0 && value.longValue() <= 1_000_000) {
+        if (value != null
+                && value.isIntegralNumber()
+                && value.longValue() >= 0
+                && value.longValue() <= BuildResultLimits.MAX_VISIBLE_COUNTER) {
             target.put(key, value.longValue());
         }
     }

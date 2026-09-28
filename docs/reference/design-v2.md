@@ -1,6 +1,6 @@
 # Design review for 2.0
 
-This page records the architecture decision for the 2.0 development line. The proposed first prerelease is `v2.0.0-rc.1`: the new required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. The Maven project remains `2.0.0-SNAPSHOT` until release gates pass.
+This page records the architecture decision for the 2.0 development line. The first prerelease candidate is `v2.0.0-rc.1`: the new required project roots, default HTTP authentication, removed model-visible tools, narrowed result shape, and scope semantics break 1.x clients. The Maven project version is `2.0.0-rc.1`; the tag is created only after release gates pass.
 
 ## Trust boundaries
 
