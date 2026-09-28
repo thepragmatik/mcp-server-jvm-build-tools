@@ -2,6 +2,7 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- The central project guard now checks build markers through one held, no-symlink project directory handle where Java `SecureDirectoryStream` is available. Providers without it keep canonical-path compatibility checks; those checks still have a path-swap race, so untrusted projects require isolation.
 - Gradle and sbt test-summary parsers now saturate oversized or inconsistent counts at 1,000,000 and mark `countsCapped`, matching Maven's bounded result contract without overflow or negative passed counts.
 - Maven POM configuration validation now uses a 1 MiB bounded, offline XML parser that rejects malformed XML, DTDs, and external entities, checks direct elements accurately, and emits finite privacy-safe diagnostics through MCP. Gradle validation reads are also bounded to 1 MiB. Both validators use race-resistant, no-symlink directory-handle traversal and fail closed if the local filesystem/JDK lacks that support. The Docker base switches to Noble Java 21 with a build-time support probe. Gradle issues use the same safe projection.
 - Removed the `buildtools.cache.hit.rate` gauge, which always reported an unmeasured `0.0`. Remove `buildtools_cache_hit_rate` dashboard queries and alerts; `buildtools.cache.score` remains a cache health score (0-100), not a comparable per-tool hit rate. sbt scoring can include locally parsed cache hits and misses.

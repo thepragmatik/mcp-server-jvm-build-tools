@@ -19,7 +19,7 @@ flowchart LR
     S --> N["🟢 Immutable native prompt catalog<br/>3 static workflows"]
     Q --> N
     N --> T
-    C --> P{"🟠 Canonical project root?"}
+    C --> P{"🟠 Canonical root +<br/>held marker checks?"}
     P -->|deny| X["🔴 Safe error"]
     P -->|allow| B["🟢 Build-tool service<br/>Maven · Gradle · sbt"]
     B --> O["🟡 Bounded process capture"]
@@ -56,7 +56,7 @@ network access.
 | Application wiring | `BuildToolsApplication` | Registers the annotated tool service beans once. |
 | Native prompts | `NativePromptCatalog` | Supplies three immutable, server-authored prompt definitions and messages to both SDK transports; rejects arguments without echoing them. HTTP `prompts/list` and `prompts/get` require `prompt:read`. |
 | Tool catalog | `MethodToolCallbackProvider` → `DeterministicToolCallbackProvider` → `GuardedToolCallbackProvider` | Discovers tools, sorts names, limits the public surface to known permissions, substitutes safe descriptions, validates path arguments, and applies output projection. |
-| Project boundary | `ProjectAccessPolicy` | Resolves existing paths with `toRealPath()` against configured allowed roots; ambiguous or markerless build-tool detection requires an explicit choice. |
+| Project boundary | `ProjectAccessPolicy` and `AnchoredProjectFileReader` | Resolve the project under configured allowed roots. Where supported, one held no-symlink directory handle checks all build markers; a canonical path compatibility check remains on providers without `SecureDirectoryStream`. Ambiguous or markerless build-tool detection requires an explicit choice. |
 | Build-tool selection | `BuildToolProvider` and `BuildTool` implementations | Selects Maven, Gradle, or sbt and delegates execution or analysis. |
 | Process lifetime | `SyncProcessRunner`, `BoundedProcessOutput`, and async build handling | Drains stdout and stderr concurrently, retains bounded head/tail bytes, applies timeouts, and terminates descendants on timeout or cancellation. |
 | Result boundary | `ModelOutputPolicy` and `PrivacySafeMcpJsonMapper` | Selects safe fields and normalized diagnostics for tool results; replaces caller-derived JSON-RPC error detail with generic text on both transports. |
@@ -149,7 +149,7 @@ still use their existing execution paths.
 | Cross-tool result projection is highly coupled | `ModelOutputPolicy` interprets tool-specific JSON and plain text centrally. Adding a tool requires synchronized changes to its projection, metadata, permissions, and docs; silent field loss is possible. | The first small slice moves `list_build_tools` into a typed `PublicBuildToolListing`, reusing the policy's bounded parse while preserving its public result. Other projections remain centralized; extract them only with characterization and protocol tests. |
 | Construction and selection are coupled to concrete classes | `BuildToolsService` and `DependencyService` construct parser/resolver implementations, while `BuildToolProvider` constructs build-tool instances. This makes substitutions and focused tests harder. | Roadmap refactor: inject interfaces or factories and preserve behavior with contract tests. |
 | Dormant services expand review work | Eleven methods in four component-scanned services were never registered as MCP callbacks; their misleading `@Tool` and `@ToolParam` annotations have been removed. Ten other annotated methods are registered as callbacks but filtered from the public catalog by the permission map. Plan services also duplicate command vocabulary. | Keep the public catalog default-deny. Design and test each future exposure deliberately; consolidate plan vocabulary separately. |
-| Filesystem checks cannot prevent all races | A symlink or build file can change after canonical validation and before a child process opens it. Build scripts can execute arbitrary project code. | Document the limitation now; require external isolation for untrusted projects. |
+| Filesystem checks cannot prevent all races | Held marker checks and configuration reads resist directory swaps where `SecureDirectoryStream` is available, but the compatibility fallback remains path-based. Other tool reads and child processes can still encounter replacements after validation. Build scripts can execute arbitrary project code. | Require external isolation for untrusted projects; gate stable 2.0 on a portable boundary or an explicit isolated-execution model. |
 
 These findings are based on the current code and synthetic dogfood.
 They are not claims that a broader refactor has already shipped. The

@@ -99,6 +99,32 @@ class AnchoredProjectFileReaderTest {
     }
 
     @Test
+    void heldMarkerChecksIgnoreReplacedProjectPathAndRejectLocalSymlinks() throws IOException {
+        assumeSecureDirectories();
+        Path root = temporary.toRealPath();
+        Path outside = Files.createDirectory(root.resolve("outside"));
+        Files.writeString(outside.resolve("build.gradle"), "SYNTHETIC_PRIVATE_CANARY");
+        Path project = Files.createDirectory(root.resolve("project"));
+        Files.writeString(project.resolve("pom.xml"), "safe");
+
+        try (AnchoredProjectFileReader.ProjectDirectory opened = AnchoredProjectFileReader.open(project)) {
+            Files.move(project, root.resolve("moved"));
+            Files.createSymbolicLink(project, outside);
+
+            opened.requireSafeMarker("pom.xml");
+            opened.requireSafeMarker("build.gradle");
+            opened.requireSafeNestedMarker("project", "build.properties");
+
+            Files.createSymbolicLink(root.resolve("moved/build.gradle"), outside.resolve("build.gradle"));
+            assertThatThrownBy(() -> opened.requireSafeMarker("build.gradle")).isInstanceOf(IOException.class);
+
+            Files.createSymbolicLink(root.resolve("moved/project"), outside);
+            assertThatThrownBy(() -> opened.requireSafeNestedMarker("project", "build.properties"))
+                    .isInstanceOf(IOException.class);
+        }
+    }
+
+    @Test
     void rejectsInvalidFileNames() throws IOException {
         Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
         for (String filename : new String[] {"", ".", "..", "child/file", "child\\file"}) {

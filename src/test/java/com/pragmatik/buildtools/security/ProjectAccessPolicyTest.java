@@ -82,4 +82,51 @@ class ProjectAccessPolicyTest {
                 IllegalArgumentException.class,
                 () -> new ProjectAccessPolicy(root.toString()).requireAllowed("project"));
     }
+
+    @Test
+    void rejectsPresentSymlinkedMarkersWithGenericError() throws IOException {
+        Path root = Files.createDirectory(temporary.toRealPath().resolve("allowed"));
+        Path project = Files.createDirectory(root.resolve("project"));
+        Path target = Files.writeString(root.resolve("inside-pom.xml"), "<project/>");
+        Path marker = project.resolve("pom.xml");
+        Files.createSymbolicLink(marker, target);
+        ProjectAccessPolicy policy = new ProjectAccessPolicy(root.toString());
+
+        IllegalArgumentException first =
+                assertThrows(IllegalArgumentException.class, () -> policy.requireAllowed("project"));
+        assertEquals("Project directory cannot be safely inspected", first.getMessage());
+
+        Files.delete(marker);
+        Files.createSymbolicLink(marker, project.resolve("missing-pom.xml"));
+        IllegalArgumentException broken =
+                assertThrows(IllegalArgumentException.class, () -> policy.requireAllowed("project"));
+        assertEquals(first.getMessage(), broken.getMessage());
+    }
+
+    @Test
+    void rejectsNestedMarkerDirectorySymlink() throws IOException {
+        Path root = Files.createDirectory(temporary.toRealPath().resolve("allowed"));
+        Path project = Files.createDirectory(root.resolve("project"));
+        Path outside = Files.createDirectory(temporary.toRealPath().resolve("outside"));
+        Files.writeString(outside.resolve("build.properties"), "SYNTHETIC_PRIVATE_CANARY");
+        Files.createSymbolicLink(project.resolve("project"), outside);
+
+        IllegalArgumentException denied = assertThrows(
+                IllegalArgumentException.class,
+                () -> new ProjectAccessPolicy(root.toString()).requireAllowed(project.toString()));
+        assertEquals("Project directory cannot be safely inspected", denied.getMessage());
+    }
+
+    @Test
+    void compatibilityFallbackPreservesSymlinkEscapeDenial() throws IOException {
+        Path root = Files.createDirectory(temporary.toRealPath().resolve("allowed"));
+        Path project = Files.createDirectory(root.resolve("project"));
+        Path outside = Files.writeString(temporary.toRealPath().resolve("outside-pom.xml"), "<project/>");
+        Files.createSymbolicLink(project.resolve("pom.xml"), outside);
+
+        ProjectAccessPolicy policy = new ProjectAccessPolicy(root.toString());
+        IllegalArgumentException denied =
+                assertThrows(IllegalArgumentException.class, () -> policy.checkBuildMarkersCompatibly(project));
+        assertEquals("Project directory cannot be safely inspected", denied.getMessage());
+    }
 }
