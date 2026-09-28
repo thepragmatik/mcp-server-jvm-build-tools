@@ -94,6 +94,7 @@ class DependencyServiceSecurityTest {
             @SuppressWarnings("unchecked")
             Map<String, Object> security = (Map<String, Object>) result.get("security");
             assertThat(security).containsKeys("cveCount", "highestSeverity", "vulnerabilities");
+            assertThat(security.get("lookupStatus")).isEqualTo("complete");
         }
 
         @Test

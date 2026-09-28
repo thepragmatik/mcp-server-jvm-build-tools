@@ -14,6 +14,8 @@ java -Dbuildtools.projects.allowed-roots=/workspace/projects -jar target/mcp-ser
 
 3. Call `detect_build_tool` with `{"projectDir":"."}`. A relative path such as `"service-a"` selects a child of the first allowed root. Absolute home paths stay out of the conversation.
 
+To check a published version, call `check_dependency_version` with a Maven `groupId` and `artifactId`. This sends those coordinates to Maven Central, but the MCP result exposes only safe version and count fields. Invalid coordinates are rejected before network access; malformed metadata yields a fixed error. Setting `includeSecurityInfo=true` with `currentVersion` additionally sends the coordinates and version to OSV.dev. The MCP result adds only `securityStatus`, a bounded `cveCount` when the lookup completes, and `highestSeverity` (`UNKNOWN` if the OSV record cannot establish it); advisory identities and summaries stay local. An incomplete lookup has no CVE count.
+
 Before running a build, an agent can call `validate_build_configuration` with `{"projectDir":"service-a"}`. A Maven POM with a missing coordinate returns `valid: false`, an `issueCount`, and a fixed `configuration` diagnostic such as `Required POM artifactId is missing.` The agent should inspect `pom.xml` locally before editing; raw XML, coordinates, and paths do not enter the MCP result. See [what validation checks](../reference/configuration-validation.md).
 Build-file symlinks are rejected. If the local filesystem/JDK cannot support race-free directory access, validation returns a fixed unavailable diagnostic; use the supported Docker image or a local runtime with `SecureDirectoryStream` support.
 

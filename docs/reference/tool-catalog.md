@@ -17,7 +17,7 @@ and [2.0 security design](design-v2.md) before granting execution access.
 | `analyze_build_performance` | `build:read` | Return tracked-build and suggestion counts with an optimization potential level; raw suggestions are withheld. |
 | `analyze_pom_dependencies` | `dependency:read` | Return dependency, managed-entry, and BOM counts; coordinates and per-dependency classifications are withheld. |
 | `analyze_sbt_build` | `sbt:read` | Return Scala and sbt versions without organization or plugin details. |
-| `check_dependency_version` | `dependency:read` | Return available version numbers and upgrade status without dependency identifiers. |
+| `check_dependency_version` | `dependency:read` | Check a version by sending coordinates to Maven Central. includeSecurityInfo also sends coordinates and version to OSV.dev and returns aggregate CVE count, status, and known severity. Dependency and CVE identities are withheld from results. |
 | `check_java_compatibility` | `java:read` | Return a compatibility verdict and issue count without dependency details. |
 | `check_tool_authorization` | `security:read` | Return an authorization decision without credential identities. |
 | `detect_build_tool` | `build:read` | Detect Maven, Gradle, or sbt; return names and count without project paths. |

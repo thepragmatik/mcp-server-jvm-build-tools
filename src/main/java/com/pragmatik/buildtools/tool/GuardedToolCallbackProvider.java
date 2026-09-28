@@ -50,7 +50,7 @@ public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
             Map.entry("profile_build", "Run a build and return duration and phase counts without raw phase details."),
             Map.entry(
                     "check_dependency_version",
-                    "Return available version numbers and upgrade status without dependency identifiers."),
+                    "Check a version by sending coordinates to Maven Central. includeSecurityInfo also sends coordinates and version to OSV.dev and returns aggregate CVE count, status, and known severity. Dependency and CVE identities are withheld from results."),
             Map.entry(
                     "analyze_pom_dependencies",
                     "Return dependency, managed-entry, and BOM counts; coordinates and per-dependency classifications are withheld."),

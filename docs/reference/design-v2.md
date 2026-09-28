@@ -37,12 +37,39 @@ The public tool descriptions state the result contract after the output policy, 
 
 | Tool | Model-visible result | Retained locally |
 |---|---|---|
-| `check_dependency_version` | Version and upgrade status; optional `includeSecurityInfo` does not expose security findings through MCP | Dependency identity and optional OSV findings |
+| `check_dependency_version` | Version and upgrade status; optional `securityStatus`, bounded `cveCount`, and `highestSeverity` | Dependency identity and individual OSV findings |
 | `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
 | `scan_dependency_cves` | `scanStatus`, recognized declaration count (`totalDeps`), and affected-dependency presence count (`vulnerableDeps`); `severityUnknown` when OSV omits severity. High/critical counts appear only when all returned severities are known. Failed or partial lookups return `scanStatus: incomplete` and no counts. | Dependency and CVE identities |
 
 These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
-For `check_dependency_version`, `includeSecurityInfo=true` still sends the supplied coordinates to OSV.dev but the current MCP projection withholds the findings. Agents should use `scan_dependency_cves` for aggregate presence until that optional lookup has a separately tested public result contract.
+For `check_dependency_version`, `includeSecurityInfo=true` sends the supplied coordinates and version to OSV.dev. A successful lookup exposes only a bounded aggregate count and known/unknown highest severity; a failed or malformed lookup exposes `securityStatus: incomplete` without a count. An oversized or malformed private version result returns `metadataStatus: incomplete` and an error. Individual advisories, summaries, and package identities stay local. The option has no OSV effect unless `currentVersion` is supplied.
+
+The Maven Central metadata lookup is another explicit egress boundary. It admits bounded Maven coordinate syntax before constructing a fixed-host URL, rejects redirects, imposes a ten-second request deadline and 1 MiB body cap, then parses strict UTF-8 XML with DTD and external-entity access disabled. Errors use fixed text; the shared output policy exposes only safe version and count fields. The optional OSV query is a separate outbound operation.
+
+```mermaid
+flowchart LR
+    C["🟣 Client coordinates"] --> V{"🟠 Bounded Maven syntax?"}
+    V -- invalid --> X["🔴 Fixed error<br/>zero egress"]
+    V -- valid --> M["🔵 Fixed Maven Central URL<br/>no redirects · 10 s"]
+    M --> B["🟡 1 MiB response cap<br/>strict UTF-8"]
+    B --> P["🟢 DTD-free XML parser"]
+    P --> O["🟢 Finite MCP projection<br/>versions and counts"]
+    M -- network failure --> X
+    B -- malformed or large --> X
+    P -- malformed XML --> X
+    classDef caller fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef decision fill:#ffedd5,stroke:#ea580c,color:#512600
+    classDef network fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef bounded fill:#fef9c3,stroke:#ca8a04,color:#443400
+    classDef safe fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef reject fill:#fee2e2,stroke:#dc2626,color:#520909
+    class C caller
+    class V decision
+    class M network
+    class B bounded
+    class P,O safe
+    class X reject
+```
 
 The [configuration validator](configuration-validation.md) illustrates the same boundary for files: bounded local XML parsing creates local issues, then a finite template projection exposes only fixed configuration diagnostics and the aggregate count. The model receives neither parser exception text nor values read from the POM.
 Its build-file reads use `SecureDirectoryStream` to resist path-component replacement races. The central project guard checks its build markers through one held project directory handle where supported. The CVE scan applies a held-directory read across POM, Gradle Kotlin, and Gradle Groovy marker priority, then admits only bounded coordinate-shaped values into typed OSV requests. On providers without secure directory streams, the guard retains canonical-path marker checks, which are not race-free; configuration validation and the CVE scan fail closed. Later tool reads and subprocess paths can still encounter replacements after the guard closes its handle and need a separate audit before stable 2.0.

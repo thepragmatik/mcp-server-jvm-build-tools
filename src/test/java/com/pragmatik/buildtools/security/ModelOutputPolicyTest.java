@@ -294,6 +294,47 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void versionSecurityProjectionIsAggregateAndFailClosed() {
+        String complete = policy.protect("check_dependency_version", """
+                {"latestVersion":"1.2.3","security":{"lookupStatus":"complete","cveCount":2,
+                 "highestSeverity":"UNKNOWN","vulnerabilities":[{"id":"SYNTHETIC_SECRET",
+                 "summary":"private.user@example.invalid"}]}}
+                """);
+        assertTrue(complete.contains("\"securityStatus\":\"complete\""));
+        assertTrue(complete.contains("\"cveCount\":2"));
+        assertTrue(complete.contains("\"highestSeverity\":\"UNKNOWN\""));
+        assertFalse(complete.contains("SYNTHETIC_SECRET"));
+        assertFalse(complete.contains("private.user@example.invalid"));
+
+        for (String security : new String[] {
+            "{\"lookupStatus\":\"incomplete\",\"cveCount\":0,\"highestSeverity\":\"NONE\"}",
+            "{\"lookupStatus\":\"complete\",\"cveCount\":-1,\"highestSeverity\":\"HIGH\"}"
+        }) {
+            String safe = policy.protect("check_dependency_version", "{\"security\":" + security + "}");
+            assertTrue(safe.contains("\"securityStatus\":\"incomplete\""));
+            assertFalse(safe.contains("\"cveCount\""));
+            assertFalse(safe.contains("\"highestSeverity\""));
+        }
+        assertFalse(policy.protect("check_dependency_version", "{\"latestVersion\":\"1.2.3\"}")
+                .contains("securityStatus"));
+        String oversized =
+                policy.protect("check_dependency_version", "x".repeat(256_001) + "{\"security\":{\"cveCount\":0}}");
+        assertTrue(oversized.contains("\"metadataStatus\":\"incomplete\""));
+        assertTrue(oversized.contains("\"isError\":true"));
+        assertFalse(oversized.contains("\"cveCount\""));
+    }
+
+    @Test
+    void versionFieldsWithTokenShapedPrereleaseTextStayPrivate() {
+        String token = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+        String raw = "{\"currentVersion\":\"1.2.3-" + token + "\",\"latestVersion\":\"2.0.0\"}";
+        String safe = policy.protect("check_dependency_version", raw);
+        assertFalse(safe.contains(token));
+        assertFalse(safe.contains("currentVersion"));
+        assertTrue(safe.contains("\"latestVersion\":\"2.0.0\""));
+    }
+
+    @Test
     void osvPresenceAndIncompleteStatusStayVisibleWithoutPrivateIdentity() {
         String raw = """
                 {"scanStatus":"severity_unknown","severityUnknown":true,
