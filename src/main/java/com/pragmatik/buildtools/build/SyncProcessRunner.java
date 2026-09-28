@@ -84,9 +84,19 @@ public final class SyncProcessRunner {
             java.util.List<String> diagnostics,
             boolean diagnosticsTruncated) {
         public String withDiagnostics(String output) {
+            return prependDiagnostics(output, true);
+        }
+
+        public String withMissingDiagnostics(String output) {
+            return prependDiagnostics(output, false);
+        }
+
+        private String prependDiagnostics(String output, boolean includeRetained) {
             StringBuilder result = new StringBuilder();
+            // Execution must keep every candidate at the front: its later
+            // private-envelope cap can clip an occurrence in the edge snapshot.
             for (String line : diagnostics) {
-                if (!output.contains(line)) {
+                if (includeRetained || !output.contains(line)) {
                     result.append(line).append('\n');
                 }
             }
@@ -219,6 +229,10 @@ public final class SyncProcessRunner {
         java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
         boolean diagnosticsTruncated = false;
         if (collectDiagnostics) {
+            // The reader closes the source, not the sink. Only a successful join
+            // proves that the final partial line is complete.
+            errDiagnostics.finishAtEof();
+            outDiagnostics.finishAtEof();
             candidates.addAll(errDiagnostics.diagnostics());
             candidates.addAll(outDiagnostics.diagnostics());
             diagnosticsTruncated = errDiagnostics.diagnosticsTruncated() || outDiagnostics.diagnosticsTruncated();

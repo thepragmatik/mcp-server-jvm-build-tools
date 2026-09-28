@@ -21,10 +21,11 @@ def load(name, path):
     return module
 
 
-def fixture(root, tool):
-    home = root / tool
+def fixture(root, tool, final_partial=False):
+    label = tool + ("-eof" if final_partial else "")
+    home = root / label
     (home / "bin").mkdir(parents=True)
-    project = root / (tool + "-project")
+    project = root / (label + "-project")
     project.mkdir()
     (project / ("build.gradle" if tool == "gradle" else "build.sbt")).write_text("")
     diagnostic = (
@@ -35,17 +36,31 @@ def fixture(root, tool):
         "test.user@example.invalid token=SYNTHETIC_SECRET"
     )
     emitter = home / "emit.py"
-    emitter.write_text(
-        "import sys\n"
-        f"out = sys.{'stdout' if tool == 'gradle' else 'stderr'}.buffer\n"
-        "chunk = b'x' * (1024 * 1024)\n"
-        "for _ in range(14): out.write(chunk)\n"
-        f"out.write(b'\\n{diagnostic}\\n')\n"
-        "for _ in range(14): out.write(chunk)\n"
-        "out.flush()\n"
-        "sys.exit(1)\n",
-        encoding="utf-8",
-    )
+    if final_partial:
+        program = (
+            "import sys\n"
+            "out = sys.stderr.buffer\n"
+            "other = sys.stdout.buffer\n"
+            "chunk = b'x' * (1024 * 1024)\n"
+            "for _ in range(14): out.write(chunk)\n"
+            f"out.write(b'\\n{diagnostic}')\n"
+            "out.flush()\n"
+            "for _ in range(14): other.write(chunk)\n"
+            "other.flush()\n"
+            "sys.exit(1)\n"
+        )
+    else:
+        program = (
+            "import sys\n"
+            f"out = sys.{'stdout' if tool == 'gradle' else 'stderr'}.buffer\n"
+            "chunk = b'x' * (1024 * 1024)\n"
+            "for _ in range(14): out.write(chunk)\n"
+            f"out.write(b'\\n{diagnostic}\\n')\n"
+            "for _ in range(14): out.write(chunk)\n"
+            "out.flush()\n"
+            "sys.exit(1)\n"
+        )
+    emitter.write_text(program, encoding="utf-8")
     executable = home / "bin" / tool
     executable.write_text('#!/bin/sh\nexec python3 "$(dirname "$0")/../emit.py"\n')
     executable.chmod(0o700)
@@ -80,7 +95,11 @@ def main():
     benchmark = load("benchmark_gate", ROOT / "scripts/benchmark-release-gate.py")
     with tempfile.TemporaryDirectory(prefix="mcp-middle-gate-") as temporary:
         root = Path(temporary)
-        fixtures = {tool: fixture(root, tool) for tool in ("gradle", "sbt")}
+        fixtures = {
+            (tool, case): fixture(root, tool, case == "final-partial")
+            for tool in ("gradle", "sbt")
+            for case in ("middle", "final-partial")
+        }
         env = os.environ.copy()
         env["BUILDTOOLS_PROJECTS_ALLOWED_ROOTS"] = str(root)
         port = release.free_port()
@@ -92,7 +111,7 @@ def main():
         )
         try:
             release.wait_for_server(server, port)
-            for tool, args in fixtures.items():
+            for (tool, case), args in fixtures.items():
                 for analysis, method in ((True, "analyze_build_output"),
                                          (False, "execute_build_command")):
                     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -101,7 +120,7 @@ def main():
                     if status != 200:
                         raise AssertionError("HTTP build request failed")
                     assert_result(release.json_rpc_reply(response, 1).get("result", {}), analysis)
-                print(f"PASS packaged HTTP {tool}: analysis, execution, privacy and parity")
+                print(f"PASS packaged HTTP {tool} {case}: analysis, execution, privacy and parity")
         finally:
             server.terminate()
             try:
@@ -115,12 +134,12 @@ def main():
             client.call("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
                                        "clientInfo": {"name": "synthetic-gate", "version": "1"}})
             client.call("notifications/initialized", notification=True)
-            for tool, args in fixtures.items():
+            for (tool, case), args in fixtures.items():
                 for analysis, method in ((True, "analyze_build_output"),
                                          (False, "execute_build_command")):
                     result, _ = client.call("tools/call", {"name": method, "arguments": args})
                     assert_result(result, analysis)
-                print(f"PASS packaged stdio {tool}: analysis, execution, privacy and parity")
+                print(f"PASS packaged stdio {tool} {case}: analysis, execution, privacy and parity")
         finally:
             client.close()
 

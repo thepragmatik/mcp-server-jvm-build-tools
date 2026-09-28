@@ -83,6 +83,13 @@ final class BuildDiagnosticOutput extends OutputStream {
         }
     }
 
+    /** Complete a bounded final line only after its reader thread reaches EOF. */
+    synchronized void finishAtEof() {
+        if (length > 0 || overflow) {
+            finishLine();
+        }
+    }
+
     synchronized List<String> diagnostics() {
         return List.copyOf(diagnostics);
     }

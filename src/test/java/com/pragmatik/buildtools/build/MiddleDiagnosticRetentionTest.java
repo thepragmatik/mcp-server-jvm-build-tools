@@ -67,6 +67,26 @@ class MiddleDiagnosticRetentionTest {
     }
 
     @Test
+    @Timeout(30)
+    void gradleUnterminatedStderrErrorSurvivesCompetingStdout() throws Exception {
+        Path binary =
+                unterminatedStderrExecutable("gradle", "error: cannot find symbol /private/synthetic/Sample.java:42");
+        BuildExecutionResult result =
+                new GradleBuildTool().executeForMcp(project.toString(), project.toString(), "build");
+        assertModelProjections("gradle", project.toString(), "build", result);
+    }
+
+    @Test
+    @Timeout(30)
+    void sbtUnterminatedStderrErrorSurvivesCompetingStdout() throws Exception {
+        Path binary =
+                unterminatedStderrExecutable("sbt", "[error] /private/synthetic/Sample.scala:42: cannot find symbol");
+        BuildExecutionResult result =
+                new SbtBuildTool().executeForMcp(binary.getParent().toString(), project.toString(), "compile");
+        assertModelProjections("sbt", binary.getParent().toString(), "compile", result);
+    }
+
+    @Test
     void escapedOutputCannotDisplaceFrontDiagnosticAtEitherPrivateBound() {
         String diagnostic = "error: cannot find symbol\n";
         String output = diagnostic + "\\\"".repeat(250_000) + "\ntail";
@@ -128,11 +148,23 @@ class MiddleDiagnosticRetentionTest {
                         .analyzeBuildOutput(tool, home, project.toString(), command));
         var analyzed = new JsonMapper().readTree(visibleAnalysis);
         assertThat(analyzed.path("success").asBoolean()).isFalse();
+        assertThat(analyzed.path("errorCount").asInt()).isEqualTo(1);
         assertThat(analyzed.path("outputTruncated").asBoolean()).isTrue();
         assertThat(analyzed.path("diagnostics").get(0).path("category").asText())
                 .isEqualTo("compilation");
         assertThat(visibleAnalysis)
                 .doesNotContain("ava@example.invalid", "synthetic-token-value", "/private/synthetic");
+    }
+
+    private Path unterminatedStderrExecutable(String name, String diagnostic) throws Exception {
+        Path bin = Files.createDirectories(project.resolve("bin"));
+        Path executable = bin.resolve(name);
+        String filler = "dd if=/dev/zero bs=1048576 count=14 2>/dev/null | tr '\\000' x";
+        Files.writeString(
+                executable,
+                "#!/bin/sh\n(" + filler + "; printf '\\n" + diagnostic + "') >&2 &\n" + filler + "\nwait\nexit 1\n");
+        assertThat(executable.toFile().setExecutable(true)).isTrue();
+        return executable;
     }
 
     private Path executable(String name, String diagnostic) throws Exception {

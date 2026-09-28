@@ -71,7 +71,7 @@ flowchart LR
     class R policy
 ```
 
-The orange lane retains a root cause that would otherwise fall between the yellow head and tail. It never bypasses the red privacy boundary. outputTruncated means bytes were omitted from head/tail storage; diagnosticsTruncated means a candidate might be missing because a line was too long or the candidate count was exceeded. Both streams are bounded separately; the combined result keeps at most 13 distinct candidates before the public 12-diagnostic limit.
+The orange lane retains a root cause that would otherwise fall between the yellow head and tail. It never bypasses the red privacy boundary. outputTruncated means bytes were omitted from head/tail storage; diagnosticsTruncated means a candidate might be missing because a line was too long or the candidate count was exceeded. Both streams are bounded separately; the combined result keeps at most 13 distinct candidates before the public 12-diagnostic limit. The final bounded partial line is examined only after its reader reaches EOF. Analysis adds a candidate only when the retained stream edges do not already contain it, so one source error counts once; execution places candidates at the front because private-envelope clipping may drop their original edge occurrence.
 
 ## Critical review
 

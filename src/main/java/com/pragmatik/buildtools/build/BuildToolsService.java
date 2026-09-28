@@ -455,12 +455,20 @@ public class BuildToolsService {
                 authoritativeExitCode = true;
                 outputTruncated = analysis.outputTruncated();
                 diagnosticsTruncated = analysis.diagnosticsTruncated();
-            } else if (tool instanceof GradleBuildTool || tool instanceof SbtBuildTool) {
+            } else if (tool instanceof GradleBuildTool gradle) {
                 BuildExecutionResult execution =
-                        tool.executeForMcp(validatedHome, validatedProject.toString(), command);
+                        gradle.analyzeCommand(validatedHome, validatedProject.toString(), command);
                 rawOutput = execution.output();
-                exitCode = execution.exitCode() == null ? 0 : execution.exitCode();
-                authoritativeExitCode = execution.exitCode() != null;
+                exitCode = execution.exitCode();
+                authoritativeExitCode = true;
+                outputTruncated = execution.outputTruncated();
+                diagnosticsTruncated = execution.diagnosticsTruncated();
+            } else if (tool instanceof SbtBuildTool sbt) {
+                BuildExecutionResult execution =
+                        sbt.analyzeCommand(validatedHome, validatedProject.toString(), command);
+                rawOutput = execution.output();
+                exitCode = execution.exitCode();
+                authoritativeExitCode = true;
                 outputTruncated = execution.outputTruncated();
                 diagnosticsTruncated = execution.diagnosticsTruncated();
             } else {

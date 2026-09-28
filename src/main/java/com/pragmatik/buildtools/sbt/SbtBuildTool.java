@@ -109,10 +109,22 @@ public class SbtBuildTool implements BuildTool {
 
     @Override
     public BuildExecutionResult executeForMcp(String buildToolHome, String projectDir, String command) {
+        return completedResult(buildToolHome, projectDir, command, false);
+    }
+
+    public BuildExecutionResult analyzeCommand(String buildToolHome, String projectDir, String command) {
+        return completedResult(buildToolHome, projectDir, command, true);
+    }
+
+    private BuildExecutionResult completedResult(
+            String buildToolHome, String projectDir, String command, boolean analysis) {
         SyncProcessRunner.Result result = runCommand(buildToolHome, projectDir, command);
         String output = result.stderr().isEmpty() ? result.stdout() : result.stderr() + "\n" + result.stdout();
+        if (result.exitCode() != 0) {
+            output = analysis ? result.withMissingDiagnostics(output) : result.withDiagnostics(output);
+        }
         return new BuildExecutionResult(
-                result.exitCode() == 0 ? output : result.withDiagnostics(output),
+                output,
                 result.exitCode(),
                 result.stdoutTruncated() || result.stderrTruncated(),
                 result.diagnosticsTruncated());

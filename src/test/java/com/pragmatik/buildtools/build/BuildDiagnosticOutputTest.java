@@ -84,6 +84,23 @@ class BuildDiagnosticOutputTest {
     }
 
     @Test
+    void eofCompletesOnlyBoundedPartialLine() throws Exception {
+        BuildDiagnosticOutput output = new BuildDiagnosticOutput(new BoundedProcessOutput(), "gradle");
+        output.write("error: cannot find symbol".getBytes(StandardCharsets.UTF_8));
+        assertThat(output.diagnostics()).isEmpty();
+        output.finishAtEof();
+        output.finishAtEof();
+        assertThat(output.diagnostics()).containsExactly("error: cannot find symbol");
+        assertThat(output.diagnosticsTruncated()).isFalse();
+
+        BuildDiagnosticOutput oversized = new BuildDiagnosticOutput(new BoundedProcessOutput(), "sbt");
+        oversized.write(("[error] " + "x".repeat(2_049)).getBytes(StandardCharsets.UTF_8));
+        oversized.finishAtEof();
+        assertThat(oversized.diagnostics()).isEmpty();
+        assertThat(oversized.diagnosticsTruncated()).isTrue();
+    }
+
+    @Test
     void ordinarySbtWarningsCannotDisplaceError() throws Exception {
         BuildDiagnosticOutput output = new BuildDiagnosticOutput(new BoundedProcessOutput(), "sbt");
         for (int i = 0; i < 100; i++) {
