@@ -490,6 +490,21 @@ public class ToolAuthorizationService {
         return false;
     }
 
+    /** Authorize a non-tool MCP capability with an explicit scope. */
+    public boolean isScopeAuthorizedForToken(String token, String requiredScope) {
+        if (token == null || token.isBlank() || requiredScope == null || requiredScope.isBlank()) {
+            return false;
+        }
+        byte[] tokenHash = digest(token);
+        for (ToolApiKey key : apiKeys.values()) {
+            if (MessageDigest.isEqual(tokenHash, key.digest)
+                    && (key.scopes.contains("*") || key.scopes.contains(requiredScope))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean hasConfiguredCredentials() {
         return !apiKeys.isEmpty();
     }

@@ -3,8 +3,8 @@
 This page describes the **2.0 release-candidate design**. The supported
 Java SDK speaks MCP `2025-11-25` over stdio or stateless Streamable HTTP.
 The public [runtime-derived catalog](tool-catalog.md) contains 24 tools.
-The 1.x tool list and 2026 draft protocol notes are historical records,
-not this server's current wire contract.
+The 1.x tool list is historical. This implementation currently targets the
+published MCP `2025-11-25` protocol version.
 
 ## Trust boundaries
 
@@ -12,10 +12,13 @@ not this server's current wire contract.
 flowchart LR
     A["🟣 MCP client<br/>model-visible input"] --> T{"🔵 Transport"}
     T -->|stdio| S["🔵 SDK stdio session"]
-    T -->|HTTP /mcp| H["🟠 Host + Origin check<br/>body cap + bearer scope"]
+    T -->|HTTP /mcp| H["🟠 Host + Origin check<br/>body cap + bearer/tool/prompt scope"]
     H --> Q["🔵 SDK servlet<br/>MCP 2025-11-25"]
     S --> C["🟢 Guarded tool callback"]
     Q --> C
+    S --> N["🟢 Immutable native prompt catalog<br/>3 static workflows"]
+    Q --> N
+    N --> T
     C --> P{"🟠 Canonical project root?"}
     P -->|deny| X["🔴 Safe error"]
     P -->|allow| B["🟢 Build-tool service<br/>Maven · Gradle · sbt"]
@@ -32,7 +35,7 @@ flowchart LR
     class A client
     class T,S,Q transport
     class H,P decision
-    class C,B work
+    class C,B,N work
     class O,R output
     class X reject
 ```
@@ -51,6 +54,7 @@ network access.
 | Layer | Active implementation | Responsibility |
 |-------|-----------------------|----------------|
 | Application wiring | `BuildToolsApplication` | Registers the annotated tool service beans once. |
+| Native prompts | `NativePromptCatalog` | Supplies three immutable, server-authored prompt definitions and messages to both SDK transports; rejects arguments without echoing them. HTTP `prompts/list` and `prompts/get` require `prompt:read`. |
 | Tool catalog | `MethodToolCallbackProvider` → `DeterministicToolCallbackProvider` → `GuardedToolCallbackProvider` | Discovers tools, sorts names, limits the public surface to known permissions, substitutes safe descriptions, validates path arguments, and applies output projection. |
 | Project boundary | `ProjectAccessPolicy` | Resolves existing paths with `toRealPath()` against configured allowed roots; ambiguous or markerless build-tool detection requires an explicit choice. |
 | Build-tool selection | `BuildToolProvider` and `BuildTool` implementations | Selects Maven, Gradle, or sbt and delegates execution or analysis. |
@@ -59,7 +63,9 @@ network access.
 | HTTP transport | `HttpMcpServerConfiguration` and servlet filters | Exposes `/mcp` through the SDK's stateless servlet when the `http` profile is active. |
 | Stdio transport | `McpServerTransportConfiguration` | Keeps stdout reserved for SDK JSON-RPC and serves the same guarded callbacks. |
 
-The callback provider is the public catalog's source of truth. It currently
+The native prompt catalog bypasses tool callbacks because its messages are static.
+It reads no project state; the existing `prompt_*` tools still use the guarded
+callback path. The callback provider is the public tool catalog's source of truth. It currently
 serves 24 sorted tools; `ToolScopeCoverageTest` compares the committed
 [tool catalog](tool-catalog.md) with those runtime callbacks and their
 `ToolPermission` scopes. Adding a method annotation alone does not make a
@@ -77,7 +83,7 @@ sequenceDiagram
     participant Build as 🟢 Build service
     participant Local as 🟡 Local output
     Client->>HTTP: POST /mcp (HTTP profile)
-    HTTP->>HTTP: Validate Host, Origin, size, bearer + tool scope
+    HTTP->>HTTP: Validate Host, Origin, size, bearer + tool or prompt scope
     HTTP->>SDK: Bounded request
     SDK->>Callback: tools/call
     Callback->>Callback: Resolve and check project path

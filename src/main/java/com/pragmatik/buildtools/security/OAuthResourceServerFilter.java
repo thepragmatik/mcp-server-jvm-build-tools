@@ -173,12 +173,17 @@ public class OAuthResourceServerFilter implements Filter {
         }
 
         if (effectiveReq instanceof McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered) {
-            String toolName = toolCallName(buffered);
-            if (toolName != null && !authorizationService.isToolAuthorizedForToken(token, toolName)) {
+            RequestPermission permission = requiredPermission(buffered);
+            boolean denied = permission != null
+                    && (permission.promptRead()
+                            ? !authorizationService.isScopeAuthorizedForToken(token, "prompt:read")
+                            : !authorizationService.isToolAuthorizedForToken(token, permission.toolName()));
+            if (denied) {
                 httpRes.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 httpRes.setHeader(
                         "WWW-Authenticate",
-                        buildChallenge("insufficient_scope", "Tool scope required", metadataUrlIfConfigured(httpReq)));
+                        buildChallenge(
+                                "insufficient_scope", "Required MCP scope missing", metadataUrlIfConfigured(httpReq)));
                 httpRes.setContentType("application/json");
                 httpRes.getWriter().write("{\"error\":\"insufficient_scope\"}");
                 return;
@@ -188,33 +193,35 @@ public class OAuthResourceServerFilter implements Filter {
         chain.doFilter(effectiveReq, response);
     }
 
-    /**
-     * Returns null for a non-tool call, or an empty name for malformed/batched input
-     * so the permission check fails closed.
-     */
-    private String toolCallName(McpHeaderValidationFilter.CachedBodyHttpServletRequest request) {
+    /** Null means no method-specific scope; malformed requests fail closed. */
+    private RequestPermission requiredPermission(McpHeaderValidationFilter.CachedBodyHttpServletRequest request) {
         if (request.exceedsLimit()) {
-            return "";
+            return new RequestPermission("", false);
         }
         try {
             JsonNode root = objectMapper.readTree(request.getInputStream());
             if (root == null || !root.isObject()) {
-                return "";
+                return new RequestPermission("", false);
             }
             JsonNode method = root.get("method");
             if (method == null || !method.isTextual()) {
-                return "";
+                return new RequestPermission("", false);
+            }
+            if ("prompts/list".equals(method.asText()) || "prompts/get".equals(method.asText())) {
+                return new RequestPermission("", true);
             }
             if (!"tools/call".equals(method.asText())) {
                 return null;
             }
             JsonNode params = root.get("params");
             JsonNode name = params == null ? null : params.get("name");
-            return name != null && name.isTextual() ? name.asText() : "";
+            return new RequestPermission(name != null && name.isTextual() ? name.asText() : "", false);
         } catch (JacksonException e) {
-            return "";
+            return new RequestPermission("", false);
         }
     }
+
+    private record RequestPermission(String toolName, boolean promptRead) {}
 
     /**
      * @return {@code true} when the request targets an enforced MCP transport path. The

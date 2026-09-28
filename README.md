@@ -1,6 +1,6 @@
 # JVM Build Tools MCP Server
 
-A Java 21+ MCP server for Maven, Gradle, and sbt. It exposes 24 tools over stdio and Streamable HTTP. The 2.0 development line puts project boundaries, scoped HTTP access, and privacy controls on every model-visible tool call.
+A Java 21+ MCP server for Maven, Gradle, and sbt. It exposes 24 tools and three native build-workflow prompts over stdio and Streamable HTTP. The 2.0 development line puts project boundaries, scoped HTTP access, and privacy controls on every model-visible tool call.
 
 > Source version: `2.0.0-rc.2` (unreleased development candidate). The published, tested prerelease is [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1); builds from `main` include later changes. Older 1.x tool lists and examples live in [the changelog](CHANGELOG.md).
 

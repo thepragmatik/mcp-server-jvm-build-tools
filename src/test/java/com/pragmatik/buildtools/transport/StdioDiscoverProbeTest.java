@@ -22,10 +22,8 @@ import com.pragmatik.buildtools.application.McpServerIdentity;
 import com.pragmatik.buildtools.tool.ToolCatalogueSummary;
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
-import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
-import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
 import io.modelcontextprotocol.spec.McpServerSession;
 import io.modelcontextprotocol.spec.McpServerTransportProvider;
 import java.io.ByteArrayOutputStream;
@@ -104,22 +102,46 @@ class StdioDiscoverProbeTest {
                     return new StdioDiscoverSession(
                             sessionTransport, frameworkSession, discoverController::discoverResult);
                 });
-        McpSyncServer server = McpServer.sync(decorated)
-                .serverInfo(SERVER_NAME, "9.9.9")
-                .capabilities(ServerCapabilities.builder().tools(Boolean.FALSE).build())
-                .jsonMapper(jsonMapper)
-                .build();
+        var provider = new com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider(
+                org.springframework.ai.tool.ToolCallbackProvider.from(
+                        org.springframework.ai.support.ToolCallbacks.from(tools)));
+        McpSyncServer server = new McpServerTransportConfiguration()
+                .mcpSyncServer(
+                        decorated,
+                        jsonMapper,
+                        new McpServerIdentity(SERVER_NAME, "9.9.9"),
+                        provider,
+                        new NativePromptCatalog(),
+                        SERVER_NAME,
+                        "9.9.9");
 
         try {
+            boolean promptRequest = jsonRequest.contains("\"method\":\"prompts/");
+            if (promptRequest) {
+                toStdin.write(
+                        ("{\"jsonrpc\":\"2.0\",\"id\":900,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"client\",\"version\":\"1\"}}}\n")
+                                .getBytes(StandardCharsets.UTF_8));
+                toStdin.flush();
+                long initDeadline = System.currentTimeMillis() + 5_000;
+                while (!stdout.toString(StandardCharsets.UTF_8).contains("\"id\":900")
+                        && System.currentTimeMillis() < initDeadline) {
+                    Thread.sleep(20);
+                }
+                toStdin.write("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n"
+                        .getBytes(StandardCharsets.UTF_8));
+            }
             toStdin.write((jsonRequest + "\n").getBytes(StandardCharsets.UTF_8));
             toStdin.flush();
 
-            // The stdio session transport writes asynchronously; poll for a complete line.
+            // The stdio session transport writes asynchronously; select the requested id.
+            String expectedId =
+                    "\"id\":" + new JsonMapper().readTree(jsonRequest).get("id").toString();
             long deadline = System.currentTimeMillis() + 5_000;
             while (System.currentTimeMillis() < deadline) {
-                String out = stdout.toString(StandardCharsets.UTF_8);
-                if (out.indexOf('\n') >= 0) {
-                    return out.substring(0, out.indexOf('\n'));
+                for (String line : stdout.toString(StandardCharsets.UTF_8).split("\n")) {
+                    if (line.contains(expectedId)) {
+                        return line;
+                    }
                 }
                 Thread.sleep(20);
             }
@@ -167,6 +189,35 @@ class StdioDiscoverProbeTest {
         String response = sendAndAwaitResponse("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"server/discover\"}");
         assertThat(response).contains("\"serverInfo\"");
         assertThat(response).contains("\"id\":\"abc\"");
+    }
+
+    @Test
+    void nativePromptsRoundTripOverProductionStdioBuilder() throws Exception {
+        JsonMapper mapper = new JsonMapper();
+        var listed =
+                mapper.readTree(sendAndAwaitResponse("{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"prompts/list\"}"));
+        assertThat(listed.get("result").get("prompts").size()).isEqualTo(3);
+        var result = mapper.readTree(
+                sendAndAwaitResponse(
+                        "{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"prompts/get\",\"params\":{\"name\":\"plan_test_strategy\"}}"));
+        assertThat(result.get("result")
+                        .get("messages")
+                        .get(0)
+                        .get("content")
+                        .get("text")
+                        .asText())
+                .contains("narrowest safe tests");
+    }
+
+    @Test
+    void initializeAdvertisesPromptsAndEmptyResources() throws Exception {
+        var response = new JsonMapper()
+                .readTree(
+                        sendAndAwaitResponse(
+                                "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"client\",\"version\":\"1\"}}}"));
+        var capabilities = response.get("result").get("capabilities");
+        assertThat(capabilities.get("prompts")).isNotNull();
+        assertThat(capabilities.get("resources")).isNotNull();
     }
 
     @Test

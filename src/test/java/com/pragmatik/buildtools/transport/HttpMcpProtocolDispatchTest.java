@@ -181,6 +181,32 @@ class HttpMcpProtocolDispatchTest {
     }
 
     @Test
+    void nativePromptsListAndGetUseServerAuthoredText() {
+        RestTemplate client = new RestTemplate();
+        String endpoint = "http://127.0.0.1:" + port + "/mcp";
+        var mapper = new tools.jackson.databind.json.JsonMapper();
+        var list = mapper.readTree(client.postForObject(endpoint, rpc("prompts/list", "{}"), String.class));
+        var prompts = list.get("result").get("prompts");
+        assertThat(prompts.size()).isEqualTo(3);
+        assertThat(prompts.get(0).get("name").asText()).isEqualTo("diagnose_build_failure");
+
+        String response = client.postForObject(
+                endpoint, rpc("prompts/get", "{\"name\":\"diagnose_build_failure\"}"), String.class);
+        assertThat(response)
+                .contains("smallest relevant redacted diagnostic result")
+                .doesNotContain(System.getProperty("user.home"));
+
+        String canary = "private-canary@example.invalid";
+        String invalid = client.postForObject(
+                endpoint,
+                rpc(
+                        "prompts/get",
+                        "{\"name\":\"diagnose_build_failure\",\"arguments\":{\"projectDir\":\"" + canary + "\"}}"),
+                String.class);
+        assertThat(invalid).contains("-32602", "Invalid params").doesNotContain(canary);
+    }
+
+    @Test
     void promptCallReturnsUsefulWorkflowWithoutEchoingInput() {
         String result = new RestTemplate()
                 .postForObject(

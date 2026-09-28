@@ -68,3 +68,6 @@ __pycache__/
 private/
 .local/
 .buildtools/
+
+# Local isolated agent worktrees can contain private scratch output.
+/.worktrees/
