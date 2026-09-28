@@ -40,11 +40,11 @@ For protocol work, install a pinned conformance runner once and reuse its packag
 
 ## Reproducible performance baseline
 
-Build the packaged jar, then run `python3 scripts/benchmark-release-gate.py --runs 5 --warmups 2 --output benchmark.json` on a host with Maven, Gradle, and sbt installed. The script creates dependency-free disposable projects, calls the packaged server over stdio, and measures end-to-end `list_build_tools` callback latency, `compile`/`compileJava` latency, 100 ms sampled process-tree RSS, MCP response bytes, and a synthetic 1 MiB versus 24 MiB unterminated-output stress case. It does not emit raw MCP responses, build logs, project paths, or process command lines. The output-stress case uses a disposable Gradle-named wrapper; its numbers test capture behavior, **not Gradle compilation**.
+Build the packaged jar, then run `python3 scripts/benchmark-release-gate.py --runs 5 --warmups 2 --output benchmark.json` on a host with Maven, Gradle, and sbt installed. The script creates dependency-free disposable projects, calls the packaged server over stdio, and measures end-to-end `list_build_tools` callback latency, **fresh source-compilation** latency, 100 ms sampled process-tree RSS, MCP response bytes, and a synthetic 1 MiB versus 24 MiB unterminated-output stress case. Before every build call, it changes a Java constant and removes the generated class; afterward it requires the compiled class hash to change. This keeps dependency caches warm while excluding up-to-date/no-op compilation samples. The output wrapper records the number of stdout bytes after flushing, and the harness verifies that count before reporting bounded-output evidence. It does not emit raw MCP responses, build logs, project paths, or process command lines. The output-stress case uses a disposable Gradle-named wrapper; its numbers test capture behavior, **not Gradle compilation**.
 
 Record OS, architecture, Java and build-tool versions, core/memory limits, warmup and sample counts, network mode, and whether each cache was cold or warm with the aggregate result. Compare measurements only within the same environment and cache state. A 100 ms RSS sample can miss short peaks; process-tree RSS sums resident pages across processes and is not a JVM heap measurement. Five runs are enough to expose obvious regressions, not to prove a universal p95 service-level objective. Set thresholds only after repeated baselines on the intended CI runner; investigate noise before treating a slower run as a regression.
 
-For a clean-room run, build the existing server image once. `scripts/benchmark-docker.sh` builds a small Python/procps layer, stages **only** the packaged jar and benchmark script, mounts those read-only, mounts the host Maven artifact repository read-only, and uses a dedicated writable Docker volume for public Gradle/sbt artifacts. The first command may use the network to populate that volume; discard its numbers. The second command is the measured, offline pass:
+For a clean-room run, build the existing server image once. `scripts/benchmark-docker.sh` builds a small Python/procps layer and stages **only** the packaged jar and benchmark script read-only. Networked bootstrap sees only dedicated writable Docker volumes for public Maven, Gradle, and sbt artifacts; it never mounts the host Maven repository. Discard the bootstrap numbers. The second command is the measured, offline pass using those same warmed volumes:
 
 ```sh
 ./mvnw -B package -DskipTests --no-transfer-progress
@@ -53,17 +53,17 @@ BENCHMARK_CACHE_STATE=cold sh scripts/benchmark-docker.sh bootstrap --runs 1 --w
 BENCHMARK_CACHE_STATE=warm sh scripts/benchmark-docker.sh offline --runs 5 --warmups 2 > /tmp/benchmark-offline.json
 ```
 
-The script runs as a nonroot UID with a read-only root filesystem, a tmpfs for generated projects, CPU/memory limits, no host secrets, and no Docker socket. Unlike the read-only Maven artifact cache, Gradle/sbt need writable runtime caches. If an offline case needs a missing public artifact, repeat the bootstrap and record that cache change. Never label the network-bootstrap result an offline baseline. The `/tmp` JSON files contain aggregate metrics only; inspect them before publishing. On an existing warmed volume, mark the bootstrap cache state `warm` rather than `cold`.
+The script runs as a nonroot UID with a read-only root filesystem, a tmpfs for generated projects, CPU/memory limits, no host secrets, and no Docker socket. To reuse an existing host `.m2` repository, set `BENCHMARK_OFFLINE_MAVEN_REPOSITORY` to that artifact directory **only for the offline command**; it is mounted read-only and is never visible to a networked bootstrap. Otherwise the dedicated Maven volume avoids repeated downloads. Gradle/sbt runtime caches remain writable. If an offline case needs a missing public artifact, repeat the bootstrap and record that cache change. Never label the network-bootstrap result an offline baseline. The `/tmp` JSON files contain aggregate metrics only; inspect them before publishing. On an existing warmed volume, mark the bootstrap cache state `warm` rather than `cold`.
 
-An exploratory offline run on the server source at `0072560` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, a warm public-artifact cache, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
+An exploratory offline run on the server source at `0072560` used the benchmark container on Linux/aarch64, Java 21.0.12.1, Maven 3.9.16, Gradle 9.8.0, sbt 2.0.9, three CPU cores, a 4 GiB memory limit, warm dedicated public-artifact volumes, one warmup, and three measured runs. The negotiated MCP revision was `2025-11-25`. Each Maven/Gradle/sbt sample recompiled a changed Java class, verified by a changed class hash; each stress sample verified its emitted byte count. These are **end-to-end stdio call** times, with process-tree RSS sampled every 100 ms. Here p95 is the nearest-rank maximum of just three samples; it is directional evidence, not a release budget.
 
 | Synthetic case | p50 latency (ms) | p95 latency (ms) | p95 sampled RSS (MiB) | Max MCP response (bytes) |
 | --- | ---: | ---: | ---: | ---: |
-| `list_build_tools` callback | 1.82 | 1.92 | 193.21 | 123 |
-| Maven `compile` | 815.38 | 838.91 | 341.71 | 290 |
-| Gradle `compileJava` | 2080.38 | 2081.77 | 616.81 | 128 |
-| sbt `compile` | 7119.60 | 7135.13 | 505.23 | 152 |
-| Synthetic 1 MiB output | 12.97 | 13.03 | 196.28 | 152 |
-| Synthetic 24 MiB output | 54.07 | 54.16 | 196.34 | 152 |
+| `list_build_tools` callback | 1.83 | 1.99 | 195.37 | 123 |
+| Maven `compile` | 882.14 | 896.56 | 347.23 | 304 |
+| Gradle `compileJava` | 2272.21 | 2288.94 | 682.34 | 128 |
+| sbt `compile` | 7442.23 | 7484.50 | 548.35 | 152 |
+| Synthetic 1 MiB output | 25.83 | 25.93 | 199.27 | 152 |
+| Synthetic 24 MiB output | 33.90 | 34.55 | 199.25 | 152 |
 
-The stable 152-byte responses in the two stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The RSS difference between those cases was 0.06 MiB at the sampled p95; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.
+The stable 152-byte responses in the two verified stress cases are evidence that the MCP-visible result stayed bounded despite the larger process output. The sampled p95 RSS values differ by 0.02 MiB, within measurement noise; the sampler can miss short peaks. Gradle and sbt startup dominate these small projects, so optimize only after more runs identify a repeatable bottleneck. Re-run the matrix on the final release head and a pinned CI runner before adopting any budget.

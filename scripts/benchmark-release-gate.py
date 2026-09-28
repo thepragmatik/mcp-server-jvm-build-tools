@@ -6,6 +6,7 @@ numbers only; protocol messages, build logs, and temporary project paths stay lo
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -24,17 +25,17 @@ from pathlib import Path
 FIXTURES = {
     "maven": {
         "pom.xml": """<project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>4.0.0</modelVersion><groupId>benchmark.synthetic</groupId><artifactId>tiny</artifactId><version>1.0.0</version></project>\n""",
-        "src/main/java/example/Tiny.java": "package example; public final class Tiny { private Tiny() {} }\n",
+        "src/main/java/example/Tiny.java": "package example; public final class Tiny { public static final int REVISION = 0; private Tiny() {} }\n",
     },
     "gradle": {
         "settings.gradle": "rootProject.name = 'tiny'\n",
         "build.gradle": "plugins { id 'java' }\n",
-        "src/main/java/example/Tiny.java": "package example; public final class Tiny { private Tiny() {} }\n",
+        "src/main/java/example/Tiny.java": "package example; public final class Tiny { public static final int REVISION = 0; private Tiny() {} }\n",
     },
     "sbt": {
         "build.sbt": "name := \"tiny\"\nversion := \"1.0.0\"\nscalaVersion := \"2.13.16\"\n",
         "project/build.properties": "sbt.version=2.0.9\n",
-        "src/main/java/example/Tiny.java": "package example; public final class Tiny { private Tiny() {} }\n",
+        "src/main/java/example/Tiny.java": "package example; public final class Tiny { public static final int REVISION = 0; private Tiny() {} }\n",
     },
 }
 
@@ -173,13 +174,57 @@ def output_fixture(root, count):
     directory = root / ("output-" + str(count))
     directory.mkdir()
     (directory / "build.gradle").write_text("plugins { id 'java' }\n", encoding="utf-8")
+    emitter = directory / "emit.py"
+    emitter.write_text(
+        "import sys\nfrom pathlib import Path\n"
+        "remaining = " + str(count) + "\nwritten = 0\nchunk = b'A' * 65536\n"
+        "while remaining:\n"
+        "    size = sys.stdout.buffer.write(chunk[:min(len(chunk), remaining)])\n"
+        "    if size is None or size <= 0:\n"
+        "        raise RuntimeError('output write failed')\n"
+        "    written += size\n    remaining -= size\n"
+        "sys.stdout.buffer.flush()\n"
+        "Path('emitted.bytes').write_text(str(written), encoding='ascii')\n",
+        encoding="utf-8",
+    )
     wrapper = directory / "gradlew"
     wrapper.write_text(
-        "#!/bin/sh\nhead -c " + str(count) + " /dev/zero | tr '\\000' A\n",
+        "#!/bin/sh\nexec " + shlex.quote(sys.executable) + " emit.py\n",
         encoding="utf-8",
     )
     wrapper.chmod(0o700)
     return directory
+
+
+def force_compile(project, revision):
+    source = project / "src/main/java/example/Tiny.java"
+    source.write_text(
+        "package example; public final class Tiny { public static final int REVISION = "
+        + str(revision) + "; private Tiny() {} }\n",
+        encoding="utf-8",
+    )
+    # Removing only generated classes preserves warm dependency and tool caches.
+    for compiled in project.rglob("Tiny.class"):
+        compiled.unlink()
+
+
+def compiled_fingerprint(project, previous):
+    classes = sorted(project.rglob("Tiny.class"))
+    if not classes:
+        raise RuntimeError("Build did not compile the synthetic Java source")
+    fingerprint = hashlib.sha256(b"".join(path.read_bytes() for path in classes)).digest()
+    if fingerprint == previous:
+        raise RuntimeError("Build reused an unchanged class file")
+    return fingerprint
+
+
+def verify_emitted(marker, expected):
+    try:
+        amount = int(marker.read_text(encoding="ascii"))
+    except (OSError, ValueError):
+        raise RuntimeError("Synthetic output byte counter is absent or invalid") from None
+    if amount != expected:
+        raise RuntimeError("Synthetic output byte counter did not match fixture")
 
 
 def has_raw_output(value):
@@ -248,6 +293,7 @@ def main():
             names = {entry["name"] for entry in catalogue.get("tools", [])}
             if not {"list_build_tools", "execute_build_command"} <= names:
                 raise RuntimeError("Required MCP tools are not registered")
+            output_sizes = {"output-1m": 1024 * 1024, "output-24m": 24 * 1024 * 1024}
             results = {}
             cases = [("callback", "list_build_tools", {})]
             cases += [(tool, "execute_build_command", {
@@ -258,12 +304,31 @@ def main():
             cases += [(label, "execute_build_command", {
                 "buildToolName": "gradle", "projectDir": str(projects[label]),
                 "command": "compileJava",
-            }) for label in ("output-1m", "output-24m")]
+            }) for label in output_sizes]
             for label, method, params in cases:
+                revision = 0
+                previous_class = None
+                output_marker = projects[label] / "emitted.bytes" if label.startswith("output-") else None
                 for _ in range(args.warmups):
-                    client.call("tools/call", {"name": method, "arguments": params})
+                    if label in tools:
+                        revision += 1
+                        force_compile(projects[label], revision)
+                    if output_marker is not None:
+                        output_marker.unlink(missing_ok=True)
+                    warmup_result, _ = client.call("tools/call", {"name": method, "arguments": params})
+                    if warmup_result.get("isError"):
+                        raise RuntimeError("Warmup build failed; response withheld")
+                    if label in tools:
+                        previous_class = compiled_fingerprint(projects[label], previous_class)
+                    if output_marker is not None:
+                        verify_emitted(output_marker, output_sizes[label])
                 samples = []
                 for _ in range(args.runs):
+                    if label in tools:
+                        revision += 1
+                        force_compile(projects[label], revision)
+                    if output_marker is not None:
+                        output_marker.unlink(missing_ok=True)
                     with RssSampler(client.process.pid) as sampler:
                         result, latency, response_bytes = timed_call(
                             client, "tools/call", {"name": method, "arguments": params}
@@ -272,6 +337,10 @@ def main():
                         raise RuntimeError("Build tool returned an error; response withheld")
                     if has_raw_output(result):
                         raise RuntimeError("Raw process output or command reached MCP result")
+                    if label in tools:
+                        previous_class = compiled_fingerprint(projects[label], previous_class)
+                    if output_marker is not None:
+                        verify_emitted(output_marker, output_sizes[label])
                     samples.append((latency, sampler.peak_kib, response_bytes))
                 results[label] = summarize(samples)
             if results["output-24m"]["response_bytes_max"] > 2 * results["output-1m"]["response_bytes_max"]:
@@ -287,7 +356,8 @@ def main():
         "method": {"transport": "stdio", "warmups": args.warmups, "runs": args.runs,
                    "rss_sample_period_ms": 100, "fixtures": tools,
                    "cache_state": args.cache_state, "network_mode": args.network_mode,
-                   "output_stress": "synthetic Gradle wrapper; 1 MiB and 24 MiB unterminated stdout"},
+                   "compile_check": "source revision changed and class fingerprint changed on every call",
+                   "output_stress": "synthetic Gradle wrapper; verified 1 MiB and 24 MiB unterminated stdout"},
         "server": {"version": server_version, "negotiated_protocol": negotiated_protocol},
         "results": results,
     }
@@ -301,6 +371,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+    except RuntimeError as exc:
         print(f"benchmark failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except (OSError, TimeoutError, ValueError):
+        print("benchmark failed: local process or fixture error; details withheld", file=sys.stderr)
         sys.exit(1)
