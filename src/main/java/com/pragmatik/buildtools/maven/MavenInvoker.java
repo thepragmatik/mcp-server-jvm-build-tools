@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.maven;
 
+import com.pragmatik.buildtools.build.BoundedProcessOutput;
 import com.pragmatik.buildtools.build.SyncProcessRunner;
 import com.pragmatik.buildtools.tracing.TraceContextHolder;
 import java.io.*;
@@ -34,6 +35,7 @@ public class MavenInvoker {
         request.setInputStream(InputStream.nullInputStream());
         request.setBaseDirectory(new File(currentProjectDirectory));
         request.addArgs(Arrays.asList(commands));
+        request.setTimeoutInSeconds((int) Math.min(Integer.MAX_VALUE, SyncProcessRunner.resolveTimeoutSeconds()));
 
         // Propagate the active W3C trace context (SEP-414) to the Maven subprocess
         // through the SAME mechanism every other build path uses
@@ -62,20 +64,16 @@ public class MavenInvoker {
             invoker.setMavenHome(mavenHomeFile);
         }
 
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
+        BoundedProcessOutput output = new BoundedProcessOutput();
+        BoundedProcessOutput errors = new BoundedProcessOutput();
 
-        request.setOutputHandler(s -> output.append(s).append(System.lineSeparator()));
-        request.setErrorHandler(s -> errors.append(s).append(System.lineSeparator()));
+        request.setOutputHandler(output::appendLine);
+        request.setErrorHandler(errors::appendLine);
 
         String finalResult;
         try {
             InvocationResult result = invoker.execute(request);
             if (invocationResultedInError(result)) {
-                if (result.getExecutionException() != null) {
-                    System.err.println("[ERROR] Maven execution failed: "
-                            + result.getExecutionException().getMessage());
-                }
                 // Maven test/compile failures write to stdout, not stderr.
                 // Combine both streams so the caller sees the actual output.
                 String errText = errors.toString();
@@ -86,8 +84,7 @@ public class MavenInvoker {
                 finalResult = output.toString();
             }
         } catch (MavenInvocationException e) {
-            finalResult = "Unable to invoke Maven command: " + e.getMessage();
-            throw new RuntimeException(finalResult);
+            throw new RuntimeException("Unable to invoke Maven command", e);
         }
 
         return finalResult;
@@ -96,13 +93,10 @@ public class MavenInvoker {
     static String executeUsingMavenEmbedder(String[] command, String currentProjectDirectory) {
         String finalResult;
 
-        // Capture the embedder's stdout/stderr as raw bytes so the UTF-8 encoding
-        // applied by the PrintStreams below is decoded back symmetrically. The
-        // previous sink appended one Java char per byte, which reinterpreted each
-        // byte as Latin-1 and mojibake'd any multi-byte UTF-8 output. Buffering the
-        // bytes and decoding once via toString(UTF_8) keeps the round-trip lossless.
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
+        // Keep only bounded leading and trailing UTF-8 output from the in-process
+        // version probe. PrintStream writes bytes directly to these collectors.
+        BoundedProcessOutput outputStream = new BoundedProcessOutput();
+        BoundedProcessOutput errorStream = new BoundedProcessOutput();
 
         PrintStream outPrintStream = new PrintStream(outputStream, false, StandardCharsets.UTF_8);
         PrintStream errPrintStream = new PrintStream(errorStream, false, StandardCharsets.UTF_8);
@@ -115,8 +109,8 @@ public class MavenInvoker {
         outPrintStream.flush();
         errPrintStream.flush();
 
-        String outText = outputStream.toString(StandardCharsets.UTF_8);
-        String errText = errorStream.toString(StandardCharsets.UTF_8);
+        String outText = outputStream.snapshot();
+        String errText = errorStream.snapshot();
 
         if (exitCode != 0) {
             finalResult = errText;
@@ -223,7 +217,7 @@ public class MavenInvoker {
      * so the async build service can destroy it on task cancellation.
      */
     public record MavenProcessExecution(
-            Process process, Thread outputCollector, StringBuilder output, StringBuilder errors) {}
+            Process process, Thread outputCollector, BoundedProcessOutput output, BoundedProcessOutput errors) {}
 
     /**
      * Execute a Maven command using {@link ProcessBuilder} so the caller can
@@ -266,8 +260,8 @@ public class MavenInvoker {
         TraceContextHolder.applyToEnvironment(pb.environment());
         Process process = pb.start();
 
-        StringBuilder output = new StringBuilder();
-        StringBuilder errors = new StringBuilder();
+        BoundedProcessOutput output = new BoundedProcessOutput();
+        BoundedProcessOutput errors = new BoundedProcessOutput();
 
         // Drain stdout and stderr concurrently to avoid the pipe-buffer deadlock that
         // occurs when one stream is read to EOF before the other is drained. The

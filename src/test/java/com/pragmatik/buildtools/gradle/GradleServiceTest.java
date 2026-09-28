@@ -523,6 +523,20 @@ class GradleServiceTest {
         Path projectDir;
 
         @Test
+        @DisplayName("large command output keeps the first and last segments")
+        void largeOutputIsBounded() throws Exception {
+            Path binDir = Files.createDirectory(projectDir.resolve("bin"));
+            Path gradleBin = binDir.resolve("gradle");
+            Files.writeString(gradleBin, "#!/bin/sh\nprintf 'BEGIN" + "x".repeat(512 * 1024) + "END'");
+            assertThat(gradleBin.toFile().setExecutable(true)).isTrue();
+
+            String output = tool.executeCommand(projectDir.toString(), projectDir.toString(), "build");
+
+            assertThat(output).startsWith("BEGIN").endsWith("END");
+            assertThat(output.length()).isLessThanOrEqualTo(128 * 1024);
+        }
+
+        @Test
         @DisplayName("builds correct ProcessBuilder command list")
         void buildsCorrectProcessBuilderCommand() throws Exception {
             // Create a minimal gradle project with marker

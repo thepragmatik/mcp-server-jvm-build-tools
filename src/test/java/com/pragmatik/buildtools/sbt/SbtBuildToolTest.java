@@ -47,6 +47,20 @@ class SbtBuildToolTest {
 
     private final SbtBuildTool tool = new SbtBuildTool();
 
+    @Test
+    @DisplayName("large command output keeps the first and last segments")
+    void largeOutputIsBounded(@TempDir Path projectDir) throws Exception {
+        Path binDir = Files.createDirectory(projectDir.resolve("bin"));
+        Path sbtBin = binDir.resolve("sbt");
+        Files.writeString(sbtBin, "#!/bin/sh\nprintf 'BEGIN" + "x".repeat(512 * 1024) + "END'");
+        assertThat(sbtBin.toFile().setExecutable(true)).isTrue();
+
+        String output = tool.executeCommand(projectDir.toString(), projectDir.toString(), "compile");
+
+        assertThat(output).startsWith("BEGIN").endsWith("END");
+        assertThat(output.length()).isLessThanOrEqualTo(128 * 1024);
+    }
+
     // ──────────────────────────────────────────────
     //  SPI Contract Compliance
     // ──────────────────────────────────────────────

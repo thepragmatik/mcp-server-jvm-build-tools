@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * <b>Execution timeout:</b> {@link #run} replaces an unbounded
  * {@code process.waitFor()} with a bounded {@link Process#waitFor(long, TimeUnit)}.
- * On timeout the process is forcibly destroyed and an
+ * On timeout the process tree is forcibly destroyed and an
  * {@link ExecutionTimeoutException} is thrown. The timeout defaults to
  * {@value #DEFAULT_TIMEOUT_SECONDS} seconds and is configurable through the
  * {@value #TIMEOUT_PROPERTY} system property, with a safe fallback to the default
@@ -69,14 +69,17 @@ public final class SyncProcessRunner {
      * Result of a synchronous process execution.
      *
      * @param exitCode the process exit code
-     * @param stdout   the fully drained standard output
-     * @param stderr   the fully drained standard error
+     * @param stdout   the retained beginning and end of standard output
+     * @param stderr   the retained beginning and end of standard error
+     * @param stdoutTruncated whether standard output exceeded the capture limit
+     * @param stderrTruncated whether standard error exceeded the capture limit
      */
-    public record Result(int exitCode, String stdout, String stderr) {}
+    public record Result(
+            int exitCode, String stdout, String stderr, boolean stdoutTruncated, boolean stderrTruncated) {}
 
     /**
      * Thrown when a synchronous process exceeds the configured execution timeout.
-     * The offending process is forcibly destroyed before this exception is raised.
+     * The offending process tree is terminated before this exception is raised.
      */
     public static final class ExecutionTimeoutException extends RuntimeException {
         public ExecutionTimeoutException(String message) {
@@ -139,8 +142,8 @@ public final class SyncProcessRunner {
      */
     public static Result run(Process process, String label, long timeout, TimeUnit unit)
             throws IOException, InterruptedException {
-        StringBuilder out = new StringBuilder();
-        StringBuilder err = new StringBuilder();
+        BoundedProcessOutput out = new BoundedProcessOutput();
+        BoundedProcessOutput err = new BoundedProcessOutput();
 
         Thread outThread = drain(process.getInputStream(), out, "sync-stdout-" + label);
         Thread errThread = drain(process.getErrorStream(), err, "sync-stderr-" + label);
@@ -149,14 +152,14 @@ public final class SyncProcessRunner {
         try {
             finished = process.waitFor(timeout, unit);
         } catch (InterruptedException e) {
-            process.destroyForcibly();
+            terminateTree(process);
             joinQuietly(outThread);
             joinQuietly(errThread);
             throw e;
         }
 
         if (!finished) {
-            process.destroyForcibly();
+            terminateTree(process);
             joinQuietly(outThread);
             joinQuietly(errThread);
             throw new ExecutionTimeoutException("Process '" + label + "' timed out after " + timeout + " "
@@ -167,10 +170,60 @@ public final class SyncProcessRunner {
         }
 
         // Process exited; let the readers finish draining whatever remains buffered.
-        outThread.join();
-        errThread.join();
+        try {
+            outThread.join(READER_JOIN_MILLIS);
+            errThread.join(READER_JOIN_MILLIS);
+        } catch (InterruptedException e) {
+            terminateTree(process);
+            throw e;
+        }
+        if (outThread.isAlive() || errThread.isAlive()) {
+            terminateTree(process);
+            throw new IOException("Process output readers did not finish after process exit");
+        }
 
-        return new Result(process.exitValue(), out.toString(), err.toString());
+        return new Result(process.exitValue(), out.snapshot(), err.snapshot(), out.truncated(), err.truncated());
+    }
+
+    /** Drain raw bytes so a single unterminated line cannot allocate without bound. */
+    public static Thread drain(InputStream stream, BoundedProcessOutput sink, String threadName) {
+        Thread thread = new Thread(
+                () -> {
+                    try (InputStream source = stream) {
+                        byte[] chunk = new byte[8192];
+                        int count;
+                        while ((count = source.read(chunk)) != -1) {
+                            sink.write(chunk, 0, count);
+                        }
+                    } catch (IOException ignored) {
+                        // A terminated process closes its pipes; never log raw stream data.
+                    }
+                },
+                threadName + "-" + THREAD_SEQ.incrementAndGet());
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    /** Destroy descendants first so inherited pipe handles cannot outlive the build. */
+    public static void terminateTree(Process process) {
+        ProcessHandle[] descendants = process.toHandle().descendants().toArray(ProcessHandle[]::new);
+        for (int i = descendants.length - 1; i >= 0; i--) {
+            descendants[i].destroyForcibly();
+        }
+        process.destroyForcibly();
+        try {
+            process.waitFor(READER_JOIN_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        try {
+            process.getInputStream().close();
+            process.getErrorStream().close();
+            process.getOutputStream().close();
+        } catch (IOException ignored) {
+            // Reader threads also close their stream when termination completes.
+        }
     }
 
     /**
@@ -195,10 +248,8 @@ public final class SyncProcessRunner {
                                 sink.append(line).append(System.lineSeparator());
                             }
                         }
-                    } catch (IOException e) {
+                    } catch (IOException ignored) {
                         // Stream closed (e.g. process destroyed) — nothing more to drain.
-                        System.err.println(
-                                "[WARN] Process stream drain stopped (" + threadName + "): " + e.getMessage());
                     }
                 },
                 threadName + "-" + THREAD_SEQ.incrementAndGet());
