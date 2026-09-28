@@ -520,7 +520,7 @@ public class DependencyService {
             Map<String, Object> security = new LinkedHashMap<>();
             security.put("cveCount", 0);
             security.put("highestSeverity", "UNKNOWN");
-            security.put("warning", "CVE lookup failed: " + e.getMessage());
+            security.put("warning", "CVE lookup failed");
             security.put("vulnerabilities", List.of());
             result.put("security", security);
         }
@@ -609,6 +609,14 @@ public class DependencyService {
             int criticalCount = 0;
             int highCount = 0;
             List<String> warnings = new ArrayList<>();
+            long skippedDeps = packages.stream()
+                    .filter(pkg ->
+                            !scanResults.containsKey(pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version()))
+                    .count();
+            if (skippedDeps > 0) {
+                warnings.add(skippedDeps
+                        + " dependencies were skipped because their coordinates are not supported for OSV lookup");
+            }
 
             for (CveLookupService.PackageRef pkg : packages) {
                 String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();

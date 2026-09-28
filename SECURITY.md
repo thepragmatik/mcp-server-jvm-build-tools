@@ -138,6 +138,12 @@ credentials. See the [current HTTP authentication guide](docs/reference/http-aut
 
 ## Dependency & Supply-Chain Scanning
 
+Runtime OSV queries send only bounded Maven group, artifact, and version
+coordinates. Coordinates containing whitespace, control characters, quotes, or
+unsupported punctuation are skipped before the HTTP request; the CVE scan
+reports an aggregate skipped count. OSV responses and transport failures do
+not cause raw package coordinates or exception messages to be logged.
+
 The server holds its **own** dependencies to the same bar as the SBOM /
 supply-chain tooling it ships to users (issue #78). The keyless
 [Dependency Review workflow](.github/workflows/dependency-review.yml) blocks

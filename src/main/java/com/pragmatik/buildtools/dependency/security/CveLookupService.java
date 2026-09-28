@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -52,8 +53,13 @@ public class CveLookupService {
     private static final String OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch";
     private static final int CACHE_MAX_SIZE = 500;
     private static final Duration CACHE_TTL = Duration.ofHours(1);
+    private static final Pattern PACKAGE_PART = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]*");
+    private static final Pattern VERSION_PART = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+~()-]*");
+    private static final int MAX_GROUP_ID_LENGTH = 256;
+    private static final int MAX_ARTIFACT_ID_LENGTH = 128;
+    private static final int MAX_VERSION_LENGTH = 128;
 
-    private final HttpClient httpClient;
+    private final OsvTransport transport;
     private final Map<String, CacheEntry> cache;
     private final ConcurrentLinkedQueue<String> lruKeys;
     private final Object cacheLock = new Object();
@@ -61,21 +67,67 @@ public class CveLookupService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public CveLookupService() {
-        this.httpClient = HttpClient.newBuilder()
+        this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
-        this.cache = new ConcurrentHashMap<>();
-        this.lruKeys = new ConcurrentLinkedQueue<>();
+                .build());
     }
 
     /**
      * Package-visible constructor for testing with a mock HTTP client.
      */
     CveLookupService(HttpClient httpClient) {
-        this.httpClient = httpClient;
+        this((uri, payload) -> {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(uri)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return new OsvResponse(response.statusCode(), response.body());
+        });
+    }
+
+    CveLookupService(OsvTransport transport) {
+        this.transport = Objects.requireNonNull(transport);
         this.cache = new ConcurrentHashMap<>();
         this.lruKeys = new ConcurrentLinkedQueue<>();
+    }
+
+    @FunctionalInterface
+    interface OsvTransport {
+        OsvResponse post(URI uri, String payload) throws IOException, InterruptedException;
+    }
+
+    record OsvResponse(int statusCode, String body) {}
+
+    private record OsvPackage(String name, String ecosystem) {}
+
+    private record OsvQuery(OsvPackage pkg, String version) {
+        // OSV uses the JSON key "package", which is reserved in Java.
+        @com.fasterxml.jackson.annotation.JsonProperty("package")
+        public OsvPackage pkg() {
+            return pkg;
+        }
+    }
+
+    private record OsvBatch(List<OsvQuery> queries) {}
+
+    private static OsvQuery query(PackageRef pkg) {
+        return new OsvQuery(new OsvPackage(pkg.groupId() + ":" + pkg.artifactId(), "Maven"), pkg.version());
+    }
+
+    private static boolean valid(PackageRef pkg) {
+        return pkg != null
+                && matches(pkg.groupId(), PACKAGE_PART, MAX_GROUP_ID_LENGTH)
+                && matches(pkg.artifactId(), PACKAGE_PART, MAX_ARTIFACT_ID_LENGTH)
+                && matches(pkg.version(), VERSION_PART, MAX_VERSION_LENGTH);
+    }
+
+    private static boolean matches(String value, Pattern pattern, int maxLength) {
+        return value != null
+                && value.length() <= maxLength
+                && pattern.matcher(value).matches();
     }
 
     /**
@@ -88,6 +140,10 @@ public class CveLookupService {
      * @throws IOException if the network request fails
      */
     public List<VulnerabilityEntry> lookup(String groupId, String artifactId, String version) throws IOException {
+        PackageRef pkg = new PackageRef(groupId, artifactId, version);
+        if (!valid(pkg)) {
+            throw new IOException("Invalid package coordinates for OSV query");
+        }
         String cacheKey = groupId + ":" + artifactId + ":" + version;
 
         // Check cache
@@ -97,18 +153,10 @@ public class CveLookupService {
         }
 
         // Build OSV query payload
-        String payload = String.format(
-                "{\"package\":{\"name\":\"%s:%s\",\"ecosystem\":\"Maven\"},\"version\":\"%s\"}",
-                groupId, artifactId, version);
+        String payload = objectMapper.writeValueAsString(query(pkg));
 
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(OSV_QUERY_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            OsvResponse response = transport.post(URI.create(OSV_QUERY_URL), payload);
 
             List<VulnerabilityEntry> entries;
             if (response.statusCode() == 200) {
@@ -147,6 +195,10 @@ public class CveLookupService {
         // Serve cache hits first; collect the rest for batching
         List<PackageRef> pending = new ArrayList<>();
         for (PackageRef pkg : packages) {
+            if (!valid(pkg)) {
+                // A malformed coordinate must never reach the outbound transport or logs.
+                continue;
+            }
             String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
             CacheEntry cached = cache.get(key);
             if (cached != null && !cached.isExpired()) {
@@ -167,25 +219,11 @@ public class CveLookupService {
     private void flushBatch(List<PackageRef> batch, Map<String, List<VulnerabilityEntry>> results) {
         if (batch.isEmpty()) return;
 
-        StringBuilder queries = new StringBuilder("[");
-        for (int i = 0; i < batch.size(); i++) {
-            PackageRef pkg = batch.get(i);
-            if (i > 0) queries.append(',');
-            queries.append(String.format(
-                    "{\"package\":{\"name\":\"%s:%s\",\"ecosystem\":\"Maven\"},\"version\":\"%s\"}",
-                    pkg.groupId(), pkg.artifactId(), pkg.version()));
-        }
-        queries.append("]");
-        String payload = String.format("{\"queries\":%s}", queries);
+        String payload = objectMapper.writeValueAsString(
+                new OsvBatch(batch.stream().map(CveLookupService::query).toList()));
 
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(OSV_BATCH_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            OsvResponse response = transport.post(URI.create(OSV_BATCH_URL), payload);
 
             if (response.statusCode() != 200) {
                 logger.warn(
@@ -219,9 +257,7 @@ public class CveLookupService {
             }
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            logger.warn(
-                    "[CveLookupService] OSV batch query failed: {}; falling back to sequential lookups",
-                    e.getMessage());
+            logger.warn("[CveLookupService] OSV batch query failed; falling back to sequential lookups");
             fallbackSequential(batch, results);
         }
     }
@@ -235,7 +271,7 @@ public class CveLookupService {
             } catch (IOException e) {
                 // Partial results — mark as unknown with warning
                 results.put(key, List.of());
-                logger.warn("[CveLookupService] Could not scan {}: {}", key, e.getMessage());
+                logger.warn("[CveLookupService] Could not scan a package after batch failure");
             }
         }
     }

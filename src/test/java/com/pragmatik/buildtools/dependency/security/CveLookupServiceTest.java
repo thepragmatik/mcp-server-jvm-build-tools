@@ -17,11 +17,17 @@
 package com.pragmatik.buildtools.dependency.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Unit tests for {@link CveLookupService}.
@@ -228,6 +234,82 @@ class CveLookupServiceTest {
         @DisplayName("batch size constant respects OSV documented limit")
         void batchSize() {
             assertThat(CveLookupService.OSV_BATCH_SIZE).isEqualTo(100);
+        }
+    }
+
+    @Nested
+    @DisplayName("OSV outbound payload boundary")
+    class OutboundPayload {
+
+        private final ObjectMapper json = new ObjectMapper();
+
+        @Test
+        void singleQuerySerializesOnlyMavenCoordinates() throws Exception {
+            List<String> payloads = new ArrayList<>();
+            CveLookupService client = new CveLookupService((uri, payload) -> {
+                assertThat(uri).isEqualTo(URI.create("https://api.osv.dev/v1/query"));
+                payloads.add(payload);
+                return new CveLookupService.OsvResponse(200, "{\"vulns\":[]}");
+            });
+
+            assertThat(client.lookup("org.example", "example-core", "1.2.3-RC1"))
+                    .isEmpty();
+            assertThat(payloads).hasSize(1);
+            var request = json.readTree(payloads.get(0));
+            assertThat(request.get("package").get("name").asText()).isEqualTo("org.example:example-core");
+            assertThat(request.get("package").get("ecosystem").asText()).isEqualTo("Maven");
+            assertThat(request.get("version").asText()).isEqualTo("1.2.3-RC1");
+            assertThat(request.size()).isEqualTo(2);
+        }
+
+        @Test
+        void malformedOrOversizedSingleCoordinatesNeverReachTransport() {
+            AtomicInteger requests = new AtomicInteger();
+            CveLookupService client = new CveLookupService((uri, payload) -> {
+                requests.incrementAndGet();
+                return new CveLookupService.OsvResponse(200, "{}");
+            });
+            List<CveLookupService.PackageRef> rejected = List.of(
+                    new CveLookupService.PackageRef("org.example\"},\"secret\":\"canary", "core", "1.0"),
+                    new CveLookupService.PackageRef("org.example", "core\nPRIVATE_EMAIL@example.com", "1.0"),
+                    new CveLookupService.PackageRef("org.example", "core", "1.0\u0000PRIVATE_SECRET"),
+                    new CveLookupService.PackageRef("org.example", "core", "x".repeat(129)),
+                    new CveLookupService.PackageRef("org.example", "x".repeat(129), "1.0"),
+                    new CveLookupService.PackageRef("x".repeat(257), "core", "1.0"));
+
+            for (var pkg : rejected) {
+                assertThatThrownBy(() -> client.lookup(pkg.groupId(), pkg.artifactId(), pkg.version()))
+                        .isInstanceOf(IOException.class)
+                        .hasMessage("Invalid package coordinates for OSV query");
+            }
+            assertThat(requests).hasValue(0);
+        }
+
+        @Test
+        void batchAndSequentialFallbackExcludeInvalidCoordinates() {
+            List<String> payloads = new ArrayList<>();
+            CveLookupService client = new CveLookupService((uri, payload) -> {
+                payloads.add(payload);
+                return uri.getPath().endsWith("querybatch")
+                        ? new CveLookupService.OsvResponse(503, "")
+                        : new CveLookupService.OsvResponse(200, "{\"vulns\":[]}");
+            });
+
+            var results = client.bulkLookup(List.of(
+                    new CveLookupService.PackageRef("com.acme", "safe-lib", "2.0+build"),
+                    new CveLookupService.PackageRef("com.acme", "bad\"},\"email\":\"PRIVATE_EMAIL@example.com", "1"),
+                    new CveLookupService.PackageRef("com.acme", "lib", "PRIVATE_SECRET\n1")));
+
+            assertThat(results).containsOnlyKeys("com.acme:safe-lib:2.0+build");
+            assertThat(payloads).hasSize(2);
+            var batch = json.readTree(payloads.get(0));
+            assertThat(batch.get("queries")).hasSize(1);
+            assertThat(batch.get("queries").get(0).get("package").get("name").asText())
+                    .isEqualTo("com.acme:safe-lib");
+            assertThat(payloads.get(0)).doesNotContain("PRIVATE_EMAIL", "PRIVATE_SECRET");
+            assertThat(payloads.get(1)).doesNotContain("PRIVATE_EMAIL", "PRIVATE_SECRET");
+            assertThat(json.readTree(payloads.get(1)).get("package").get("name").asText())
+                    .isEqualTo("com.acme:safe-lib");
         }
     }
 }
