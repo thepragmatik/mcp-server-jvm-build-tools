@@ -44,6 +44,7 @@ final class MavenDiagnosticOutput extends OutputStream {
     private long position;
     private int length;
     private int prefixLength;
+    private int possiblePrefixes = (1 << PREFIXES.length) - 1;
     private int ansiPrefixBytes;
     private int ansiState;
     private boolean candidate;
@@ -163,17 +164,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     overflow = true;
                     return;
                 }
-            } else if (matchesCandidatePrefix(value)) {
-                prefixLength++;
-                for (byte[] prefix : PREFIXES) {
-                    if (prefixLength == prefix.length
-                            && prefix[prefixLength - 1] == value
-                            && matchesPrefix(prefix, prefixLength - 1)) {
-                        candidate = true;
-                        break;
-                    }
-                }
-            } else {
+            } else if (!advanceCandidatePrefix(value)) {
                 overflow = true; // An ordinary log line never needs buffering.
                 return;
             }
@@ -209,25 +200,31 @@ final class MavenDiagnosticOutput extends OutputStream {
         }
         length = 0;
         prefixLength = 0;
+        possiblePrefixes = (1 << PREFIXES.length) - 1;
         ansiPrefixBytes = 0;
         ansiState = 0;
         candidate = false;
         overflow = false;
     }
 
-    private boolean matchesCandidatePrefix(byte value) {
-        for (byte[] prefix : PREFIXES) {
-            if (prefixLength < prefix.length && prefix[prefixLength] == value && matchesPrefix(prefix, prefixLength)) {
-                return true;
+    private boolean advanceCandidatePrefix(byte value) {
+        int next = 0;
+        for (int i = 0; i < PREFIXES.length; i++) {
+            byte[] prefix = PREFIXES[i];
+            int bit = 1 << i;
+            if ((possiblePrefixes & bit) != 0 && prefixLength < prefix.length && prefix[prefixLength] == value) {
+                next |= bit;
             }
         }
-        return false;
-    }
-
-    private boolean matchesPrefix(byte[] prefix, int count) {
-        for (int i = 0; i < count; i++) {
-            if (line[ansiPrefixBytes + i] != prefix[i]) {
-                return false;
+        if (next == 0) {
+            return false;
+        }
+        possiblePrefixes = next;
+        prefixLength++;
+        for (int i = 0; i < PREFIXES.length; i++) {
+            if ((next & (1 << i)) != 0 && prefixLength == PREFIXES[i].length) {
+                candidate = true;
+                break;
             }
         }
         return true;
