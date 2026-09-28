@@ -146,7 +146,7 @@ nav:
   - Testing:
       - Historical Test Results (1.x): reference/test-results.md
       - Historical Test Plan (1.x): reference/test-plan.md
-      - Test Tools: reference/test-tools-recommendations.md
+      - Historical Test Tool Research (July 2026): reference/test-tools-recommendations.md
   - FAQ: FAQ.md
   - Project:
       - Historical Mission (1.x): MISSION.md

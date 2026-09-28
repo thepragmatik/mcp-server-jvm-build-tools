@@ -24,7 +24,7 @@ and [2.0 security design](design-v2.md) before granting execution access.
 | `detect_dependency_conflicts` | `dependency:read` | Return conflict and analyzed-file counts without dependency identifiers. |
 | `detect_sbt_modules` | `sbt:read` | Return module count and structure flags without module names. |
 | `detect_sbt_test_frameworks` | `sbt:read` | Return framework count and configuration flags without framework names. |
-| `execute_build_command` | `build:execute` | Execute an allowed build command and return status with at most 12 structured, redacted diagnostics (severity, category, diagnosticRef, optional file type and line, normalized message), not raw logs. Use for triage; inspect local files for edits. |
+| `execute_build_command` | `build:execute` | Execute an allowed build command and return optional exitCode for a completed built-in process and at most 12 structured, redacted diagnostics (severity, category, diagnosticRef, optional fileRef, file type and line, normalized message), not raw logs. Use for triage; inspect local files for edits. |
 | `get_build_tool_version` | `build:read` | Return a build-tool version number without host details. |
 | `list_available_scopes` | `security:read` | Return the names of public permission scopes. |
 | `list_build_resources` | `resource:read` | Return resource count and kind names without resource URIs or contents. |
@@ -40,8 +40,8 @@ and [2.0 security design](design-v2.md) before granting execution access.
 
 For exact input parameters and JSON schemas, ask the running server for
 `tools/list`; that response is authoritative for the version you installed.
-In builds after `v2.0.0-rc.1`, `analyze_build_output` also advertises an
-`outputSchema` and returns the same safe JSON object in `structuredContent`
+In builds after `v2.0.0-rc.1`, both `analyze_build_output` and `execute_build_command` advertise an
+`outputSchema` and return the same safe JSON object in `structuredContent`
 and legacy text; see
 [structured build results](structured-build-results.md).
 Results are bounded and privacy-filtered. Raw build logs and commands stay local;

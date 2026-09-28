@@ -59,6 +59,7 @@ final class BuildResultSchema {
         fields.put("isError", booleanField());
         fields.put("truncated", booleanField());
         fields.put("outputTruncated", Map.of("const", true));
+        fields.put("exitCode", Map.of("type", "integer", "minimum", Integer.MIN_VALUE, "maximum", Integer.MAX_VALUE));
         fields.put("errorCount", count());
         fields.put("warningCount", count());
         fields.put("testSummary", summary());

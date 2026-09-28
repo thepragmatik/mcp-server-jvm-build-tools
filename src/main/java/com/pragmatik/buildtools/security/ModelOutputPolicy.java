@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 public final class ModelOutputPolicy {
     private static final int MAX_DIAGNOSTICS = 12;
     private static final int MAX_MESSAGE_LENGTH = 500;
-    private static final int MAX_RESULT_CHARS = 256_000;
+    private static final int MAX_RESULT_CHARS = BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS;
     private static final Set<String> COUNTERS = Set.of(
             "total",
             "passed",
@@ -248,11 +248,32 @@ public final class ModelOutputPolicy {
             safe.put("scopes", ToolPermission.allScopes());
         }
         if ("execute_build_command".equals(toolName) && output != null) {
-            if (output.contains("BUILD FAILURE") || output.contains("BUILD FAILED")) {
-                safe.put("success", false);
-                safe.put("isError", true);
-            } else if (output.contains("BUILD SUCCESS")) {
-                safe.put("success", true);
+            String executionOutput = output;
+            Integer exitCode = null;
+            if (parsed != null && parsed.isObject()) {
+                JsonNode rawOutput = parsed.get("rawOutput");
+                if (rawOutput != null && rawOutput.isTextual()) {
+                    executionOutput = rawOutput.asText();
+                }
+                JsonNode status = parsed.get("exitCode");
+                if (status != null && status.isIntegralNumber() && status.canConvertToInt()) {
+                    exitCode = status.intValue();
+                    safe.put("exitCode", exitCode);
+                }
+            }
+            if (!safe.containsKey("diagnostics")) {
+                copyPlainDiagnostics(executionOutput, safe);
+            }
+            if (exitCode != null) {
+                safe.put("success", exitCode == 0);
+                if (exitCode != 0) {
+                    safe.put("isError", true);
+                } else {
+                    safe.remove("isError");
+                }
+            } else {
+                safe.remove("success");
+                safe.remove("isError");
             }
         }
         if (safe.size() == 1) {

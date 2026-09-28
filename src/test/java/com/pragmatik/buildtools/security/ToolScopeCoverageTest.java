@@ -144,8 +144,8 @@ class ToolScopeCoverageTest {
 
                 For exact input parameters and JSON schemas, ask the running server for
                 `tools/list`; that response is authoritative for the version you installed.
-                In builds after `v2.0.0-rc.1`, `analyze_build_output` also advertises an
-                `outputSchema` and returns the same safe JSON object in `structuredContent`
+                In builds after `v2.0.0-rc.1`, both `analyze_build_output` and `execute_build_command` advertise an
+                `outputSchema` and return the same safe JSON object in `structuredContent`
                 and legacy text; see
                 [structured build results](structured-build-results.md).
                 Results are bounded and privacy-filtered. Raw build logs and commands stay local;

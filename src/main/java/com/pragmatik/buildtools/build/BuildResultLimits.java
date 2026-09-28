@@ -19,6 +19,9 @@ package com.pragmatik.buildtools.build;
 /** Shared numeric limit for parsed build results and the model-visible projection. */
 public final class BuildResultLimits {
     public static final int MAX_VISIBLE_COUNTER = 1_000_000;
+    public static final int MAX_PRIVATE_PROJECTION_INPUT_CHARS = 256_000;
+    // Leave space for JSON escaping and envelope fields before the privacy projector's input cap.
+    public static final int MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS = 240_000;
 
     private BuildResultLimits() {}
 }

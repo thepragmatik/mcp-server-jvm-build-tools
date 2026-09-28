@@ -41,7 +41,8 @@ class ModelOutputPolicyTest {
 
     @Test
     void executeStatusUsesAuthoritativeExitCodeOverMisleadingOutput() {
-        String raw = "{\"exitCode\":1,\"success\":false,\"rawOutput\":\"BUILD SUCCESS /synthetic/private alice@example.invalid\"}";
+        String raw =
+                "{\"exitCode\":1,\"success\":false,\"rawOutput\":\"BUILD SUCCESS /synthetic/private alice@example.invalid\"}";
 
         String safe = policy.protect("execute_build_command", raw);
 
@@ -50,6 +51,18 @@ class ModelOutputPolicyTest {
         assertTrue(safe.contains("\"isError\":true"));
         assertFalse(safe.contains("/synthetic/private"));
         assertFalse(safe.contains("alice@example.invalid"));
+    }
+
+    @Test
+    void signedExitCodeIsAuthoritativeAndUnknownStatusIsNotInferred() {
+        String failed = policy.protect("execute_build_command", "{\"exitCode\":-9,\"rawOutput\":\"BUILD SUCCESS\"}");
+        assertTrue(failed.contains("\"exitCode\":-9"));
+        assertTrue(failed.contains("\"success\":false"));
+
+        String unknown = policy.protect("execute_build_command", "{\"rawOutput\":\"BUILD FAILURE\"}");
+        assertFalse(unknown.contains("\"exitCode\""));
+        assertFalse(unknown.contains("\"success\""));
+        assertFalse(unknown.contains("\"isError\""));
     }
 
     @Test

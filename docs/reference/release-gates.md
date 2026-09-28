@@ -8,6 +8,11 @@ wire version, checks adversarial HTTP requests, and probes stdio separately. It
 prints only pass/fail labels; server logs and protocol responses stay out of CI
 output.
 
+The packaged Maven synthetic probe exercises both transports for a retained
+middle compiler diagnostic and a failed `execute_build_command` whose output
+also claims success. It checks authoritative `exitCode`, structured/text
+parity, and private canary suppression without printing build logs.
+
 The official scenarios selected for this product are `server-initialize`,
 `ping`, `tools-list`, `resources-list`, `prompts-list`, and
 `dns-rebinding-protection`. The official runner's frozen `--requirements
