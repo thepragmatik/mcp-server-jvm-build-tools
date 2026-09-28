@@ -33,33 +33,26 @@ import java.util.Set;
 public enum ToolPermission {
     BUILD_READ(
             "build:read",
-            Set.of("get_build_tool_version", "list_build_tools", "detect_build_tool", "validate_build_configuration")),
-
-    BUILD_EXECUTE("build:execute", Set.of("execute_build_command")),
-
-    BUILD_PROFILE("build:profile", Set.of("profile_build", "analyze_build_performance")),
-
-    DEPENDENCY_READ("dependency:read", Set.of("check_dependency_version", "list_dependencies")),
-
-    DEPENDENCY_MANAGE("dependency:manage", Set.of("detect_dependency_conflicts")),
-
-    CREDENTIAL_READ("credential:read", Set.of("check_credential_status")),
-
-    JAVA_READ("java:read", Set.of("check_java_compatibility")),
-
-    SBT_READ("sbt:read", Set.of("check_sbt_project", "list_sbt_modules")),
-
-    SBT_EXECUTE("sbt:execute", Set.of("execute_sbt_command")),
-
-    PROMPT_READ("prompt:read", Set.of("get_build_tool_prompt")),
-
-    RESOURCE_READ(
-            "resource:read",
             Set.of(
-                    "list_build_resources", "read_build_resource",
-                    "list_dependency_resources", "read_dependency_resource")),
-
-    RESOURCE_TEMPLATE("resource:template", Set.of("list_resource_templates", "get_resource_template"));
+                    "get_build_tool_version",
+                    "list_build_tools",
+                    "detect_build_tool",
+                    "validate_build_configuration",
+                    "analyze_build_performance")),
+    BUILD_EXECUTE("build:execute", Set.of("execute_build_command", "analyze_build_output", "profile_build")),
+    DEPENDENCY_READ(
+            "dependency:read",
+            Set.of(
+                    "check_dependency_version",
+                    "analyze_pom_dependencies",
+                    "scan_dependency_cves",
+                    "detect_dependency_conflicts")),
+    JAVA_READ("java:read", Set.of("check_java_compatibility")),
+    SBT_READ("sbt:read", Set.of("detect_sbt_modules", "detect_sbt_test_frameworks", "analyze_sbt_build")),
+    PROMPT_READ("prompt:read", Set.of("prompt_build_and_test", "prompt_dependency_audit", "prompt_build_diagnosis")),
+    RESOURCE_READ("resource:read", Set.of("list_build_resources", "list_dependency_resources")),
+    CI_READ("ci:read", Set.of("validate_ci_flow")),
+    SECURITY_READ("security:read", Set.of("check_tool_authorization", "list_available_scopes"));
 
     private final String scope;
     private final Set<String> toolNames;
@@ -88,10 +81,19 @@ public enum ToolPermission {
 
     public static boolean isToolAuthorized(String toolName, List<String> grantedScopes) {
         if (grantedScopes == null || grantedScopes.isEmpty()) return false;
-        if (grantedScopes.contains("*")) return true;
+        if (grantedScopes.contains("*")) return isKnownTool(toolName);
         for (String scope : grantedScopes) {
             ToolPermission perm = fromScope(scope);
             if (perm != null && perm.toolNames.contains(toolName)) return true;
+        }
+        return false;
+    }
+
+    public static boolean isKnownTool(String toolName) {
+        for (ToolPermission permission : values()) {
+            if (permission.toolNames.contains(toolName)) {
+                return true;
+            }
         }
         return false;
     }

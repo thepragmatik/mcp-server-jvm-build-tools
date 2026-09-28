@@ -40,6 +40,14 @@ import org.springframework.web.client.RestTemplate;
  */
 class HttpProfileWebServerTest {
 
+    @Test
+    void runtimeProfilesAndLoggingArePackaged() {
+        ClassLoader loader = getClass().getClassLoader();
+        assertThat(loader.getResource("application-http.properties")).isNotNull();
+        assertThat(loader.getResource("application-metrics.properties")).isNotNull();
+        assertThat(loader.getResource("logback-spring.xml")).isNotNull();
+    }
+
     /**
      * Starts the application with {@code spring.profiles.active=http} on a random port and asserts a
      * real TCP listener accepts connections and serves the health endpoint.

@@ -1,5 +1,7 @@
 # Release Notes — v0.2.0
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
+
 **Release Date:** June 12, 2026
 **Previous Release:** [v0.1.0](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v0.1.0)
 

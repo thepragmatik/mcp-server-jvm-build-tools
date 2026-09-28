@@ -284,7 +284,7 @@ public class BuildPerformanceService {
         try {
             loadAllBuildHistory(dir, tool.getName(), allHistory);
         } catch (IOException e) {
-            System.err.println("[WARN] Build performance: " + e.getMessage());
+            System.err.println("[WARN] Build performance history could not be read; details withheld");
         }
 
         // Analyze historical patterns

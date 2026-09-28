@@ -103,24 +103,16 @@ public class ServerCardController {
                 "Dependency version checking against Maven Central",
                 "Dependency conflict detection across build files",
                 "Build configuration validation (syntax, required elements)",
-                "Credential status scanning (masked, read-only)",
                 "Resource exposure for build configs and dependencies",
                 "SBT project structure analysis (modules, test frameworks)",
                 "Streamable HTTP transport with health check endpoint",
                 "Prompt templates for build analysis, dependency audits, failure diagnosis");
         card.put("features", features);
 
-        // Deprecation notices (MCP 2026-07-28)
-        Map<String, Object> deprecations = new LinkedHashMap<>();
-        deprecations.put("roots", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
-        deprecations.put("sampling", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
-        deprecations.put("logging", Map.of("deprecated", "2026-07-28", "removal", "2027-07-28"));
-        card.put("deprecations", deprecations);
-
         Map<String, Object> security = new LinkedHashMap<>();
         security.put("transportSecurity", "stdio (local, no network surface); Streamable HTTP with Origin validation");
         security.put("inputValidation", "Shell injection blocking, dangerous flag blocking, path canonicalization");
-        security.put("credentialHandling", "Read-only scanning with masked values (only last 3 chars shown)");
+        security.put("credentialHandling", "Credential inspection is not exposed to MCP clients");
         security.put("commandRestrictions", "Length limits (500 chars), character allowlists, rate limiting");
         card.put("security", security);
 

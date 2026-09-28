@@ -132,7 +132,7 @@ public class OAuthTokenController {
         // ── 3. Look up and authenticate client ──────────────────────────
         Optional<OAuthClientRegistration> clientOpt = clientRepository.findByClientId(clientId);
         if (clientOpt.isEmpty()) {
-            log.warn("Token request for unknown client_id: {}", clientId);
+            log.warn("Token request for unknown client ID");
             return errorResponse(HttpStatus.UNAUTHORIZED, "invalid_client", "Client authentication failed");
         }
 
@@ -145,7 +145,7 @@ public class OAuthTokenController {
                 && !MessageDigest.isEqual(
                         client.clientSecret().getBytes(StandardCharsets.UTF_8),
                         clientSecret.getBytes(StandardCharsets.UTF_8))) {
-            log.warn("Token request with invalid secret for client: {}", clientId);
+            log.warn("Token request with invalid client secret");
             return errorResponse(HttpStatus.UNAUTHORIZED, "invalid_client", "Client authentication failed");
         }
 
@@ -178,7 +178,7 @@ public class OAuthTokenController {
         long ttl = client.tokenTtlSeconds();
         String accessToken = jwtTokenService.generateToken(clientId, grantedScopes, ttl);
 
-        log.info("Issued access token for client: {} (scopes={}, ttl={}s)", clientId, grantedScopes, ttl);
+        log.info("Issued access token (scope count={}, ttl={}s)", grantedScopes.size(), ttl);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("access_token", accessToken);
