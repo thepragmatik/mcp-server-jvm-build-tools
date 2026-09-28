@@ -26,18 +26,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 /**
- * MCP service for detecting flaky tests and analyzing test history.
+ * Internal service for detecting flaky tests and analyzing test history.
  * <p>
  * Runs tests multiple times to detect non-deterministic results, computes
  * flakiness scores per test method, and analyzes historical test trends
  * from build history files.
  * <p>
- * Registered MCP tools:
+ * Internal operations (not exposed as MCP tools):
  * <ul>
  *   <li>{@code detect_flaky_tests} — run tests N times, detect flaky ones</li>
  *   <li>{@code analyze_test_history} — analyze historical test pass/fail trends</li>
@@ -73,21 +71,7 @@ public class TestFlakinessService {
      * and computes a flakiness score per test method. Tests that pass sometimes
      * and fail other times are flagged as flaky.
      */
-    @Tool(
-            name = "detect_flaky_tests",
-            description = "Detect flaky tests by running them multiple times. "
-                    + "Executes tests N times (default 5), tracks pass/fail per test method, "
-                    + "and computes a flakiness score. Returns JSON with {flakyTests: [{testName, "
-                    + "passCount, failCount, flakinessScore, flag}], totalTests, flakyCount, "
-                    + "suggestions}. Flags: score=0 STABLE, >0 FLAKY, >0.5 VERY_FLAKY.")
-    public String detectFlakyTests(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
-            @ToolParam(required = false, description = "Number of test iterations (default 5, max 20)")
-                    Integer iterations,
-            @ToolParam(
-                            required = false,
-                            description = "Test filter pattern (e.g., 'com.example.MyTest' or '*ServiceTest')")
-                    String testFilter) {
+    public String detectFlakyTests(String projectDir, Integer iterations, String testFilter) {
 
         Path dir;
         try {
@@ -211,14 +195,7 @@ public class TestFlakinessService {
      * pass-rate trends, identifies degrading tests, and suggests tests
      * to quarantine based on historical flakiness.
      */
-    @Tool(
-            name = "analyze_test_history",
-            description = "Analyze historical test pass/fail trends from build history. "
-                    + "Reads stored build profiles and computes pass-rate trends over time. "
-                    + "Identifies degrading tests and suggests quarantine candidates. "
-                    + "Returns JSON with {totalBuilds, passRateTrend, degradingTests, quarantineCandidates}.")
-    public String analyzeTestHistory(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir) {
+    public String analyzeTestHistory(String projectDir) {
 
         Path dir;
         try {

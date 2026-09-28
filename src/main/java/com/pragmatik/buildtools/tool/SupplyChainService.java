@@ -30,12 +30,10 @@ import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 /**
- * MCP service for supply chain security: SBOM generation, vulnerability auditing,
+ * Internal service for supply chain security: SBOM generation, vulnerability auditing,
  * and license compliance checking.
  * <p>
  * Generates CycloneDX/SPDX SBOMs for Maven, Gradle, and SBT projects.
@@ -43,7 +41,7 @@ import org.springframework.stereotype.Service;
  * dependencies against OSV.dev and GitHub Advisory databases for known CVEs.
  * Checks licenses for copyleft/restricted terms.
  * <p>
- * Registered MCP tools:
+ * Internal operations (not exposed as MCP tools):
  * <ul>
  *   <li>{@code generate_sbom} — generate a CycloneDX or SPDX SBOM</li>
  *   <li>{@code audit_supply_chain} — check dependencies for known vulnerabilities</li>
@@ -114,17 +112,7 @@ public class SupplyChainService {
      * Maven: cyclonedx-maven-plugin, Gradle: org.cyclonedx.bom, SBT: sbt-cyclonedx.
      * If a pre-existing SBOM file is found, parses and returns it directly.
      */
-    @Tool(
-            name = "generate_sbom",
-            description = "Generate a CycloneDX or SPDX Software Bill of Materials (SBOM) for a JVM project. "
-                    + "Auto-detects build tool and uses the appropriate CycloneDX plugin. "
-                    + "Returns structured JSON with component inventory, dependency graph, and metadata. "
-                    + "Formats: cyclonedx (default, JSON) or spdx (JSON).")
-    public String generateSbom(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
-            @Schema(allowableValues = {"cyclonedx", "spdx"})
-                    @ToolParam(required = false, description = "SBOM format: 'cyclonedx' (default) or 'spdx'")
-                    String format) {
+    public String generateSbom(String projectDir, @Schema(allowableValues = {"cyclonedx", "spdx"}) String format) {
 
         Path dir;
         try {
@@ -176,15 +164,7 @@ public class SupplyChainService {
      * <p>
      * Reports CVEs with severity scores, fix versions, and remediation steps.
      */
-    @Tool(
-            name = "audit_supply_chain",
-            description = "Audit a project's dependencies for known vulnerabilities. "
-                    + "Parses SBOM, cross-references against OSV.dev and GitHub Advisory databases. "
-                    + "Returns JSON with {vulnerabilities: [{cve, severity, package, currentVersion, "
-                    + "fixVersion, advisory}], totalCount, severityBreakdown}. "
-                    + "Also checks artifact signing status on Maven Central.")
-    public String auditSupplyChain(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir) {
+    public String auditSupplyChain(String projectDir) {
 
         Path dir;
         try {
@@ -253,15 +233,7 @@ public class SupplyChainService {
      * each license as permissive, copyleft, restricted, or unknown, and
      * generates a compliance report by category.
      */
-    @Tool(
-            name = "check_license_compliance",
-            description = "Check all project dependencies for license compliance. "
-                    + "Classifies licenses as permissive, copyleft, restricted, or unknown. "
-                    + "Flags GPL/AGPL dependencies that may impose copyleft obligations. "
-                    + "Returns JSON with {compliant, licenses: [{name, category, count}], "
-                    + "restrictedDeps: [{groupId, artifactId, version, license}], summary}.")
-    public String checkLicenseCompliance(
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir) {
+    public String checkLicenseCompliance(String projectDir) {
 
         Path dir;
         try {

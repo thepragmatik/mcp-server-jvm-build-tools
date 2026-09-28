@@ -38,12 +38,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 /**
- * MCP service that provides asynchronous build execution via the
+ * Internal service that provides asynchronous build execution via the
  * MCP tasks extension pattern.
  * <p>
  * Long-running build operations (Maven, Gradle, SBT) are executed
@@ -52,7 +50,7 @@ import org.springframework.stereotype.Service;
  * <p>
  * Task lifecycle: {@code queued -> running -> completed / failed / cancelled}
  * <p>
- * Registered MCP tools:
+ * Internal operations (not exposed as MCP tools):
  * <ul>
  *   <li>{@code execute_build_async} — start a build, return a task handle immediately</li>
  *   <li>{@code get_build_task} — poll task status, progress, and partial output</li>
@@ -82,21 +80,11 @@ public class AsyncBuildService {
      * The build runs in the background. Use {@link #getBuildTask} to poll for
      * status, progress, and results. Use {@link #cancelBuildTask} to cancel.
      */
-    @Tool(
-            name = "execute_build_async",
-            description = "Start an async build and return a task handle immediately. "
-                    + "Use this for long-running builds (30s+) instead of execute_build_command. "
-                    + "Returns a task JSON with {taskId, status:\"queued\"}. "
-                    + "Poll with get_build_task to track progress, stream output, and get results. "
-                    + "Supports Maven, Gradle, and SBT.")
     public String executeBuildAsync(
-            @Schema(allowableValues = {"maven", "gradle", "sbt"})
-                    @ToolParam(required = false, description = "Build tool name. Omit to auto-detect.")
-                    String buildToolName,
-            @ToolParam(required = false, description = "Path to build tool installation.") String buildToolHome,
-            @ToolParam(required = true, description = "Path to the project directory") String projectDir,
-            @ToolParam(required = true, description = "Build command to execute (e.g., 'clean compile')")
-                    String command) {
+            @Schema(allowableValues = {"maven", "gradle", "sbt"}) String buildToolName,
+            String buildToolHome,
+            String projectDir,
+            String command) {
 
         // --- Input validation (aligned with BuildToolsService) ---
         if (command == null || command.trim().isEmpty()) {
@@ -162,14 +150,7 @@ public class AsyncBuildService {
     /**
      * Poll a build task for its current status, progress, and partial output.
      */
-    @Tool(
-            name = "get_build_task",
-            description = "Get the current status, progress, and partial output of an async build task. "
-                    + "Returns JSON with {taskId, status, progress, output (partial), duration, "
-                    + "phaseProgress, result (when completed)}. "
-                    + "Status values: queued, running, completed, failed, cancelled.")
-    public String getBuildTask(
-            @ToolParam(required = true, description = "Task ID returned by execute_build_async") String taskId) {
+    public String getBuildTask(String taskId) {
 
         BuildTask task = tasks.get(taskId);
         if (task == null) {
@@ -235,12 +216,7 @@ public class AsyncBuildService {
     /**
      * Cancel a running build task by killing the underlying process.
      */
-    @Tool(
-            name = "cancel_build_task",
-            description = "Cancel a running async build task. Kills the underlying build process "
-                    + "and marks the task as cancelled. Has no effect on already-completed tasks. "
-                    + "Returns JSON with {taskId, status, cancelled}.")
-    public String cancelBuildTask(@ToolParam(required = true, description = "Task ID to cancel") String taskId) {
+    public String cancelBuildTask(String taskId) {
 
         BuildTask task = tasks.get(taskId);
         if (task == null) {
@@ -284,11 +260,6 @@ public class AsyncBuildService {
     /**
      * List all active and recent build tasks.
      */
-    @Tool(
-            name = "list_build_tasks",
-            description = "List all async build tasks. Returns JSON with {activeCount, completedCount, "
-                    + "tasks: [{taskId, status, tool, command, elapsed}]}. "
-                    + "Active tasks include queued and running. Completed tasks are kept for 1 hour.")
     public String listBuildTasks() {
         List<Map<String, Object>> taskList = new ArrayList<>();
         Instant now = Instant.now();
