@@ -398,7 +398,48 @@ public class BuildToolsService {
         BuildOutputParser parser = outputParsers.getOrDefault(tool.getName(), outputParsers.get("maven"));
         Map<String, Object> result = parser.parse(rawOutput, exitCode, command);
 
+        return modelVisibleBuildResult(result);
+    }
+
+    static String modelVisibleBuildResult(Map<String, Object> parsed) {
+        // The parser retains these for local callers, but neither belongs in the
+        // JSON handed to the model-visible output boundary. A large log would
+        // otherwise cause that boundary to discard the structured result.
+        Map<String, Object> result = new java.util.LinkedHashMap<>(parsed);
+        result.remove("rawOutput");
+        result.remove("command");
+        result.computeIfPresent("errors", (key, value) -> boundedDiagnosticInput(value));
+        result.computeIfPresent("warnings", (key, value) -> boundedDiagnosticInput(value));
+
         return JsonUtils.toJson(result);
+    }
+
+    private static List<Map<String, Object>> boundedDiagnosticInput(Object value) {
+        if (!(value instanceof List<?> entries)) {
+            return List.of();
+        }
+        List<Map<String, Object>> bounded = new ArrayList<>();
+        for (Object entry : entries) {
+            if (bounded.size() == 13) {
+                break;
+            }
+            if (!(entry instanceof Map<?, ?> detail)) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            for (String key : List.of("message", "file")) {
+                Object field = detail.get(key);
+                if (field instanceof String text) {
+                    item.put(key, text.substring(0, Math.min(text.length(), 2_000)));
+                }
+            }
+            Object line = detail.get("line");
+            if (line instanceof Integer) {
+                item.put("line", line);
+            }
+            bounded.add(item);
+        }
+        return bounded;
     }
 
     /**

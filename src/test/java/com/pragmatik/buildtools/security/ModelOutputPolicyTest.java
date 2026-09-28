@@ -34,9 +34,9 @@ class ModelOutputPolicyTest {
         assertFalse(safe.contains("/home/private-user"));
         assertFalse(safe.contains("secret-value"));
         assertFalse(safe.contains("400 123 456"));
-        assertTrue(safe.contains("[redacted-path]"));
-        assertTrue(safe.contains("[redacted-email]"));
-        assertTrue(safe.contains("[redacted-secret]"));
+        assertTrue(safe.contains("\"category\":\"other\""));
+        assertTrue(safe.contains("\"severity\":\"error\""));
+        assertTrue(safe.contains("\"diagnostics\":[{"));
     }
 
     @Test
@@ -53,7 +53,7 @@ class ModelOutputPolicyTest {
         assertFalse(safe.contains("example.invalid"));
         assertFalse(safe.contains("secret-value"));
         assertFalse(safe.contains("123456789"));
-        assertTrue(safe.contains("[redacted-email]"));
+        assertTrue(safe.contains("\"category\":\"other\""));
     }
 
     @Test
@@ -89,8 +89,7 @@ class ModelOutputPolicyTest {
         String safe = policy.protect("execute_build_command", output);
         assertFalse(safe.contains("SECRET WITH SPACES"));
         assertFalse(safe.contains("PRIVATE NAME"));
-        assertTrue(safe.contains("[redacted-secret]"));
-        assertTrue(safe.contains("[redacted-path]"));
+        assertTrue(safe.contains("\"diagnostics\":[{"));
     }
 
     @Test
@@ -106,8 +105,7 @@ class ModelOutputPolicyTest {
         String safe = policy.protect("execute_build_command", output);
         assertFalse(safe.contains("SECRET WITH SPACES"));
         assertFalse(safe.contains("PRIVATE NAME"));
-        assertTrue(safe.contains("[redacted-secret]"));
-        assertTrue(safe.contains("[redacted-path]"));
+        assertTrue(safe.contains("\"diagnostics\":[{"));
     }
 
     @Test
@@ -165,7 +163,7 @@ class ModelOutputPolicyTest {
         String output = "x".repeat(300_000) + "\nERROR /home/private-user/File.java";
         String safe = policy.protect("execute_build_command", output);
         assertTrue(safe.contains("\"truncated\":true"));
-        assertTrue(safe.contains("[redacted-path]"));
+        assertTrue(safe.contains("\"category\":\"other\""));
         assertFalse(safe.contains("private-user"));
         assertTrue(safe.length() < 1_000);
     }

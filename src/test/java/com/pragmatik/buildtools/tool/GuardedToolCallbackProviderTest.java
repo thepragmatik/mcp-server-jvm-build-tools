@@ -56,7 +56,7 @@ class GuardedToolCallbackProviderTest {
         assertTrue(received.get().contains(project.toString()));
         assertFalse(result.contains("private-user"));
         assertFalse(result.contains("example.invalid"));
-        assertTrue(result.contains("[redacted-path]"));
+        assertTrue(result.contains("\"diagnostics\":[{"));
     }
 
     @Test
