@@ -28,9 +28,9 @@ Inspect `pom.xml` locally to make the edit. The result can identify a fixed clas
 ```mermaid
 flowchart LR
     A["🟣 Agent<br/>relative projectDir"] --> B{"🟠 Allowed root?"}
-    B -- yes --> C["🔵 Local validator<br/>read ≤ 1 MiB POM"]
+    B -- yes --> C["🔵 Anchored directory handles<br/>no symlink traversal"]
     B -- no --> X["🔴 Generic denial"]
-    C --> D["🟢 Offline XML parse<br/>DTD + external access disabled"]
+    C --> D["🟢 Bounded local parse<br/>≤ 1 MiB per file"]
     D --> E["🟡 Fixed issue templates<br/>max 12 diagnostics"]
     E --> A
     classDef agent fill:#eee5ff,stroke:#7c3aed,color:#24114b
@@ -49,4 +49,6 @@ flowchart LR
 
 The Maven validator caps input at 1 MiB before parsing. It rejects malformed XML, DTDs, and external entities; disables XInclude and external DTD/schema access; and checks direct `<project>` coordinates, inherited parent coordinates, duplicate direct dependencies, and inconsistent plugin versions. These controls follow the [Oracle JAXP security guidance](https://docs.oracle.com/en/java/javase/25/security/java-api-xml-processing-jaxp-security-guide.html). A POM above the limit gets a fixed error, including when it would otherwise be valid. This is structural validation, not Maven model resolution or a complete schema check; run Maven locally to validate interpolation, profiles, and plugins.
 
-Gradle `.gradle` and `.gradle.kts` checks remain lightweight syntax heuristics. They now use the same finite model-visible issue projection, while the original local issue detail stays private. sbt configuration validation is not implemented. The packaged [release gate](release-gates.md) probes Maven validation over HTTP and stdio with synthetic malformed XML, external entities, oversized input, parent inheritance, and private canaries.
+Maven and Gradle validation open each path component relative to a held directory handle, starting at the filesystem root, and do not follow symlinks. This prevents a concurrent replacement of the project directory or build file from redirecting validation outside the allowed root. Build-file symlinks are rejected even when they point inside that root. The local filesystem/JDK must support Java `SecureDirectoryStream`; otherwise validation fails closed with a fixed “race-free validation unavailable” diagnostic. The [official Java API](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/SecureDirectoryStream.html) describes that provider-dependent support. The Docker image uses a Java 21 Noble base whose support is checked during image construction. Other MCP tools still have separate filesystem access paths; use an isolated, trusted project mount for untrusted builds.
+
+Gradle `.gradle` and `.gradle.kts` reads are also capped at 1 MiB; their checks remain lightweight syntax heuristics. They now use the same finite model-visible issue projection, while the original local issue detail stays private. sbt configuration validation is not implemented. The packaged [release gate](release-gates.md) probes Maven validation over HTTP and stdio with synthetic malformed XML, external entities, oversized input, parent inheritance, and private canaries.

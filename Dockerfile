@@ -1,19 +1,25 @@
 # syntax=docker/dockerfile:1.7
 # Maven and JDK are supplied by the official image. Dependency downloads persist
 # in a BuildKit cache across source edits; only the final jar enters the runtime image.
-FROM maven:3.9.16-eclipse-temurin-21-alpine AS build
+FROM maven:3.9.16-eclipse-temurin-21-noble AS build
 WORKDIR /build
 COPY pom.xml ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn -B package -DskipTests --no-transfer-progress
 
-FROM maven:3.9.16-eclipse-temurin-21-alpine
+FROM maven:3.9.16-eclipse-temurin-21-noble
 ARG GRADLE_VERSION=9.8.0
 ARG SBT_VERSION=2.0.9
 
-RUN apk add --no-cache bash curl unzip \
-    && addgroup -S buildtools && adduser -S -G buildtools -h /home/buildtools buildtools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash curl unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 buildtools \
+    && useradd --system --uid 10001 --gid 10001 --home-dir /home/buildtools --create-home buildtools
+
+COPY scripts/SecureDirectoryStreamProbe.java /tmp/SecureDirectoryStreamProbe.java
+RUN java /tmp/SecureDirectoryStreamProbe.java && rm /tmp/SecureDirectoryStreamProbe.java
 
 # Verify upstream checksums before extracting optional build tool launchers.
 RUN set -eu; \

@@ -159,6 +159,20 @@ class BuildConfigurationValidationTest {
         }
 
         @Test
+        void rejectsSymlinkedPomAtOpenTime() throws Exception {
+            Path target = projectDir.resolve("private.xml");
+            Files.writeString(target, """
+                    <project><modelVersion>4.0.0</modelVersion><groupId>g</groupId>
+                    <artifactId>a</artifactId><version>1</version></project>
+                    """);
+            Files.createSymbolicLink(projectDir.resolve("pom.xml"), target);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+
+            assertThat(result).contains("\"valid\":false").contains("Cannot read pom.xml");
+        }
+
+        @Test
         void doesNotMistakeProjectAndPluginArtifactIdsForDuplicateDependencies() throws Exception {
             Files.writeString(projectDir.resolve("pom.xml"), """
                     <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId>
@@ -230,6 +244,30 @@ class BuildConfigurationValidationTest {
 
         @TempDir
         Path projectDir;
+
+        @Test
+        void rejectsSymlinkedGradleFilesAtOpenTime() throws Exception {
+            for (String name : new String[] {"build.gradle", "build.gradle.kts"}) {
+                Path project = projectDir.resolve(name + "-project");
+                Files.createDirectory(project);
+                Path target = project.resolve("private.gradle");
+                Files.writeString(target, "plugins { id 'java' }");
+                Files.createSymbolicLink(project.resolve(name), target);
+
+                String result = service.validateBuildConfiguration(project.toString());
+
+                assertThat(result).contains("\"valid\":false").contains("Cannot read build file");
+            }
+        }
+
+        @Test
+        void rejectsOversizedGradleFileBeforeDecoding() throws Exception {
+            Files.writeString(projectDir.resolve("build.gradle"), "plugins { id 'java' }" + " ".repeat(1_100_000));
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+
+            assertThat(result).contains("\"valid\":false").contains("too large");
+        }
 
         @Test
         @DisplayName("validates a basic build.gradle successfully")

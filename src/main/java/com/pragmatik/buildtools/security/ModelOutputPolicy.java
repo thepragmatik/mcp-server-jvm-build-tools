@@ -469,6 +469,8 @@ public final class ModelOutputPolicy {
             case "pom.xml is too large to validate" -> "POM exceeds the local 1 MiB validation limit.";
             case "Cannot read pom.xml" -> "POM cannot be read locally.";
             case "Secure XML parser is unavailable" -> "Secure XML parser is unavailable in the local runtime.";
+            case "Validation unavailable on this filesystem" ->
+                "Race-free validation is unavailable on this local filesystem or JDK.";
             case "Duplicate dependency declaration" -> "POM repeats a dependency declaration.";
             case "Inconsistent plugin versions" -> "POM declares inconsistent plugin versions.";
             case "Build file is empty" -> "Build file is empty.";
@@ -478,6 +480,7 @@ public final class ModelOutputPolicy {
             case "Using Groovy-style single quotes in Kotlin DSL" ->
                 "Gradle Kotlin DSL uses Groovy-style dependency quoting.";
             case "Cannot read build file" -> "Build file cannot be read locally.";
+            case "Build file is too large to validate" -> "Build file exceeds the local 1 MiB validation limit.";
             default ->
                 message.startsWith("Unbalanced braces:")
                         ? "Build file has unbalanced braces."

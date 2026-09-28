@@ -28,6 +28,7 @@ build
 **/surefire-reports
 **/test-results
 docs
-scripts
+scripts/**
+!scripts/SecureDirectoryStreamProbe.java
 README.md
 CHANGELOG.md

@@ -18,9 +18,6 @@ package com.pragmatik.buildtools.build;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,18 +39,12 @@ import org.xml.sax.helpers.DefaultHandler;
 /** Bounded, offline structural validation of a Maven POM. */
 final class PomXmlValidator {
 
-    private static final int MAX_POM_BYTES = 1_048_576;
+    static final int MAX_POM_BYTES = 1_048_576;
     private static final String MAVEN_NAMESPACE = "http://maven.apache.org/POM/4.0.0";
 
     private PomXmlValidator() {}
 
-    static List<Map<String, Object>> validate(Path pomXml) {
-        byte[] xml;
-        try (InputStream input = Files.newInputStream(pomXml)) {
-            xml = input.readNBytes(MAX_POM_BYTES + 1);
-        } catch (IOException e) {
-            return List.of(issue("ERROR", "Cannot read pom.xml", null));
-        }
+    static List<Map<String, Object>> validate(byte[] xml) {
         if (xml.length > MAX_POM_BYTES) {
             return List.of(issue("ERROR", "pom.xml is too large to validate", "Reduce pom.xml to 1 MiB or less"));
         }

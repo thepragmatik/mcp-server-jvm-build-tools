@@ -23,11 +23,15 @@ import com.pragmatik.buildtools.maven.MavenInvoker;
 import com.pragmatik.buildtools.maven.MavenOutputParser;
 import com.pragmatik.buildtools.sbt.SbtBuildTool;
 import com.pragmatik.buildtools.sbt.SbtOutputParser;
+import com.pragmatik.buildtools.security.AnchoredProjectFileReader;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tracing.BuildTracer;
 import com.pragmatik.buildtools.tracing.TraceScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -61,6 +65,7 @@ import org.springframework.stereotype.Service;
 public class BuildToolsService {
 
     private static final int MAX_COMMAND_LENGTH = 500;
+    private static final int MAX_GRADLE_CONFIG_BYTES = 1_048_576;
     private static final Pattern COMMAND_PATTERN = Pattern.compile("^(gradle\\w*\\s+)?[a-zA-Z0-9\\s._=/:@;\\-]+$");
 
     private final BuildToolProvider provider;
@@ -548,11 +553,11 @@ public class BuildToolsService {
      */
     @Tool(
             name = "validate_build_configuration",
-            description = "Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) "
-                    + "for correctness. Checks XML well-formedness, required elements, plugin version "
-                    + "consistency for Maven, and basic syntax for Gradle. Returns structured JSON with "
-                    + "{valid, tool, file, issues: [{severity, path, line, message, suggestion}]}. "
-                    + "Use this before executing builds to catch configuration errors early.")
+            description = "Check Maven POM structure and basic Gradle syntax without running a build. "
+                    + "Caps input at 1 MiB per file and rejects build-file symlinks; secure directory "
+                    + "access must be supported by the local filesystem and JDK. Returns validity, "
+                    + "issue count, and up to 12 fixed configuration diagnostics without paths, "
+                    + "coordinates, raw XML, or parser exception text. This is not Maven model resolution.")
     public String validateBuildConfiguration(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir) {
@@ -633,7 +638,21 @@ public class BuildToolsService {
      * Validate a pom.xml file for structural and content issues.
      */
     private List<Map<String, Object>> validatePomXml(Path pomXml) {
-        return PomXmlValidator.validate(pomXml);
+        try {
+            return PomXmlValidator.validate(readValidationBytes(pomXml, PomXmlValidator.MAX_POM_BYTES));
+        } catch (UnsupportedOperationException e) {
+            return List.of(validationIssue("pom.xml", "Validation unavailable on this filesystem"));
+        } catch (IOException | IllegalArgumentException e) {
+            return List.of(validationIssue("pom.xml", "Cannot read pom.xml"));
+        }
+    }
+
+    private static Map<String, Object> validationIssue(String filename, String message) {
+        Map<String, Object> issue = new LinkedHashMap<>();
+        issue.put("severity", "ERROR");
+        issue.put("path", filename);
+        issue.put("message", message);
+        return issue;
     }
 
     /**
@@ -644,7 +663,23 @@ public class BuildToolsService {
         String filename = buildFile.getFileName().toString();
 
         try {
-            String content = Files.readString(buildFile);
+            byte[] bytes;
+            // Authorize the final file at open time too: a symlink can be swapped
+            // after the project-root policy checked its real path.
+            bytes = readValidationBytes(buildFile, MAX_GRADLE_CONFIG_BYTES);
+            if (bytes.length > MAX_GRADLE_CONFIG_BYTES) {
+                Map<String, Object> issue = new LinkedHashMap<>();
+                issue.put("severity", "ERROR");
+                issue.put("path", filename);
+                issue.put("message", "Build file is too large to validate");
+                issues.add(issue);
+                return issues;
+            }
+            String content = StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
 
             if (content.isBlank()) {
                 Map<String, Object> issue = new LinkedHashMap<>();
@@ -725,7 +760,9 @@ public class BuildToolsService {
                 }
             }
 
-        } catch (IOException e) {
+        } catch (UnsupportedOperationException e) {
+            issues.add(validationIssue(filename, "Validation unavailable on this filesystem"));
+        } catch (IOException | IllegalArgumentException e) {
             Map<String, Object> issue = new LinkedHashMap<>();
             issue.put("severity", "ERROR");
             issue.put("path", filename);
@@ -734,5 +771,10 @@ public class BuildToolsService {
         }
 
         return issues;
+    }
+
+    private byte[] readValidationBytes(Path buildFile, int maxBytes) throws IOException {
+        return AnchoredProjectFileReader.read(
+                buildFile.getParent(), buildFile.getFileName().toString(), maxBytes);
     }
 }

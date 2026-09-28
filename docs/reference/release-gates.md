@@ -144,6 +144,7 @@ Local repeat command after packaging:
 python3 scripts/release-gate.py
 python3 scripts/maven-middle-protocol-gate.py
 python3 scripts/gradle-sbt-middle-protocol-gate.py
+python3 scripts/config-validation-protocol-gate.py
 ```
 
 For any build-output capture change, test a synthetic root cause in the discarded
