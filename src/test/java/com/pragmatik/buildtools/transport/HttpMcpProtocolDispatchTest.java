@@ -46,6 +46,9 @@ class HttpMcpProtocolDispatchTest {
         String endpoint = "http://127.0.0.1:" + port + "/mcp";
         String tools = client.postForObject(endpoint, rpc("tools/list", "{}"), String.class);
         assertThat(tools).contains("\"tools\"").contains("detect_build_tool").doesNotContain("Method not found");
+        assertThat(tools)
+                .contains("Return dependency, managed-entry, and BOM counts")
+                .contains("Return scanned, vulnerable, critical, and high counts");
 
         String result = client.postForObject(
                 endpoint,

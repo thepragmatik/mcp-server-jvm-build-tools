@@ -58,4 +58,16 @@ class ToolScopeCoverageTest {
                 .toList();
         assertTrue(unknown.isEmpty(), "Unscoped MCP tools: " + unknown);
     }
+
+    @Test
+    void dependencyToolMetadataMatchesAggregateResultContract() {
+        var descriptions = Arrays.stream(callbacks.getToolCallbacks())
+                .collect(java.util.stream.Collectors.toMap(
+                        callback -> callback.getToolDefinition().name(),
+                        callback -> callback.getToolDefinition().description()));
+        assertTrue(descriptions.get("analyze_pom_dependencies").contains("counts"));
+        assertTrue(descriptions.get("analyze_pom_dependencies").contains("withheld"));
+        assertTrue(descriptions.get("scan_dependency_cves").contains("counts"));
+        assertTrue(descriptions.get("scan_dependency_cves").contains("withheld"));
+    }
 }

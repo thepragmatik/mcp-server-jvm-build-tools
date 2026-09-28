@@ -33,6 +33,15 @@ flowchart LR
 
 The `ToolCallbackProvider` is the shared boundary for stdio and HTTP. Only tools explicitly mapped to a public permission are exposed; future `@Tool` methods are private by default. It canonicalizes `projectDir` and `localRepositoryPath`, rejects build files whose real paths escape the configured roots, and applies the output policy. Raw resource readers, URI-template tools, and free-form CI generation remain private until they have useful privacy-safe result contracts. HTTP adds bearer and per-tool scope checks before dispatch. The catalog is static, so wrappers and credential digests are cached. Input schema failures abort startup and SDK input validation is enabled.
 
+The public tool descriptions state the result contract after the output policy, rather than the richer local Java return values. In particular:
+
+| Tool | Model-visible result | Retained locally |
+|---|---|---|
+| `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
+| `scan_dependency_cves` | Scanned, vulnerable, critical, and high counts; bounded redacted warnings | Dependency and CVE identities |
+
+These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
+
 ## Critical review
 
 | Finding from 1.x | 2.0 decision | Remaining risk |
