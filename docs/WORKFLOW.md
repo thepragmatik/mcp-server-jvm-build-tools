@@ -29,3 +29,5 @@ Before a PR, run a local adversarial pass covering traversal, symlinks, unknown 
 Open a PR targeting `main` and wait for CI. Two independent reviewers each use a fresh checkout and run full verify: one focuses on adversarial security and correctness, the other on code quality, SOLID boundaries, performance, tests, and docs. They leave inline findings and role-tagged verdicts in the GitHub PR. Address every thread and rerun gates. Merge only when CI and both verdicts are green. A release candidate adds protocol conformance, privacy canary, container smoke, strict docs build, migration guide, and version consistency checks.
 
 Never paste private user data, credentials, home paths, or raw build output into issues, PRs, CI logs, tests, or model prompts. Use synthetic `.invalid` examples and report counts/status rather than values.
+
+The [2.0 release gates](reference/release-gates.md) record the exact packaged-server protocol checks, adversarial probes, and remaining security-scan prerequisite.
