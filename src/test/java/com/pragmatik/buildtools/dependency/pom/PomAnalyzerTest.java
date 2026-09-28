@@ -94,7 +94,7 @@ class PomAnalyzerTest {
             PomModel.ResolvedDependency guava = result.dependencies().get(0);
             assertThat(guava.groupId()).isEqualTo("com.google.guava");
             assertThat(guava.artifactId()).isEqualTo("guava");
-            assertThat(guava.version()).isEqualTo("31.1-jre");
+            assertThat(guava.version()).isEqualTo("32.0.0-jre");
             assertThat(guava.classification()).isEqualTo(PomModel.Classification.EXPLICIT);
 
             PomModel.ResolvedDependency junit = result.dependencies().get(1);
@@ -160,7 +160,7 @@ class PomAnalyzerTest {
 
             PomModel.ResolvedDependency guava = findDep(result, "com.google.guava", "guava");
             assertThat(guava).isNotNull();
-            assertThat(guava.version()).isEqualTo("31.1-jre");
+            assertThat(guava.version()).isEqualTo("32.0.0-jre");
 
             PomModel.ResolvedDependency junit = findDep(result, "org.junit.jupiter", "junit-jupiter");
             assertThat(junit).isNotNull();
