@@ -21,8 +21,12 @@ server's advertised capabilities.
 
 The black-box adversarial probes send only synthetic data. They require:
 
-- Malformed JSON-RPC to return a client error and avoid reflecting a synthetic
-  private canary anywhere in the bounded response body.
+- Malformed JSON-RPC to return the generic JSON-RPC `-32700` parse error in a
+  small HTTP 400 response, without a synthetic private canary or exception
+  internals anywhere in the body.
+- Invalid JSON-RPC method, identifier, and parameter shapes to return a small
+  generic `-32600` error; the gate checks eight synthetic mutations, including
+  scalar and list parameters and a malformed tool argument.
 - A request larger than the 1 MiB MCP body cap to return HTTP 413.
 - A hostile Host and Origin pair to return HTTP 403.
 - A valid bearer limited to `build:read` to receive HTTP 403 for
@@ -32,6 +36,11 @@ The black-box adversarial probes send only synthetic data. They require:
 
 The full Maven verification suite exercises structured diagnostic redaction,
 prompt-injection suppression, authorization, and allowed-root/symlink handling.
+The HTTP boundary parses every body under the 1 MiB request cap before SDK
+dispatch to prevent malformed input reaching a verbose exception mapper. This
+adds one bounded parse on requests without optional MCP headers; the release
+performance baseline should include it. The server still buffers the request
+only once at this boundary.
 These checks do not prove that an arbitrary build script is safe. A filesystem
 symlink can change after Java validates its path and before a child process uses
 it; run untrusted workspaces in a container or equivalent OS sandbox without

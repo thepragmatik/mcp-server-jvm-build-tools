@@ -91,9 +91,42 @@ def adversarial_checks(port):
     canary = "synthetic-private-canary.invalid"
     invalid = b'{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"' + canary.encode() + b'"}'
     status, response = request(port, invalid)
-    if status not in (400, 422) or canary.encode() in response:
-        raise AssertionError(f"Malformed JSON returned HTTP {status} or reflected a canary")
-    print("PASS malformed JSON: bounded error without canary reflection")
+    expected_error = {
+        "jsonrpc": "2.0", "id": None,
+        "error": {"code": -32700, "message": "Parse error"},
+    }
+    try:
+        safe_error = json.loads(response) == expected_error
+    except ValueError:
+        safe_error = False
+    if status != 400 or len(response) > 256 or not safe_error or canary.encode() in response:
+        raise AssertionError(f"Malformed JSON returned unsafe error envelope: HTTP {status}")
+    print("PASS malformed JSON: generic bounded JSON-RPC parse error")
+
+    invalid_shapes = (
+        {"jsonrpc": "2.0", "id": 1, "params": {}},
+        {"jsonrpc": "2.0", "id": 1, "method": 7},
+        {"jsonrpc": "2.0", "id": {"bad": 1}, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": None},
+        {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": "bad"},
+        {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": []},
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+         "params": {"name": "list_build_tools", "arguments": "bad"}},
+        {"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": "bad"},
+    )
+    expected_invalid = {
+        "jsonrpc": "2.0", "id": None,
+        "error": {"code": -32600, "message": "Invalid Request"},
+    }
+    for index, shape in enumerate(invalid_shapes):
+        invalid_status, invalid_response = request(port, json.dumps(shape).encode())
+        try:
+            safe_invalid = json.loads(invalid_response) == expected_invalid
+        except ValueError:
+            safe_invalid = False
+        if invalid_status != 400 or len(invalid_response) > 256 or not safe_invalid:
+            raise AssertionError(f"Malformed request shape {index} exposed an unsafe response")
+    print(f"PASS invalid JSON-RPC shapes: {len(invalid_shapes)} generic bounded errors")
 
     large = b"{" + b" " * 1_048_576 + b"}"
     status, _ = request(port, large)

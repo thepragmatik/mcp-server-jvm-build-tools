@@ -107,6 +107,9 @@ public class McpHeaderValidationFilter implements Filter {
     /** JSON-RPC "Invalid Request" code, reused for the HeaderMismatch error. */
     static final int JSONRPC_INVALID_REQUEST = -32600;
 
+    /** JSON-RPC parse error code for syntactically malformed MCP requests. */
+    static final int JSONRPC_PARSE_ERROR = -32700;
+
     /** Default body-buffer cap for validation: 1 MiB. */
     public static final int DEFAULT_MAX_VALIDATION_BODY_BYTES = 1_048_576;
 
@@ -164,37 +167,50 @@ public class McpHeaderValidationFilter implements Filter {
             return;
         }
 
-        // No standard MCP headers present => legacy/older client. Forward the
-        // replayable, size-checked request without header validation.
-        if (headerMethod == null && headerName == null) {
-            chain.doFilter(cached, response);
-            return;
-        }
-
         String bodyMethod = null;
         Object bodyId = null;
         boolean parsed = false;
         try {
-            if (!cached.isBodyEmpty()) {
-                // Parse the buffered bytes in place (no defensive copy).
-                JsonNode root = objectMapper.readTree(cached.getInputStream());
-                if (root != null && root.isObject()) {
-                    parsed = true;
-                    JsonNode methodNode = root.get("method");
-                    if (methodNode != null && methodNode.isTextual()) {
-                        bodyMethod = methodNode.asText();
-                    }
-                    JsonNode idNode = root.get("id");
-                    if (idNode != null && !idNode.isNull()) {
-                        bodyId = idNode.isNumber() ? idNode.numberValue() : idNode.asText();
-                    }
-                }
+            // Parse every MCP POST, including headerless requests. Otherwise an
+            // unparseable request reaches the transport's verbose exception mapper.
+            JsonNode root = cached.isBodyEmpty() ? null : objectMapper.readTree(cached.getInputStream());
+            if (root == null) {
+                rejectParseError(httpRes);
+                return;
+            }
+            if (!root.isObject()) {
+                rejectInvalidRequest(httpRes);
+                return;
+            }
+            parsed = true;
+            String requestPath = httpReq.getServletPath();
+            if (requestPath == null || requestPath.isEmpty()) {
+                requestPath = httpReq.getRequestURI();
+            }
+            boolean bareDiscoverProbe =
+                    headerMethod == null && headerName == null && MCP_PROTOCOL_PATH.equals(requestPath);
+            if (!validRequestShape(root, bareDiscoverProbe)) {
+                rejectInvalidRequest(httpRes);
+                return;
+            }
+            JsonNode methodNode = root.get("method");
+            if (methodNode != null && methodNode.isTextual()) {
+                bodyMethod = methodNode.asText();
+            }
+            JsonNode idNode = root.get("id");
+            if (idNode != null && !idNode.isNull()) {
+                bodyId = idNode.isNumber() ? idNode.numberValue() : idNode.asText();
             }
         } catch (JacksonException parseFailure) {
-            // Malformed / non-JSON body: not our concern. Let the transport handle it.
-            // Jackson 3 surfaces parse failures as the unchecked JacksonException
-            // (it no longer extends IOException), so this catch must name it explicitly.
-            log.debug("Skipping MCP header validation for unparseable body");
+            // Jackson exception messages may contain request data. Never pass the
+            // exception to the transport or include it in model-visible output.
+            rejectParseError(httpRes);
+            return;
+        }
+
+        // Headerless older clients still pass through unchanged when their JSON
+        // is valid; only malformed bodies are rejected above.
+        if (headerMethod == null && headerName == null) {
             chain.doFilter(cached, response);
             return;
         }
@@ -213,6 +229,45 @@ public class McpHeaderValidationFilter implements Filter {
         }
 
         chain.doFilter(cached, response);
+    }
+
+    private boolean validRequestShape(JsonNode root, boolean bareDiscoverProbe) {
+        JsonNode version = root.get("jsonrpc");
+        JsonNode method = root.get("method");
+        JsonNode id = root.get("id");
+        JsonNode params = root.get("params");
+        if (version == null
+                || !version.isTextual()
+                || !"2.0".equals(version.asText())
+                || (id != null && !id.isNull() && !id.isTextual() && !id.isNumber())
+                || (params != null && !params.isObject())) {
+            return false;
+        }
+        if (method == null) {
+            // Preserve the bare POST /mcp discovery probe without allowing a
+            // malformed JSON-RPC call to masquerade as discovery.
+            return bareDiscoverProbe && params == null && root.get("result") == null && root.get("error") == null;
+        }
+        if (!method.isTextual() || method.asText().isBlank()) {
+            return false;
+        }
+        if ("tools/call".equals(method.asText())) {
+            JsonNode name = params == null ? null : params.get("name");
+            JsonNode arguments = params == null ? null : params.get("arguments");
+            return name != null
+                    && name.isTextual()
+                    && !name.asText().isBlank()
+                    && (arguments == null || arguments.isObject());
+        }
+        if ("prompts/get".equals(method.asText())) {
+            JsonNode name = params == null ? null : params.get("name");
+            JsonNode arguments = params == null ? null : params.get("arguments");
+            return name != null
+                    && name.isTextual()
+                    && !name.asText().isBlank()
+                    && (arguments == null || arguments.isObject());
+        }
+        return true;
     }
 
     private boolean isMcpPost(HttpServletRequest req) {
@@ -246,6 +301,23 @@ public class McpHeaderValidationFilter implements Filter {
                         null,
                         "PayloadTooLargeError",
                         "Request body exceeds the " + maxValidationBodyBytes + "-byte MCP limit"));
+    }
+
+    private void rejectParseError(HttpServletResponse response) throws IOException {
+        rejectGenericJsonRpcError(response, JSONRPC_PARSE_ERROR, "Parse error");
+    }
+
+    private void rejectInvalidRequest(HttpServletResponse response) throws IOException {
+        rejectGenericJsonRpcError(response, JSONRPC_INVALID_REQUEST, "Invalid Request");
+    }
+
+    private void rejectGenericJsonRpcError(HttpServletResponse response, int code, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter()
+                .write("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":" + code + ",\"message\":\"" + message
+                        + "\"}}");
     }
 
     /**

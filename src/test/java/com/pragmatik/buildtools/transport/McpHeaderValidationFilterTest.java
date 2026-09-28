@@ -88,7 +88,8 @@ class McpHeaderValidationFilterTest {
         @Test
         @DisplayName("matching Mcp-Method and Mcp-Name pass through and replay the body")
         void matchingHeadersPassThrough() throws Exception {
-            String body = "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\"}";
+            String body =
+                    "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"list_build_tools\",\"arguments\":{}}}";
             MockHttpServletRequest req = mcpPost(body);
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/call");
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_NAME, SERVER_NAME);
@@ -133,22 +134,41 @@ class McpHeaderValidationFilterTest {
         }
 
         @Test
-        @DisplayName("unparseable body is left to the transport (not rejected)")
-        void unparseableBodyPassesThrough() throws Exception {
-            MockHttpServletRequest req = mcpPost("this is not json");
+        @DisplayName("unparseable body with MCP headers gets a generic parse error")
+        void unparseableBodyRejected() throws Exception {
+            MockHttpServletRequest req = mcpPost("not-json synthetic-private-canary.invalid");
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
             MockHttpServletResponse res = new MockHttpServletResponse();
             MockFilterChain chain = new MockFilterChain();
 
             filter.doFilter(req, res, chain);
 
-            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            assertThat(bodyOf(chain)).isEqualTo("this is not json");
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
+            assertThat(res.getContentAsString())
+                    .isEqualTo(
+                            "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}");
+            assertThat(chain.getRequest()).isNull();
         }
 
         @Test
-        @DisplayName("body without a method field is not a Mcp-Method mismatch")
-        void bodyWithoutMethodNotRejected() throws Exception {
+        @DisplayName("headerless malformed body cannot reach verbose transport exception mapper")
+        void headerlessMalformedBodyRejected() throws Exception {
+            MockHttpServletRequest req = mcpPost("{\"private\":\"synthetic-private-canary.invalid\"");
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            filter.doFilter(req, res, chain);
+
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
+            assertThat(res.getContentAsString())
+                    .isEqualTo(
+                            "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error\"}}");
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        @DisplayName("body without a method field gets a generic Invalid Request error")
+        void bodyWithoutMethodRejected() throws Exception {
             String body = "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{}}";
             MockHttpServletRequest req = mcpPost(body);
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
@@ -157,7 +177,33 @@ class McpHeaderValidationFilterTest {
 
             filter.doFilter(req, res, chain);
 
-            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
+            assertThat(res.getContentAsString()).contains("\"message\":\"Invalid Request\"");
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        @DisplayName("invalid JSON-RPC parameter and identifier shapes get generic errors")
+        void invalidShapesRejected() throws Exception {
+            String[] bodies = {
+                "{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"ping\"}",
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\",\"params\":null}",
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\",\"params\":[]}",
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"list_build_tools\",\"arguments\":\"bad\"}}"
+            };
+            for (String body : bodies) {
+                MockHttpServletRequest req = mcpPost(body);
+                MockHttpServletResponse res = new MockHttpServletResponse();
+                MockFilterChain chain = new MockFilterChain();
+
+                filter.doFilter(req, res, chain);
+
+                assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_BAD_REQUEST);
+                assertThat(res.getContentAsString())
+                        .isEqualTo(
+                                "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"}}");
+                assertThat(chain.getRequest()).isNull();
+            }
         }
 
         @Test
@@ -179,7 +225,8 @@ class McpHeaderValidationFilterTest {
         @Test
         @DisplayName("Mcp-Method header contradicting body method is rejected with 400")
         void mcpMethodMismatchRejected() throws Exception {
-            String body = "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\"}";
+            String body =
+                    "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\",\"params\":{\"name\":\"list_build_tools\",\"arguments\":{}}}";
             MockHttpServletRequest req = mcpPost(body);
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
             MockHttpServletResponse res = new MockHttpServletResponse();
@@ -291,7 +338,7 @@ class McpHeaderValidationFilterTest {
         @Test
         @DisplayName("a body at/under the cap is validated and replayed unchanged")
         void bodyWithinCapPassesThrough() throws Exception {
-            String body = "{\"method\":\"tools/list\"}";
+            String body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}";
             McpHeaderValidationFilter small = cappedFilter(body.getBytes(StandardCharsets.UTF_8).length);
             MockHttpServletRequest req = mcpPost(body);
             req.addHeader(McpHeaderValidationFilter.HEADER_MCP_METHOD, "tools/list");
