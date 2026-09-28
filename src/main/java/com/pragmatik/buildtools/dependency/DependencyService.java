@@ -119,12 +119,13 @@ public class DependencyService {
      */
     @Tool(
             name = "check_dependency_version",
-            description = "Check if a newer version exists for a Maven Central dependency. "
-                    + "Use this to determine whether a dependency can be upgraded. "
-                    + "Sends bounded Maven group and artifact coordinates to Maven Central; redirects are refused. "
-                    + "The model receives safe version/count fields, not the full metadata or coordinates. "
-                    + "Provide projectDir for local build-tool context. Set includeSecurityInfo=true to query OSV.dev "
-                    + "for the supplied currentVersion; coordinates leave the host, while MCP withholds security findings.")
+            description =
+                    "Check if a newer version exists for a Maven Central dependency. "
+                            + "Use this to determine whether a dependency can be upgraded. "
+                            + "Sends bounded Maven group and artifact coordinates to Maven Central; redirects are refused. "
+                            + "The model receives safe version/count fields, not the full metadata or coordinates. "
+                            + "Provide projectDir for local build-tool context. Set includeSecurityInfo=true to query OSV.dev "
+                            + "for the supplied currentVersion; coordinates leave the host, while MCP withholds security findings.")
     public String checkDependencyVersion(
             @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
                     String groupId,
