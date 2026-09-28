@@ -357,7 +357,9 @@ public final class ModelOutputPolicy {
         JsonNode value = source.get(key);
         if (value != null
                 && value.isTextual()
-                && VERSION.matcher(value.asText()).matches()) {
+                && value.asText().length() <= 64
+                && VERSION.matcher(value.asText()).matches()
+                && redact(value.asText()).equals(value.asText())) {
             target.put(key, value.asText());
         }
     }

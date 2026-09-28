@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pragmatik.buildtools.build.BuildToolProvider;
+import com.pragmatik.buildtools.dependency.security.CveLookupService;
+import com.pragmatik.buildtools.security.ModelOutputPolicy;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,6 +29,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +72,37 @@ class MavenMetadataSecurityTest {
                 .checkDependencyVersion("org.example", "good-artifact", null, null, null, false);
         assertThat(result).contains("1.2.0");
         assertThat(requests).hasValue(1);
+    }
+
+    @Test
+    void optInVersionCheckReturnsOnlyAggregateSecurityThroughModelPolicy() throws Exception {
+        serve(200, METADATA);
+        AtomicInteger osvRequests = new AtomicInteger();
+        CveLookupService lookup = new CveLookupService() {
+            @Override
+            public List<VulnerabilityEntry> lookup(String groupId, String artifactId, String version) {
+                assertThat(groupId).isEqualTo("org.example");
+                assertThat(artifactId).isEqualTo("artifact");
+                assertThat(version).isEqualTo("1.0.0");
+                osvRequests.incrementAndGet();
+                return List.of(
+                        new VulnerabilityEntry("SYNTHETIC_SECRET", "private.user@example.invalid", "HIGH", null, 7.5));
+            }
+        };
+        String privateResult = new DependencyService(
+                        new BuildToolProvider(), metadataClient(Duration.ofSeconds(2)), lookup)
+                .checkDependencyVersion("org.example", "artifact", "1.0.0", null, null, true);
+        String safe = new ModelOutputPolicy().protect("check_dependency_version", privateResult);
+
+        assertThat(requests).hasValue(1);
+        assertThat(osvRequests).hasValue(1);
+        assertThat(safe)
+                .contains(
+                        "\"securityStatus\":\"complete\"",
+                        "\"cveCount\":1",
+                        "\"highestSeverity\":\"HIGH\"",
+                        "\"latestVersion\":\"1.2.0\"")
+                .doesNotContain("SYNTHETIC_SECRET", "private.user@example.invalid", "org.example", "artifact");
     }
 
     @Test
@@ -155,12 +189,16 @@ class MavenMetadataSecurityTest {
     }
 
     private DependencyService service(Duration timeout) {
+        return new DependencyService(new BuildToolProvider(), metadataClient(timeout));
+    }
+
+    private MavenMetadataClient metadataClient(Duration timeout) {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(1))
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/maven2/");
-        return new DependencyService(new BuildToolProvider(), new MavenMetadataClient(base, client, timeout));
+        return new MavenMetadataClient(base, client, timeout);
     }
 
     private void serve(int status, String body) throws IOException {

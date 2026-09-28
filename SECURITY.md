@@ -152,6 +152,7 @@ dependency coordinates are not forwarded to a redirect target.
 
 `check_dependency_version` sends Maven group and artifact coordinates to the fixed Maven Central metadata endpoint. It rejects malformed or overlong coordinates before network access, refuses redirects, and accepts at most 1 MiB of strict UTF-8 XML within a ten-second request deadline. DTDs and external entities are disabled; network, parser, and malformed-response errors return fixed text without caller values. Setting `includeSecurityInfo=true` also queries OSV.dev for the supplied version; use that option only when dependency-inventory egress is acceptable.
 The MCP result exposes only bounded aggregate status, count, and known/unknown highest severity; individual OSV findings remain local.
+Unexpected OSV response fields fail incomplete, and version strings matching secret-redaction rules are withheld from model-visible results.
 
 The server holds its **own** dependencies to the same bar as the SBOM /
 supply-chain tooling it ships to users (issue #78). The keyless

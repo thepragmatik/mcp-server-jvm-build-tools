@@ -97,7 +97,7 @@ public class DependencyService {
         this(buildToolProvider, metadataClient, new CveLookupService());
     }
 
-    private DependencyService(
+    DependencyService(
             BuildToolProvider buildToolProvider, MavenMetadataClient metadataClient, CveLookupService cveLookup) {
         this.metadataClient = Objects.requireNonNull(metadataClient);
         this.buildToolProvider = buildToolProvider;

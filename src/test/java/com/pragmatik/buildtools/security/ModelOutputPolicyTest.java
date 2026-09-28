@@ -325,6 +325,16 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void versionFieldsWithTokenShapedPrereleaseTextStayPrivate() {
+        String token = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+        String raw = "{\"currentVersion\":\"1.2.3-" + token + "\",\"latestVersion\":\"2.0.0\"}";
+        String safe = policy.protect("check_dependency_version", raw);
+        assertFalse(safe.contains(token));
+        assertFalse(safe.contains("currentVersion"));
+        assertTrue(safe.contains("\"latestVersion\":\"2.0.0\""));
+    }
+
+    @Test
     void osvPresenceAndIncompleteStatusStayVisibleWithoutPrivateIdentity() {
         String raw = """
                 {"scanStatus":"severity_unknown","severityUnknown":true,

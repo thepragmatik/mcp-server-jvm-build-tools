@@ -317,7 +317,7 @@ public class CveLookupService {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
-            if (root == null || !root.isObject() || root.has("next_page_token")) {
+            if (root == null || !root.isObject() || root.size() != 1 || root.has("next_page_token")) {
                 logger.warn("[CveLookupService] OSV batch response shape mismatch");
                 return;
             }
@@ -337,7 +337,7 @@ public class CveLookupService {
                     return;
                 }
                 JsonNode vulns = node.get("vulns");
-                if (vulns != null && !vulns.isArray()) {
+                if ((vulns != null && !vulns.isArray()) || node.size() != (vulns == null ? 0 : 1)) {
                     logger.warn("[CveLookupService] OSV batch response shape mismatch");
                     return;
                 }
@@ -394,7 +394,7 @@ public class CveLookupService {
                 throw new IllegalArgumentException("OSV response incomplete");
             }
             JsonNode vulns = root.get("vulns");
-            if (vulns != null && !vulns.isArray()) {
+            if ((vulns != null && !vulns.isArray()) || root.size() != (vulns == null ? 0 : 1)) {
                 throw new IllegalArgumentException("OSV response shape invalid");
             }
             return parseVulnsArray(vulns);

@@ -157,11 +157,21 @@ class CveLookupServiceTest {
         }
 
         @Test
-        @DisplayName("parseOsvResponse returns empty list for null/missing vulns key")
+        @DisplayName("parseOsvResponse accepts an empty object as a verified clean result")
         void emptyForMissingVulns() {
-            String json = "{\"other\":\"data\"}";
+            String json = "{}";
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);
             assertThat(entries).isEmpty();
+        }
+
+        @Test
+        void errorShapedSuccessfulResponseIsNotClean() {
+            assertThatThrownBy(() -> service.parseOsvResponse("{\"error\":\"rate limited\"}"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("OSV response shape invalid");
+            assertThatThrownBy(() -> service.parseOsvResponse("{\"vulns\":[],\"code\":429}"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("OSV response shape invalid");
         }
 
         @Test
@@ -353,6 +363,8 @@ class CveLookupServiceTest {
             List<CveLookupService.OsvResponse> responses = List.of(
                     new CveLookupService.OsvResponse(500, "{}"),
                     new CveLookupService.OsvResponse(200, "not-json"),
+                    new CveLookupService.OsvResponse(200, "{\"error\":\"rate limited\"}"),
+                    new CveLookupService.OsvResponse(200, "{\"results\":[{\"error\":\"rate limited\"}]}"),
                     new CveLookupService.OsvResponse(200, "x".repeat(CveLookupService.MAX_RESPONSE_BYTES + 1)),
                     new CveLookupService.OsvResponse(200, "{\"results\":[{\"vulns\":\"bad\"}]}"),
                     new CveLookupService.OsvResponse(
