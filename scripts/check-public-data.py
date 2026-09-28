@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import itertools
 import json
 import os
 import pathlib
@@ -11,17 +12,24 @@ import subprocess
 import sys
 
 EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
-HOME = re.compile(r"(?:/Users/|/home/)[A-Za-z0-9._-]+")
+HOME = re.compile(r"(?:/Users/|/home/|[A-Za-z]:\\Users\\)[A-Za-z0-9._-]+", re.IGNORECASE)
 PRIVATE_KEY = re.compile(r"-----BEGIN (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----")
 SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b(?:api[_-]?key|access[_-]?token|password|passwd|client[_-]?secret)"
     r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
 )
+CONFIG_SECRET_KEY = (
+    r"[A-Za-z0-9_.-]*?(?:password|passwd|pass|api[_-]?key|"
+    r"access[_-]?key(?:[_-]?id)?|secret(?:[_-]?access)?[_-]?key|"
+    r"private[_-]?key|secret|token)"
+)
 CONFIG_SECRET_ASSIGNMENT = re.compile(
-    r"(?i)(?<![A-Za-z0-9])(?:[A-Za-z0-9_.-]*?"
-    r"(?:password|passwd|pass|api[_-]?key|access[_-]?key(?:[_-]?id)?|"
-    r"secret(?:[_-]?access)?[_-]?key|private[_-]?key|secret|token))"
-    r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
+    r"(?i)(?<![A-Za-z0-9])" + CONFIG_SECRET_KEY
+    + r"\s*['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
+)
+CONFIG_XML_SECRET_ELEMENT = re.compile(
+    r"(?i)<" + CONFIG_SECRET_KEY
+    + r">\s*([A-Za-z0-9+/_-]{16,})\s*</"
 )
 CONFIG_SUFFIXES = (".properties", ".yaml", ".yml", ".json", ".toml", ".xml", ".ini", ".gradle", ".gradle.kts")
 
@@ -49,18 +57,21 @@ def issues(line: str, path: str = "") -> list[str]:
         for email in EMAIL.finditer(line)
     ):
         found.append("email")
-    if any(path.group().split("/")[-1] not in SAFE_HOME_NAMES for path in HOME.finditer(line)):
+    if any(re.split(r"[/\\]", match.group())[-1] not in SAFE_HOME_NAMES for match in HOME.finditer(line)):
         found.append("home path")
     if PRIVATE_KEY.search(line):
         found.append("private key")
     secret_pattern = CONFIG_SECRET_ASSIGNMENT if is_config_path(path) else SECRET_ASSIGNMENT
+    secret_matches = secret_pattern.finditer(line)
+    if path.lower().endswith(".xml"):
+        secret_matches = itertools.chain(secret_matches, CONFIG_XML_SECRET_ELEMENT.finditer(line))
     if any(
         match.group(1) not in SAFE_VALUES
         and not (
             path.endswith(".java")
             and re.match(r"\s*(?:[.([?!+*:=]|!=)", line[match.end():])
         )
-        for match in secret_pattern.finditer(line)
+        for match in secret_matches
     ):
         found.append("secret assignment")
     return found
@@ -109,25 +120,29 @@ def added_lines(base: str):
 
 def local_file_lines(file: pathlib.Path):
     """Read local tracked content; inspect symlink text without following it."""
-    try:
-        if file.is_symlink():
-            yield 1, os.readlink(file)
-        elif file.is_file():
-            for number, line in enumerate(file.read_text(errors="replace").splitlines(), 1):
-                yield number, line
-    except (UnicodeDecodeError, OSError):
-        return
+    if file.is_symlink():
+        yield 1, os.readlink(file)
+    elif file.is_file():
+        for number, line in enumerate(file.read_text(errors="replace").splitlines(), 1):
+            yield number, line
+    else:
+        raise OSError("tracked file unavailable")
 
 
 def tracked_lines():
     """Scan every tracked text file, including legacy content outside the current diff."""
     files = subprocess.run(
-        ["git", "ls-files", "-z"], check=True, capture_output=True
+        ["git", "ls-files", "--stage", "-z"], check=True, capture_output=True
     ).stdout.split(b"\0")
     for raw in files:
         if not raw:
             continue
-        file = pathlib.Path(raw.decode())
+        metadata, separator, raw_path = raw.partition(b"\t")
+        if not separator:
+            raise OSError("invalid Git index entry")
+        if metadata.split(b" ", 1)[0] == b"160000":
+            continue  # Submodule Git link, not a tracked regular file.
+        file = pathlib.Path(os.fsdecode(raw_path))
         for number, line in local_file_lines(file):
             yield str(file), number, line
 

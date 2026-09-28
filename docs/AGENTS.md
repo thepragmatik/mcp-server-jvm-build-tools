@@ -22,6 +22,8 @@ test them with synthetic path, email, secret, and prompt-injection canaries.
 Privacy scanner findings use opaque file references. The local interactive
 `--resolve-ref` option is for a human maintainer; agents must not invoke it or
 copy resolved paths into model-visible output.
+Scanner exit code 2 means the scan could not complete (for example, an unreadable
+tracked file); fix the local state and rerun it before claiming a privacy pass.
 
 ## PR workflow — 4-gate state machine (never skip a gate, never fake a result)
 1. **Branch** off `main` (`fix/<issue>-<slug>` or `feat/<issue>-<slug>`). Never

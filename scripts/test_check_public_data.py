@@ -163,6 +163,24 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertNotIn("::error::", failed_scan.stderr)
             self.assertNotIn("Traceback", failed_scan.stderr)
 
+    def test_quoted_config_keys_and_xml_elements_are_detected(self):
+        value = "synthetic" + "credential123456"
+        examples = (
+            ("config.json", '{"github_token":"' + value + '"}'),
+            ("config.yaml", "'github_token': '" + value + "'"),
+            ("config.xml", "<github_token>" + value + "</github_token>"),
+        )
+        for path, line in examples:
+            with self.subTest(path=path):
+                self.assertIn("secret assignment", SCANNER.issues(line, path))
+
+    def test_windows_home_path_is_detected(self):
+        self.assertIn(
+            "home path",
+            SCANNER.issues("C:\\Users\\" + "SyntheticEmployee\\project"),
+        )
+        self.assertNotIn("home path", SCANNER.issues("C:\\Users\\" + "test-user\\project"))
+
     def test_tracked_scan_keeps_valid_lines_in_mixed_encoding_file(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
@@ -179,6 +197,44 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertIn("possible secret assignment", scan.stdout)
             self.assertNotIn("syntheticcredential123456", scan.stdout)
             self.assertEqual("", scan.stderr)
+
+    def test_unreadable_tracked_file_fails_closed_without_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            (repo / "settings.properties").write_text("synthetic fixture\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "--", "settings.properties"], cwd=repo, check=True)
+            original = Path.cwd()
+            try:
+                os.chdir(repo)
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with mock.patch.object(Path, "read_text", side_effect=PermissionError("person@" + "private.example.net")):
+                    with mock.patch.object(sys, "argv", ["scanner", "--tracked"]):
+                        with redirect_stdout(stdout), redirect_stderr(stderr):
+                            self.assertEqual(2, SCANNER.main())
+                self.assertEqual("", stdout.getvalue())
+                self.assertIn("Privacy scan could not complete", stderr.getvalue())
+                self.assertNotIn("person@", stderr.getvalue())
+            finally:
+                os.chdir(original)
+
+    def test_missing_tracked_file_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            file = repo / "settings.properties"
+            file.write_text("synthetic fixture\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "--", file.name], cwd=repo, check=True)
+            file.unlink()
+            scan = subprocess.run(
+                ["python3", str(Path(__file__).resolve().with_name("check-public-data.py")), "--tracked"],
+                cwd=repo, capture_output=True, text=True,
+            )
+            self.assertEqual(2, scan.returncode)
+            self.assertEqual("", scan.stdout)
+            self.assertIn("Privacy scan could not complete", scan.stderr)
+            self.assertNotIn(file.name, scan.stderr)
 
     def test_reference_resolution_requires_human_terminal(self):
         class TerminalOutput(io.StringIO):
