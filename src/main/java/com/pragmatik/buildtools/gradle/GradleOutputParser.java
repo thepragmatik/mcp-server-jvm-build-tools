@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.gradle;
 
+import com.pragmatik.buildtools.build.BoundedTestCounts;
 import com.pragmatik.buildtools.build.BuildOutputParser;
 import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
@@ -95,6 +96,7 @@ public class GradleOutputParser implements BuildOutputParser {
 
         int totalTests = 0;
         int failedTests = 0;
+        BoundedTestCounts testCounts = new BoundedTestCounts();
         int firstTestDiagnosticIndex = -1;
 
         for (int i = 0; i < lines.length; i++) {
@@ -110,8 +112,10 @@ public class GradleOutputParser implements BuildOutputParser {
             // Parse test summary line
             Matcher testSumMatcher = TEST_SUMMARY_PATTERN.matcher(line);
             if (testSumMatcher.find()) {
-                totalTests = Integer.parseInt(testSumMatcher.group(1));
-                failedTests = Integer.parseInt(testSumMatcher.group(2));
+                testCounts = new BoundedTestCounts();
+                totalTests = testCounts.parse(testSumMatcher.group(1));
+                failedTests = testCounts.parse(testSumMatcher.group(2));
+                totalTests = testCounts.atLeast(totalTests, failedTests);
             }
 
             // Parse individual test failures
@@ -225,6 +229,9 @@ public class GradleOutputParser implements BuildOutputParser {
             testSummary.put("passed", totalTests - failedTests);
             testSummary.put("errors", 0);
             testSummary.put("skipped", 0);
+            if (testCounts.wasCapped()) {
+                testSummary.put("countsCapped", true);
+            }
         }
 
         if (failedTests > 0 && firstTestDiagnosticIndex < 0) {

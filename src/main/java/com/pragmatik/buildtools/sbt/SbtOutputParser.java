@@ -16,6 +16,7 @@
  */
 package com.pragmatik.buildtools.sbt;
 
+import com.pragmatik.buildtools.build.BoundedTestCounts;
 import com.pragmatik.buildtools.build.BuildOutputParser;
 import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
@@ -108,6 +109,7 @@ public class SbtOutputParser implements BuildOutputParser {
 
         int totalTests = 0, failedTests = 0, errorTests = 0;
         int passedTests = 0, skippedTests = 0;
+        BoundedTestCounts testCounts = new BoundedTestCounts();
 
         Map<String, Object> lastFileLineError = null;
 
@@ -137,34 +139,35 @@ public class SbtOutputParser implements BuildOutputParser {
             // ScalaTest summary
             Matcher scalaTestMatcher = SCALATEST_SUMMARY_PATTERN.matcher(line);
             if (scalaTestMatcher.find()) {
-                totalTests += Integer.parseInt(scalaTestMatcher.group(1));
-                failedTests += Integer.parseInt(scalaTestMatcher.group(2));
-                errorTests += Integer.parseInt(scalaTestMatcher.group(3));
-                passedTests += Integer.parseInt(scalaTestMatcher.group(4));
+                totalTests = testCounts.add(totalTests, testCounts.parse(scalaTestMatcher.group(1)));
+                failedTests = testCounts.add(failedTests, testCounts.parse(scalaTestMatcher.group(2)));
+                errorTests = testCounts.add(errorTests, testCounts.parse(scalaTestMatcher.group(3)));
+                passedTests = testCounts.add(passedTests, testCounts.parse(scalaTestMatcher.group(4)));
                 continue;
             }
 
             // JUnit summary
             Matcher junitMatcher = JUNIT_SUMMARY_PATTERN.matcher(line);
             if (junitMatcher.find()) {
-                int f = Integer.parseInt(junitMatcher.group(1));
-                int ig = Integer.parseInt(junitMatcher.group(2));
-                int t = Integer.parseInt(junitMatcher.group(3));
-                totalTests += t;
-                failedTests += f;
-                skippedTests += ig;
-                passedTests += (t - f - ig);
+                int f = testCounts.parse(junitMatcher.group(1));
+                int ig = testCounts.parse(junitMatcher.group(2));
+                int excluded = testCounts.add(f, ig);
+                int t = testCounts.atLeast(testCounts.parse(junitMatcher.group(3)), excluded);
+                totalTests = testCounts.add(totalTests, t);
+                failedTests = testCounts.add(failedTests, f);
+                skippedTests = testCounts.add(skippedTests, ig);
+                passedTests = testCounts.add(passedTests, t - excluded);
                 continue;
             }
 
             // specs2 summary
             Matcher specs2Matcher = SPECS2_SUMMARY_PATTERN.matcher(line);
             if (specs2Matcher.find()) {
-                int t = Integer.parseInt(specs2Matcher.group(1));
-                int f = Integer.parseInt(specs2Matcher.group(2));
-                totalTests += t;
-                failedTests += f;
-                passedTests += (t - f);
+                int f = testCounts.parse(specs2Matcher.group(2));
+                int t = testCounts.atLeast(testCounts.parse(specs2Matcher.group(1)), f);
+                totalTests = testCounts.add(totalTests, t);
+                failedTests = testCounts.add(failedTests, f);
+                passedTests = testCounts.add(passedTests, t - f);
                 continue;
             }
 
@@ -246,7 +249,9 @@ public class SbtOutputParser implements BuildOutputParser {
             errors.addFirst(errors.remove(firstTestDiagnosticIndex));
         }
         result.put("success", success);
-        result.put("testSummary", buildTestSummary(totalTests, passedTests, failedTests, errorTests, skippedTests));
+        result.put(
+                "testSummary",
+                buildTestSummary(testCounts, totalTests, passedTests, failedTests, errorTests, skippedTests));
         result.put("errors", errors);
         result.put("warnings", warnings);
         result.put("duration", duration != null ? duration : "unknown");
@@ -294,13 +299,25 @@ public class SbtOutputParser implements BuildOutputParser {
         return summary;
     }
 
-    private static Map<String, Object> buildTestSummary(int total, int passed, int failed, int error, int skipped) {
+    private static Map<String, Object> buildTestSummary(
+            BoundedTestCounts counts, int total, int reportedPassed, int failed, int error, int skipped) {
+        total = counts.atLeast(total, counts.add(failed, counts.add(error, skipped)));
+        failed = Math.min(failed, total);
+        error = Math.min(error, total - failed);
+        skipped = Math.min(skipped, total - failed - error);
+        int passed = total - failed - error - skipped;
+        if (passed != reportedPassed) {
+            counts.markInconsistent();
+        }
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("total", total);
         summary.put("passed", passed);
         summary.put("failed", failed);
         summary.put("errors", error);
         summary.put("skipped", skipped);
+        if (counts.wasCapped()) {
+            summary.put("countsCapped", true);
+        }
         return summary;
     }
 }
