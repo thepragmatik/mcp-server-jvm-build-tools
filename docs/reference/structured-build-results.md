@@ -1,5 +1,7 @@
 # Structured build analysis results
 
+> **Post-RC1 development feature:** [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1) does not include this contract. In RC1, read `analyze_build_output` from JSON text content.
+
 `analyze_build_output` returns a JSON object in MCP `structuredContent`. Its `tools/list` entry advertises an `outputSchema` that clients can use to validate the result. The existing `content[0].text` still contains the same serialized JSON for clients that only read text.
 
 The result reports `completed: true` for a finished tool call. A build failure sets `success: false` and `isError: true`; a failure before build execution returns `completed: true`, `isError: true`, and a fixed privacy-safe `details` message. Optional fields include `errorCount`, `warningCount`, `testSummary`, and up to 12 `diagnostics`. A diagnostic can carry a category, severity, stable reference, file type, line, and normalized message. `fileRef` distinguishes files within one result without revealing names or paths. `diagnosticsTruncated` and `testSummary.countsCapped` make incomplete aggregates explicit.

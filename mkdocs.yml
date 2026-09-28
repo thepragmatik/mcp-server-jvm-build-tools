@@ -129,6 +129,7 @@ nav:
       - Architecture: reference/architecture.md
       - Design 2.0: reference/design-v2.md
       - Current Tool Catalog: reference/tool-catalog.md
+      - Structured Build Results: reference/structured-build-results.md
       - Configuration 2.0: reference/configuration-v2.md
       - Legacy Tools (1.x): reference/tools.md
       - Legacy Configuration (1.x): reference/configuration.md

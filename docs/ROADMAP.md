@@ -2,7 +2,7 @@
 
 This is the active 2.0 roadmap. The 1.x research history remains in Git history and release notes; its tool counts and 2026 draft claims are not the current contract.
 
-## Current line: 2.0.0-rc.1 candidate
+## Current line: [v2.0.0-rc.1](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.1) published prerelease
 
 - Packaged HTTP profile and logging configuration verified from the built jar.
 - Explicit project roots and root-relative aliases; traversal and symlink-escape tests.
@@ -15,6 +15,8 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 - Nonroot Docker image with verified Gradle/sbt downloads and reusable Maven build cache.
 
 ## Release candidate gate: v2.0.0-rc.1
+
+Completed for the published prerelease tag. The checks below remain the release gate for subsequent tags.
 
 1. Finish full Java 21/23/25 verification, packaged stdio and HTTP protocol smoke, and strict MkDocs build.
 2. Red-team prompt injection, path races, scope bypass, malformed and oversized JSON-RPC, and synthetic privacy canaries through both transports.
@@ -48,9 +50,20 @@ Before any release tag, the release engineer checks this matrix against the exac
 
 Order the next slices by observed user friction, with a measured baseline or test before choosing an implementation:
 
+The first post-RC development increment adds MCP `structuredContent` and a bounded
+`outputSchema` for `analyze_build_output`, while preserving its JSON text result.
+It needs both-transport parity, schema conformance, privacy, and performance
+checks before merge; see the [result contract](reference/structured-build-results.md).
+
 1. **Repair from private diagnostics.** If redacted structured diagnostics cannot explain a real synthetic failure, provide a short-lived local artifact reference and a separate, explicit caller-approved share operation. Keep raw content local by default; scope artifact access to the caller and project, bound size and lifetime, and recheck the path at read time. Acceptance: injected instructions, private-path/email/secret canaries, cross-caller reads, symlink races, expiry, and oversized artifacts cannot reach model-visible results without approval. Avoid building a general file browser or log-export API.
 2. **Reduce repair round trips.** Observe a small set of representative repair sessions first. Then offer one constrained `diagnose → suggest → verify` operation or build-plan primitive only if it demonstrably reduces calls and time. It requires caller ownership, cancelable process trees, TTL, revalidated project paths at execution, and no stored credentials. Acceptance: deterministic synthetic repair fixture, cancellation/race tests, privacy-safe result, and a measured comparison with the current tool sequence. Keep the first slice to a single build tool and command family.
 3. **Improve hot-path cost with evidence.** Use the release-gate fixture and recorded workloads to profile subprocess capture, Maven/Gradle cache behavior, and parallel dependency lookup before tuning. Acceptance: the same tests and security/privacy cases pass, with an environment-matched latency/RSS comparison; no global budget inferred from a developer laptop.
 4. **Adopt official Tasks when stable in the Java SDK.** Treat MCP Tasks and the 2026-07-28 revision as experimental until SDK support and official conformance cover them. Replace the dormant custom async protocol rather than offering two competing task models. Acceptance: cancellation, ownership, expiry, interoperability, and migration tests with real clients.
+
+**Known classification defect for the next small TDD fix:** an `AssertionError`
+message containing `expected` and a `.java` file is currently categorized as a
+compiler syntax error. Assertion and test markers should take precedence over
+generic syntax phrases. Cover Maven, Gradle, sbt, safe redaction, and the MCP
+result shape in a separate reviewed PR.
 
 Architecture debt stays visible alongside features: decide whether to remove the dormant 11 `@Tool` methods and stale 1.x feature specs after the 2.0 contract stabilizes; first quantify their code, test, and review cost. Consolidate process execution and cache policies where measured duplication exists; preserve the single authorization/output-policy boundary for new tools; and keep the generated public catalog as the docs drift check. Each decision needs a failing test, a specific user or maintenance cost, or a measured hot path rather than a speculative rewrite.
