@@ -69,18 +69,18 @@ import tools.jackson.databind.json.JsonMapper;
  * (2024-11-05, 2025-03-26) do not send them. To avoid breaking those clients this
  * filter is purely <b>additive</b>:
  * <ul>
- *   <li>If a header is <b>absent</b>, the request passes through unchanged.</li>
+ *   <li>If a header is <b>absent</b>, header validation is skipped.</li>
  *   <li>If a header is <b>present and matches</b>, the request passes through.</li>
  *   <li>Only a present-and-<b>contradictory</b> header is rejected.</li>
  *   <li>Unparseable / non-JSON bodies are <b>not</b> rejected here — they are left
  *       for the downstream transport to handle, so this filter never manufactures
  *       errors from parse failures.</li>
  * </ul>
- * It therefore never changes the behaviour seen by an existing, well-formed client;
- * it only catches genuinely self-contradictory requests.
+ * Header validation therefore preserves existing well-formed requests. The body
+ * size cap below applies to all clients, including those without optional headers.
  *
  * <h2>Bounded buffering</h2>
- * To inspect the body the filter buffers it, but only up to a configurable cap
+ * The filter buffers every MCP POST body, but only up to a configurable cap
  * ({@code mcp.transport.max-validation-body-bytes}, default 1 MiB). A request that
  * exceeds the cap is rejected with HTTP {@code 413} before the whole body is
  * materialised, so the opt-in HTTP transport has no unbounded memory-amplification
@@ -154,18 +154,20 @@ public class McpHeaderValidationFilter implements Filter {
         final String headerMethod = trimToNull(httpReq.getHeader(HEADER_MCP_METHOD));
         final String headerName = trimToNull(httpReq.getHeader(HEADER_MCP_NAME));
 
-        // No standard MCP headers present => legacy/older client. Pass through.
-        if (headerMethod == null && headerName == null) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        // Buffer the body (bounded) so we can inspect it and still forward it downstream.
+        // Apply the body cap to every MCP POST, including older clients that omit
+        // optional MCP headers. Buffer once so the transport can still read it.
         final CachedBodyHttpServletRequest cached = new CachedBodyHttpServletRequest(httpReq, maxValidationBodyBytes);
 
         // Reject oversized bodies before materialising the whole payload (DoS guard).
         if (cached.exceedsLimit()) {
             rejectTooLarge(httpRes);
+            return;
+        }
+
+        // No standard MCP headers present => legacy/older client. Forward the
+        // replayable, size-checked request without header validation.
+        if (headerMethod == null && headerName == null) {
+            chain.doFilter(cached, response);
             return;
         }
 
@@ -243,8 +245,7 @@ public class McpHeaderValidationFilter implements Filter {
                 .write(buildJsonRpcError(
                         null,
                         "PayloadTooLargeError",
-                        "Request body exceeds the " + maxValidationBodyBytes
-                                + "-byte limit for MCP header validation"));
+                        "Request body exceeds the " + maxValidationBodyBytes + "-byte MCP limit"));
     }
 
     /**

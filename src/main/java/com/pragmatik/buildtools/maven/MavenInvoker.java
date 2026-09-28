@@ -26,68 +26,48 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.apache.maven.cli.MavenCli;
-import org.apache.maven.shared.invoker.*;
 
 public class MavenInvoker {
 
-    static String executeCommandUsingMavenInvoker(String mavenHome, String[] commands, String currentProjectDirectory) {
-        InvocationRequest request = new DefaultInvocationRequest();
-        request.setInputStream(InputStream.nullInputStream());
-        request.setBaseDirectory(new File(currentProjectDirectory));
-        request.addArgs(Arrays.asList(commands));
-        request.setTimeoutInSeconds((int) Math.min(Integer.MAX_VALUE, SyncProcessRunner.resolveTimeoutSeconds()));
-
-        // Propagate the active W3C trace context (SEP-414) to the Maven subprocess
-        // through the SAME mechanism every other build path uses
-        // (TraceContextHolder.applyToEnvironment), so TRACEPARENT is set and stale
-        // TRACESTATE/BAGGAGE are cleared symmetrically. The maven-invoker API can
-        // only ADD shell variables, never remove them, so we materialise the full
-        // subprocess environment from the server's own environment, apply the trace
-        // context to that map, and pass it verbatim with inheritance disabled.
-        TraceContextHolder.currentSpan().ifPresent(span -> {
-            Map<String, String> environment = new HashMap<>(System.getenv());
-            TraceContextHolder.applyToEnvironment(environment);
-            request.setShellEnvironmentInherited(false);
-            environment.forEach(request::addShellEnvironment);
-        });
-
-        Invoker invoker = new DefaultInvoker();
-        invoker.setWorkingDirectory(new File(currentProjectDirectory));
-
-        // If the configured mavenHome directory doesn't exist, skip
-        // setMavenHome so the DefaultInvoker falls back to the system
-        // PATH. This handles CI runners (setup-java, SDKMAN) where mvn
-        // is on PATH but the home directory may not be at the configured
-        // path (e.g. a contributor's local SDKMAN path hard-coded in tests).
-        File mavenHomeFile = new File(mavenHome);
-        if (mavenHomeFile.exists() && mavenHomeFile.isDirectory()) {
-            invoker.setMavenHome(mavenHomeFile);
-        }
-
-        BoundedProcessOutput output = new BoundedProcessOutput();
-        BoundedProcessOutput errors = new BoundedProcessOutput();
-
-        request.setOutputHandler(output::appendLine);
-        request.setErrorHandler(errors::appendLine);
-
-        String finalResult;
+    static String executeCommand(String mavenHome, String[] commands, String currentProjectDirectory) {
         try {
-            InvocationResult result = invoker.execute(request);
-            if (invocationResultedInError(result)) {
-                // Maven test/compile failures write to stdout, not stderr.
-                // Combine both streams so the caller sees the actual output.
-                String errText = errors.toString();
-                String outText = output.toString();
-                finalResult = errText.isEmpty() ? outText : errText + "\n" + outText;
-                throw new RuntimeException("Maven exited with code " + result.getExitCode() + ":\n" + finalResult);
-            } else {
-                finalResult = output.toString();
+            MavenProcessExecution execution = executeWithProcessCapture(mavenHome, commands, currentProjectDirectory);
+            Process process = execution.process();
+            boolean finished;
+            try {
+                finished = process.waitFor(
+                        SyncProcessRunner.resolveTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                SyncProcessRunner.terminateTree(process);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Maven execution interrupted", e);
             }
-        } catch (MavenInvocationException e) {
+            if (!finished) {
+                SyncProcessRunner.terminateTree(process);
+                throw new SyncProcessRunner.ExecutionTimeoutException("Maven execution timed out");
+            }
+            try {
+                execution.outputCollector().join(5000);
+            } catch (InterruptedException e) {
+                SyncProcessRunner.terminateTree(process);
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Maven output collection interrupted", e);
+            }
+            if (execution.outputCollector().isAlive()) {
+                SyncProcessRunner.terminateTree(process);
+                throw new IOException("Maven output collector did not finish");
+            }
+            String stdout = execution.output().snapshot();
+            if (process.exitValue() != 0) {
+                // Maven compile and test failures commonly appear on stdout.
+                String stderr = execution.errors().snapshot();
+                throw new RuntimeException("Maven exited with code " + process.exitValue() + ":\n"
+                        + (stderr.isEmpty() ? stdout : stderr + "\n" + stdout));
+            }
+            return stdout;
+        } catch (IOException e) {
             throw new RuntimeException("Unable to invoke Maven command", e);
         }
-
-        return finalResult;
     }
 
     static String executeUsingMavenEmbedder(String[] command, String currentProjectDirectory) {
@@ -208,10 +188,6 @@ public class MavenInvoker {
         return validated.toArray(new String[0]);
     }
 
-    static boolean invocationResultedInError(InvocationResult result) {
-        return result.getExitCode() != 0;
-    }
-
     /**
      * A cancellable Maven execution that exposes the underlying {@link Process}
      * so the async build service can destroy it on task cancellation.
@@ -279,6 +255,7 @@ public class MavenInvoker {
                     }
                 },
                 "maven-output-collector");
+        collector.setDaemon(true);
         collector.start();
 
         return new MavenProcessExecution(process, collector, output, errors);

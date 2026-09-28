@@ -25,6 +25,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootTest(
@@ -96,6 +97,32 @@ class HttpMcpProtocolDispatchTest {
         assertThat(result)
                 .contains("availableBuildTools", "maven", "resourceCount")
                 .doesNotContain(System.getProperty("user.home"));
+    }
+
+    @Test
+    void rejectsOversizedHeaderlessPostBeforeSdkDispatch() {
+        assertOversizedPostRejected(12 * 1024 * 1024, false);
+    }
+
+    @Test
+    void rejectsOversizedHeaderedPostBeforeSdkDispatch() {
+        assertOversizedPostRejected(2 * 1024 * 1024, true);
+    }
+
+    private void assertOversizedPostRejected(int bytes, boolean withMethodHeader) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (withMethodHeader) {
+            headers.add("Mcp-Method", "tools/list");
+        }
+        HttpEntity<String> request = new HttpEntity<>("x".repeat(bytes), headers);
+        try {
+            new RestTemplate().postForEntity("http://127.0.0.1:" + port + "/mcp", request, String.class);
+            org.junit.jupiter.api.Assertions.fail("Expected HTTP 413");
+        } catch (HttpClientErrorException e) {
+            assertThat(e.getStatusCode().value()).isEqualTo(413);
+            assertThat(e.getResponseBodyAsString()).contains("PayloadTooLargeError");
+        }
     }
 
     private static HttpEntity<String> rpc(String method, String params) {

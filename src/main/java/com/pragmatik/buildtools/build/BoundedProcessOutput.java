@@ -71,6 +71,11 @@ public final class BoundedProcessOutput extends OutputStream {
         write(bytes, 0, bytes.length);
     }
 
+    public synchronized void append(String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        write(bytes, 0, bytes.length);
+    }
+
     public synchronized boolean truncated() {
         return bytesSeen > HEAD_BYTES + TAIL_BYTES;
     }

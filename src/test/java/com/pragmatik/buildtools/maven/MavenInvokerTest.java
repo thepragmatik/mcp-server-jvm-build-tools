@@ -18,13 +18,14 @@ package com.pragmatik.buildtools.maven;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.apache.maven.shared.invoker.InvocationResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 
@@ -135,44 +136,36 @@ class MavenInvokerTest {
         }
     }
 
-    @Nested
-    @DisplayName("invocationResultedInError()")
-    class InvocationResultedInError {
+    @Test
+    @DisplayName("active Maven execution bounds an unterminated multi-megabyte line")
+    void activeMavenExecutionBoundsLongLine(@TempDir Path projectDir) throws Exception {
+        Path mavenHome = Files.createDirectory(projectDir.resolve("maven-home"));
+        Path bin = Files.createDirectory(mavenHome.resolve("bin"));
+        Path fakeMaven = bin.resolve("mvn");
+        Files.writeString(
+                fakeMaven, "#!/bin/sh\nprintf 'BEGIN'; yes x | tr -d '\\n' | head -c 25165824; printf 'END'\n");
+        assertThat(fakeMaven.toFile().setExecutable(true)).isTrue();
 
-        @Test
-        @DisplayName("returns false when exit code is 0")
-        void returnsFalseForExitCodeZero() {
-            InvocationResult result = mock(InvocationResult.class);
-            when(result.getExitCode()).thenReturn(0);
-            assertThat(MavenInvoker.invocationResultedInError(result)).isFalse();
-        }
+        String output = MavenInvoker.executeCommand(mavenHome.toString(), new String[] {"test"}, projectDir.toString());
 
-        @Test
-        @DisplayName("returns true when exit code is 1")
-        void returnsTrueForExitCodeOne() {
-            InvocationResult result = mock(InvocationResult.class);
-            when(result.getExitCode()).thenReturn(1);
-            assertThat(MavenInvoker.invocationResultedInError(result)).isTrue();
-        }
+        assertThat(output).startsWith("BEGIN").endsWith("END");
+        assertThat(output.length()).isLessThanOrEqualTo(128 * 1024);
+    }
 
-        @Test
-        @DisplayName("returns true when exit code is negative")
-        void returnsTrueForNegativeExitCode() {
-            InvocationResult result = mock(InvocationResult.class);
-            when(result.getExitCode()).thenReturn(-1);
-            assertThat(MavenInvoker.invocationResultedInError(result)).isTrue();
-        }
+    @Test
+    @DisplayName("Maven failure retains diagnostic text from both pipes")
+    void activeMavenExecutionPreservesFailurePipes(@TempDir Path projectDir) throws Exception {
+        Path mavenHome = Files.createDirectory(projectDir.resolve("maven-home"));
+        Path bin = Files.createDirectory(mavenHome.resolve("bin"));
+        Path fakeMaven = bin.resolve("mvn");
+        Files.writeString(fakeMaven, "#!/bin/sh\nprintf 'compile failed'\nprintf 'error detail' >&2\nexit 7\n");
+        assertThat(fakeMaven.toFile().setExecutable(true)).isTrue();
 
-        @Test
-        @DisplayName("returns true for any non-zero exit code")
-        void returnsTrueForAnyNonZeroExitCode() {
-            for (int code : new int[] {2, 42, 255, Integer.MAX_VALUE}) {
-                InvocationResult result = mock(InvocationResult.class);
-                when(result.getExitCode()).thenReturn(code);
-                assertThat(MavenInvoker.invocationResultedInError(result))
-                        .as("exit code " + code + " should indicate error")
-                        .isTrue();
-            }
-        }
+        assertThatThrownBy(() ->
+                        MavenInvoker.executeCommand(mavenHome.toString(), new String[] {"test"}, projectDir.toString()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Maven exited with code 7")
+                .hasMessageContaining("error detail")
+                .hasMessageContaining("compile failed");
     }
 }
