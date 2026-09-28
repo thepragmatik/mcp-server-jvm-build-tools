@@ -64,17 +64,35 @@ def request(port, body, *, host=None, origin=None, bearer=None):
     try:
         connection.request("POST", "/mcp", body=body, headers=headers)
         response = connection.getresponse()
-        return response.status, response.read(4096)
+        # Read the entire bounded error/result body. A prefix-only read can miss
+        # a reflected canary that appears after a verbose JSON-RPC envelope.
+        body = response.read(65_537)
+        if len(body) > 65_536:
+            raise AssertionError("MCP response exceeded the release-gate inspection cap")
+        return response.status, body
     finally:
         connection.close()
+
+
+def json_rpc_reply(body, identifier):
+    """Decode JSON or a finite SSE response without printing its content."""
+    if body.lstrip().startswith(b"{"):
+        candidates = [json.loads(body)]
+    else:
+        candidates = [
+            json.loads(line[5:].strip())
+            for line in body.splitlines()
+            if line.startswith(b"data:")
+        ]
+    return next((item for item in candidates if item.get("id") == identifier), None)
 
 
 def adversarial_checks(port):
     canary = "synthetic-private-canary.invalid"
     invalid = b'{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"' + canary.encode() + b'"}'
     status, response = request(port, invalid)
-    if status >= 500 or canary.encode() in response:
-        raise AssertionError("Malformed JSON caused server error or canary reflection")
+    if status not in (400, 422) or canary.encode() in response:
+        raise AssertionError(f"Malformed JSON returned HTTP {status} or reflected a canary")
     print("PASS malformed JSON: bounded error without canary reflection")
 
     large = b"{" + b" " * 1_048_576 + b"}"
@@ -128,7 +146,16 @@ def scope_check():
         status, _ = request(port, call, bearer=token)
         if status != 403:
             raise AssertionError(f"Read-only bearer reached executor: HTTP {status}")
-        print("PASS read-only bearer: build execution denied with HTTP 403")
+        read_call = json.dumps({
+            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": {"name": "list_build_tools", "arguments": {}},
+        }).encode()
+        read_status, read_response = request(port, read_call, bearer=token)
+        reply = json_rpc_reply(read_response, 3) if read_status == 200 else None
+        result = reply.get("result") if reply else None
+        if read_status != 200 or not isinstance(result, dict) or result.get("isError") is True:
+            raise AssertionError(f"Read-only bearer could not call build:read tool: HTTP {read_status}")
+        print("PASS read-only bearer: build execution denied and build read allowed")
     finally:
         process.terminate()
         try:

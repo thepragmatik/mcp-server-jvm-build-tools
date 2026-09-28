@@ -21,12 +21,13 @@ server's advertised capabilities.
 
 The black-box adversarial probes send only synthetic data. They require:
 
-- Malformed JSON-RPC to avoid an HTTP 5xx and avoid reflecting a synthetic
-  private canary.
+- Malformed JSON-RPC to return a client error and avoid reflecting a synthetic
+  private canary anywhere in the bounded response body.
 - A request larger than the 1 MiB MCP body cap to return HTTP 413.
 - A hostile Host and Origin pair to return HTTP 403.
 - A valid bearer limited to `build:read` to receive HTTP 403 for
-  `execute_build_command`.
+  `execute_build_command` and successfully call `list_build_tools` with the
+  same key.
 - Stdio to negotiate `2025-11-25` and answer `ping` and `tools/list`.
 
 The full Maven verification suite exercises structured diagnostic redaction,
