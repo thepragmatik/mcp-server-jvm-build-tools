@@ -90,7 +90,6 @@ class SbtBuildToolTest {
                             "clean",
                             "assembly",
                             "publishLocal",
-                            "publish",
                             "update",
                             "doc",
                             "console");
@@ -251,6 +250,15 @@ class SbtBuildToolTest {
         @DisplayName("allows 'publishLocal' task")
         void allowsPublishLocalTask() {
             assertThat(SbtBuildTool.parseCommandTokens("sbt publishLocal")).containsExactly("publishLocal");
+        }
+
+        @Test
+        @DisplayName("remote publish is unavailable under ordinary build execution")
+        void remotePublishIsRejected() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> SbtBuildTool.parseCommandTokens("sbt compile;publish"))
+                    .withMessageContaining("sbt task not allowed");
+            assertThat(tool.getSupportedCommands()).doesNotContain("publish");
         }
 
         @Test

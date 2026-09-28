@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * Generates structured build plan steps from natural language descriptions.
  *
  * <p>Analyzes descriptions for build lifecycle keywords and orders them
- * by convention: clean → validate → compile → test → package → install → deploy.
+ * by convention: clean → validate → compile → test → package → install.
  */
 public class PlanStepGenerator {
 
@@ -37,7 +37,6 @@ public class PlanStepGenerator {
             "test",
             "package",
             "install",
-            "deploy",
             "validate",
             "build",
             "check",
@@ -59,9 +58,7 @@ public class PlanStepGenerator {
             "package",
             "jar",
             "assemble",
-            "install",
-            "publish",
-            "deploy");
+            "install");
 
     private final BuildToolProvider provider;
 
@@ -90,7 +87,7 @@ public class PlanStepGenerator {
         if (keywords.isEmpty()) {
             throw new IllegalArgumentException("No recognized build commands found in description. "
                     + "Expected keywords like: build, compile, test, package, install, "
-                    + "deploy, validate, clean, check, jar, publish.");
+                    + "validate, clean, check, jar.");
         }
 
         // Validate against allowed commands
@@ -321,6 +318,9 @@ public class PlanStepGenerator {
         Set<String> keywords = new LinkedHashSet<>();
         String[] words = description.toLowerCase().split("[\\s,;.]+");
         for (String word : words) {
+            if (word.equals("deploy") || word.equals("publish")) {
+                throw new IllegalArgumentException("Remote publishing is unavailable in build plans");
+            }
             if (ALLOWED_COMMANDS.contains(word)) {
                 keywords.add(word);
             }
@@ -333,7 +333,6 @@ public class PlanStepGenerator {
             return switch (keyword) {
                 case "jar" -> "package";
                 case "build" -> "compile";
-                case "publish" -> "deploy";
                 case "check" -> "verify";
                 case "integrationTest", "testIntegration" -> "verify";
                 default -> keyword;
@@ -343,7 +342,6 @@ public class PlanStepGenerator {
                 case "compile" -> "compileJava";
                 case "validate" -> "check";
                 case "jar" -> "jar";
-                case "publish" -> "publish";
                 case "install" -> "publishToMavenLocal";
                 case "integrationTest", "testIntegration" -> "integrationTest";
                 default -> keyword;
@@ -368,13 +366,11 @@ public class PlanStepGenerator {
             case "test" -> "Run unit tests";
             case "package" -> "Package artifact";
             case "install" -> "Install to local repository";
-            case "deploy" -> "Deploy artifact";
             case "validate" -> "Validate project";
             case "clean" -> "Clean build artifacts";
             case "check" -> "Run checks";
             case "verify" -> "Run verification";
             case "jar" -> "Create JAR";
-            case "publish" -> "Publish artifact";
             case "integrationTest", "testIntegration" -> "Run integration tests";
             case "assemble" -> "Assemble outputs";
             default -> "Execute " + keyword;
@@ -387,7 +383,7 @@ public class PlanStepGenerator {
             case "compile", "build", "jar" -> 120;
             case "test", "check", "verify" -> 300;
             case "package", "assemble" -> 120;
-            case "install", "deploy", "publish" -> 180;
+            case "install" -> 180;
             case "integrationTest", "testIntegration" -> 600;
             default -> 300;
         };

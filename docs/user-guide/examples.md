@@ -1,5 +1,9 @@
 # Examples
 
+> **1.x reference:** These examples show the older command list and response
+> shapes. For the current 2.0 interface, use the [quickstart](quickstart-v2.md)
+> and [tool catalog](../reference/tool-catalog.md).
+
 Concrete, end-to-end examples for Maven, Gradle, and SBT. Each shows the **tool call arguments**
 the agent sends and a **representative response shape**. The JSON below illustrates the structure
 the server returns — exact values depend on your project and toolchain.

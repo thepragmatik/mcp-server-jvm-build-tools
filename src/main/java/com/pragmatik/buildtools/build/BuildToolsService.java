@@ -97,7 +97,7 @@ public class BuildToolsService {
             name = "execute_build_command",
             description = "Execute a build command using Maven, Gradle, SBT, or any registered build tool. "
                     + "Auto-detects the build tool from project markers if no tool name is specified. "
-                    + "Maven supports: clean, compile, test, package, install, deploy, validate. "
+                    + "Maven supports: clean, compile, test, package, install, validate. "
                     + "Gradle supports: clean, build, test, compileJava, compileTestJava, jar, assemble, check. "
                     + "SBT supports: compile, test, run, package, clean, assembly.")
     public String executeBuildCommand(

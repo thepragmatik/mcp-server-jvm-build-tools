@@ -96,12 +96,19 @@ class PlanStepGeneratorTest {
     @Test
     void testDescriptionWithAllPhases() throws IOException {
         PlanStepGenerator generator = new PlanStepGenerator();
-        String description = "clean, validate, compile, test, package, install, deploy";
+        String description = "clean, validate, compile, test, package, install";
 
         List<PlanStep> steps = generator.generateSteps(description, "maven");
 
-        assertEquals(7, steps.size());
+        assertEquals(6, steps.size());
         assertEquals("clean", steps.get(0).command());
+    }
+
+    @Test
+    void remotePublishingIsRejectedRatherThanPlanned() {
+        PlanStepGenerator generator = new PlanStepGenerator();
+        assertThrows(IllegalArgumentException.class, () -> generator.generateSteps("compile deploy", "maven"));
+        assertThrows(IllegalArgumentException.class, () -> generator.generateSteps("compile publish", "sbt"));
     }
 
     @Test

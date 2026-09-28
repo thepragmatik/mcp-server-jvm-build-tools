@@ -22,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Security and adversarial tests for command parsing and input validation.
@@ -94,6 +96,15 @@ class MavenSecurityTest {
         void legitimateCommandsPass() {
             String[] result = MavenInvoker.getCommands("mvn clean install -DskipTests");
             assertThat(result).containsExactly("clean", "install", "-DskipTests");
+        }
+
+        @Test
+        @DisplayName("remote deploy is unavailable under ordinary build execution")
+        void remoteDeployIsRejected() {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn clean deploy"))
+                    .withMessageContaining("Command not allowed");
+            assertThat(new MavenBuildTool().getSupportedCommands()).doesNotContain("deploy");
         }
     }
 
@@ -171,32 +182,38 @@ class MavenSecurityTest {
                     .containsExactly("clean", "install", "-DskipTests", "-Dmaven.test.failure.ignore=true", "-B");
         }
 
-        @Test
-        @DisplayName("-Dmaven.ext.class.path is passed through (no blocklist)")
-        void mavenExtClassPathPasses() {
-            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.ext.class.path=/tmp/ext.jar");
-            assertThat(result).containsExactly("clean", "-Dmaven.ext.class.path=/tmp/ext.jar");
+        @ParameterizedTest
+        @ValueSource(
+                strings = {
+                    "-f=../outside/pom.xml",
+                    "--file=../outside/pom.xml",
+                    "-s=../outside/settings.xml",
+                    "--settings=../outside/settings.xml",
+                    "--global-settings=../outside/settings.xml",
+                    "--toolchains=../outside/toolchains.xml",
+                    "-pl=../outside",
+                    "--projects=../outside"
+                })
+        @DisplayName("project and credential file selectors cannot escape the allowed root")
+        void pathSelectingOptionsAreRejected(String option) {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn validate " + option))
+                    .withMessageContaining("flag");
         }
 
-        @Test
-        @DisplayName("-Dmaven.repo.local is passed through (no blocklist)")
-        void mavenRepoLocalPasses() {
-            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.repo.local=/tmp/repo");
-            assertThat(result).containsExactly("clean", "-Dmaven.repo.local=/tmp/repo");
-        }
-
-        @Test
-        @DisplayName("-Dmaven.multiModuleProjectDirectory is passed through (no blocklist)")
-        void mavenMultiModuleProjectDirectoryPasses() {
-            String[] result = MavenInvoker.getCommands("mvn clean -Dmaven.multiModuleProjectDirectory=/tmp/root");
-            assertThat(result).containsExactly("clean", "-Dmaven.multiModuleProjectDirectory=/tmp/root");
-        }
-
-        @Test
-        @DisplayName("double-dash --D form is passed through (just another property key)")
-        void doubleDashFormPasses() {
-            String[] result = MavenInvoker.getCommands("mvn clean --Dmaven.repo.local=/tmp/repo");
-            assertThat(result).containsExactly("clean", "--Dmaven.repo.local=/tmp/repo");
+        @ParameterizedTest
+        @ValueSource(
+                strings = {
+                    "-Dmaven.ext.class.path=../outside/ext.jar",
+                    "-Dmaven.repo.local=../outside/repo",
+                    "-Dmaven.multiModuleProjectDirectory=../outside",
+                    "--Dmaven.repo.local=../outside/repo"
+                })
+        @DisplayName("Maven environment override properties cannot redirect outside the allowed root")
+        void reservedMavenPropertiesAreRejected(String option) {
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> MavenInvoker.getCommands("mvn validate " + option))
+                    .withMessageContaining("flag");
         }
 
         @Test
