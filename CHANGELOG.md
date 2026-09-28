@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - toward 2.0.0-rc.2
+## [2.0.0-rc.2] - 2026-09-29
 
 - Opt-in Maven version security checks now expose only bounded aggregate OSV status, CVE count, and known/unknown highest severity through MCP; advisory and package identities stay local.
 - OSV responses with unexpected fields now fail incomplete instead of appearing clean, and token-shaped version strings are withheld from model-visible results.
