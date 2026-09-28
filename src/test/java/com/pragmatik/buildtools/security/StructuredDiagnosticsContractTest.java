@@ -113,6 +113,36 @@ class StructuredDiagnosticsContractTest {
     }
 
     @Test
+    void assertionExpectedValueWithJavaLocationRemainsATestFailure() {
+        JsonNode safe = project("""
+                {"errors":[{"file":"/workspace/private/AccountTest.java","line":37,
+                 "message":"org.opentest4j.AssertionFailedError: expected: <JaneDoePatient> but was: <SYNTHETIC SECRET WITH SPACES>"}]}
+                """);
+
+        JsonNode diagnostic = safe.get("diagnostics").get(0);
+        assertEquals("test", diagnostic.get("category").asText());
+        assertEquals("java", diagnostic.get("fileType").asText());
+        assertEquals(37, diagnostic.get("line").intValue());
+        assertEquals(
+                "test assertion failed: values withheld",
+                diagnostic.get("message").asText());
+        assertFalse(safe.toString().contains("JaneDoePatient"));
+        assertPrivateDataAbsent(safe);
+    }
+
+    @Test
+    void compilerExpectedTokenWithJavaLocationRemainsCompilation() {
+        JsonNode safe = project("""
+                {"errors":[{"file":"/workspace/private/Account.java","line":37,
+                 "message":"';' expected near SYNTHETIC_SOURCE_IDENTIFIER"}]}
+                """);
+
+        assertEquals(
+                "compilation", safe.get("diagnostics").get(0).get("category").asText());
+        assertPrivateDataAbsent(safe);
+    }
+
+    @Test
     void errorsPrecedeWarningsAndDiagnosticLimitIsExplicit() {
         StringBuilder source = new StringBuilder("{\"errors\":[");
         for (int i = 1; i <= 13; i++) {

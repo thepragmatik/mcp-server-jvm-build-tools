@@ -471,12 +471,7 @@ public final class ModelOutputPolicy {
                 "compiling ")) {
             category = "compilation";
             message = "Compilation failed; inspect the indicated source line locally.";
-        } else if (containsAny(lower, "expected", "illegal start", "not a statement")
-                && fileType != null
-                && List.of("java", "kt", "scala").contains(fileType)) {
-            category = "compilation";
-            message = "Compiler reported a syntax error near the indicated line.";
-        } else if (containsAny(lower, "assertionerror", "assertion failed")) {
+        } else if (containsAny(lower, "assertionerror", "assertionfailederror", "assertion failed")) {
             category = "test";
             message = "A test assertion failed; inspect the local test report.";
         } else if (containsAny(
@@ -484,12 +479,15 @@ public final class ModelOutputPolicy {
                 "test failed",
                 "tests failed",
                 "there are test failures",
-                "assertionerror",
-                "assertion failed",
                 "execution failed for task ':test",
                 "() in ")) {
             category = "test";
             message = "A test failed; inspect the local test report.";
+        } else if (containsAny(lower, "expected", "illegal start", "not a statement")
+                && fileType != null
+                && List.of("java", "kt", "scala").contains(fileType)) {
+            category = "compilation";
+            message = "Compiler reported a syntax error near the indicated line.";
         } else if (containsAny(
                 lower,
                 "could not resolve",
@@ -590,17 +588,17 @@ public final class ModelOutputPolicy {
         if (containsAny(lower, "type mismatch", "incompatible types")) {
             return "type mismatch: involved types withheld";
         }
+        if (containsAny(lower, "assertionerror", "assertionfailederror", "assertion failed")) {
+            return "test assertion failed: values withheld";
+        }
+        if (containsAny(lower, "test failed", "tests failed")) {
+            return "test failed: inspect local test report";
+        }
         if (lower.contains("';' expected")) {
             return "';' expected";
         }
         if (containsAny(lower, "expected", "illegal start", "not a statement")) {
             return "compiler syntax error: token or expression withheld";
-        }
-        if (containsAny(lower, "assertionerror", "assertion failed")) {
-            return "test assertion failed: values withheld";
-        }
-        if (containsAny(lower, "test failed", "tests failed")) {
-            return "test failed: inspect local test report";
         }
         if (containsAny(lower, "could not resolve", "failed to resolve", "could not find artifact")) {
             return "dependency resolution failed: identity withheld";
