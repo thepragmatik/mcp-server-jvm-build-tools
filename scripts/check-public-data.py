@@ -2,6 +2,7 @@
 """Fail on likely private data without printing the matched value."""
 
 import argparse
+import hashlib
 import os
 import pathlib
 import re
@@ -10,11 +11,18 @@ import sys
 
 EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 HOME = re.compile(r"(?:/Users/|/home/)[A-Za-z0-9._-]+")
-PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+PRIVATE_KEY = re.compile(r"-----BEGIN (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----")
 SECRET_ASSIGNMENT = re.compile(
-    r"(?i)(?<![A-Za-z0-9])(?:[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?token|password|passwd|client[_-]?secret))"
+    r"(?i)\b(?:api[_-]?key|access[_-]?token|password|passwd|client[_-]?secret)"
     r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
 )
+CONFIG_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)(?<![A-Za-z0-9])(?:[A-Za-z0-9_.-]*?"
+    r"(?:password|passwd|pass|api[_-]?key|access[_-]?key(?:[_-]?id)?|"
+    r"secret(?:[_-]?access)?[_-]?key|private[_-]?key|secret|token))"
+    r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
+)
+CONFIG_SUFFIXES = (".properties", ".yaml", ".yml", ".env", ".json", ".toml", ".xml", ".ini")
 SAFE_EMAIL_SUFFIXES = (".invalid", ".example", "@example.com", "@example.org")
 SAFE_HOME_NAMES = {"private-user", "test-user", "user", "buildtools"}
 SAFE_VALUES = {"synthetic-value", "integration-test-only"}
@@ -35,13 +43,14 @@ def issues(line: str, path: str = "") -> list[str]:
         found.append("home path")
     if PRIVATE_KEY.search(line):
         found.append("private key")
+    secret_pattern = CONFIG_SECRET_ASSIGNMENT if path.endswith(CONFIG_SUFFIXES) else SECRET_ASSIGNMENT
     if any(
         match.group(1) not in SAFE_VALUES
         and not (
             path.endswith(".java")
             and re.match(r"\s*(?:[.([?!+*:=]|!=)", line[match.end():])
         )
-        for match in SECRET_ASSIGNMENT.finditer(line)
+        for match in secret_pattern.finditer(line)
     ):
         found.append("secret assignment")
     return found
@@ -114,7 +123,8 @@ def main() -> int:
         for kind in issues(line, path):
             findings.append((path, number, kind))
     for path, number, kind in findings:
-        print(f"{path}:{number}: possible {kind}; value withheld")
+        file_ref = hashlib.sha256(str(path).encode("utf-8", "surrogateescape")).hexdigest()[:12]
+        print(f"file:{file_ref}:{number}: possible {kind}; value and filename withheld")
     print(f"Privacy scan: {len(findings)} finding(s)")
     return 1 if findings else 0
 

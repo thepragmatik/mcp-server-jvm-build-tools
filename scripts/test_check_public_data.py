@@ -41,6 +41,20 @@ class PublicDataScannerTest(unittest.TestCase):
         candidate = "nexus" + "Password=" + "syntheticcredential123456"
         self.assertIn("secret assignment", SCANNER.issues(candidate, "gradle.properties"))
 
+    def test_common_prefixed_credential_names_are_detected(self):
+        keys = (
+            "aws_access_key_id", "aws_secret_access_key", "github_token", "auth_token",
+            "secretKey", "private_key", "db_pass", "bearerToken",
+        )
+        for key in keys:
+            with self.subTest(key=key):
+                self.assertIn("secret assignment", SCANNER.issues(key + "=" + "syntheticcredential123456", "settings.properties"))
+
+    def test_common_private_key_headers_are_detected(self):
+        for variant in ("ENCRYPTED PRIVATE KEY", "DSA PRIVATE KEY", "PGP PRIVATE KEY BLOCK"):
+            with self.subTest(variant=variant):
+                self.assertIn("private key", SCANNER.issues("-----BEGIN " + variant + "-----"))
+
     def test_symlinks_scan_targets_without_dereferencing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -64,6 +78,23 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertIn(("tracked-link", 1, "../outside.txt"), tracked)
             self.assertIn(("untracked-link", 1, "../outside.txt"), changed)
             self.assertFalse(any("person@" in line for _, _, line in tracked + changed))
+
+    def test_finding_output_hides_malicious_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            filename = "person@" + "private.example.net\n::error::flag"
+            (repo / filename).write_text("password=" + "syntheticcredential123456\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "--", filename], cwd=repo, check=True)
+            scan = subprocess.run(
+                ["python3", str(Path(__file__).resolve().with_name("check-public-data.py")), "--tracked"],
+                cwd=repo, capture_output=True, text=True,
+            )
+            self.assertEqual(1, scan.returncode)
+            self.assertIn("possible secret assignment", scan.stdout)
+            self.assertNotIn("person@", scan.stdout)
+            self.assertNotIn("::error::", scan.stdout)
+            self.assertNotIn("syntheticcredential123456", scan.stdout)
 
 
 if __name__ == "__main__":
