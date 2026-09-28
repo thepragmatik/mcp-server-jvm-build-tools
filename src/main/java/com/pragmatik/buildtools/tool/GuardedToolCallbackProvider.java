@@ -56,7 +56,7 @@ public final class GuardedToolCallbackProvider implements ToolCallbackProvider {
                     "Return dependency, managed-entry, and BOM counts; coordinates and per-dependency classifications are withheld."),
             Map.entry(
                     "scan_dependency_cves",
-                    "Return scanned, vulnerable, critical, and high counts with redacted warnings; dependency and CVE identities are withheld."),
+                    "Return project-level POM or selected Gradle literal-declaration and affected-dependency counts with scan status. Sparse OSV matches have unknown severity; high and critical counts appear only when known. Incomplete scans have no counts. Dependency and CVE identities are withheld."),
             Map.entry(
                     "detect_dependency_conflicts",
                     "Return conflict and analyzed-file counts without dependency identifiers."),

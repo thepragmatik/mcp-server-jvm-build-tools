@@ -18,6 +18,7 @@ package com.pragmatik.buildtools.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -131,6 +133,26 @@ class AnchoredProjectFileReaderTest {
             assertThatThrownBy(() -> AnchoredProjectFileReader.read(project, filename, 100))
                     .isInstanceOf(IOException.class);
         }
+    }
+
+    @Test
+    void rejectsNamedPipeBeforeReadOnlyOpen() throws Exception {
+        assumeSecureDirectories();
+        Path project = Files.createDirectory(temporary.toRealPath().resolve("fifo-project"));
+        Path marker = project.resolve("pom.xml");
+        Process command;
+        try {
+            command = new ProcessBuilder("mkfifo", marker.toString()).start();
+        } catch (IOException unavailable) {
+            assumeTrue(false, "mkfifo is unavailable");
+            return;
+        }
+        assumeTrue(command.waitFor() == 0, "mkfifo is unavailable");
+
+        assertTimeoutPreemptively(
+                Duration.ofSeconds(2),
+                () -> assertThatThrownBy(() -> AnchoredProjectFileReader.read(project, "pom.xml", 100))
+                        .isInstanceOf(IOException.class));
     }
 
     private void assumeSecureDirectories() throws IOException {

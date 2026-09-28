@@ -22,6 +22,7 @@ import com.pragmatik.buildtools.dependency.pom.PomDependencyResolver;
 import com.pragmatik.buildtools.dependency.pom.PomModel.AnalysisResult;
 import com.pragmatik.buildtools.dependency.security.CveLookupService;
 import com.pragmatik.buildtools.dependency.security.CveLookupService.VulnerabilityEntry;
+import com.pragmatik.buildtools.security.AnchoredProjectFileReader;
 import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tool.XmlUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,13 +31,26 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -59,20 +73,36 @@ public class DependencyService {
     private static final Logger logger = LoggerFactory.getLogger(DependencyService.class);
 
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
+    private static final int MAX_SCAN_BUILD_FILE_BYTES = 1024 * 1024;
+    private static final HttpClient MAVEN_CENTRAL_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    private static final int SCAN_READ_TIMEOUT_SECONDS = 5;
+    // Zero queue and one daemon keep a blocked native file-open race from creating
+    // an unbounded number of threads or stalling request threads indefinitely.
+    private static final ThreadPoolExecutor SCAN_FILE_READER =
+            new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<>(), task -> {
+                Thread worker = new Thread(task, "dependency-scan-file-reader");
+                worker.setDaemon(true);
+                return worker;
+            });
 
     private final HttpClient httpClient;
     private final BuildToolProvider buildToolProvider;
     private final PomDependencyResolver pomResolver;
     private final CveLookupService cveLookup;
 
+    @Autowired
     public DependencyService(BuildToolProvider buildToolProvider) {
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(java.time.Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this(buildToolProvider, new CveLookupService());
+    }
+
+    DependencyService(BuildToolProvider buildToolProvider, CveLookupService cveLookup) {
+        this.httpClient = MAVEN_CENTRAL_HTTP_CLIENT;
         this.buildToolProvider = buildToolProvider;
         this.pomResolver = new PomDependencyResolver();
-        this.cveLookup = new CveLookupService();
+        this.cveLookup = Objects.requireNonNull(cveLookup);
     }
 
     /**
@@ -94,7 +124,8 @@ public class DependencyService {
                     + "Returns a JSON object with latest version, all versions, "
                     + "stability classification, and upgrade type (major/minor/patch). "
                     + "Provide projectDir to get build-tool-specific dependency syntax. "
-                    + "Set includeSecurityInfo=true to include CVE vulnerability data from OSV.dev.")
+                    + "includeSecurityInfo opts into sending the supplied coordinates to OSV.dev for local enrichment; "
+                    + "the public MCP result withholds those security details.")
     public String checkDependencyVersion(
             @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
                     String groupId,
@@ -117,7 +148,7 @@ public class DependencyService {
             @ToolParam(
                             required = false,
                             description =
-                                    "Include CVE/security vulnerability information from OSV.dev. Default false for backward compatibility.")
+                                    "Opt in to an OSV.dev coordinate lookup for local integrations. MCP withholds its security details; use scan_dependency_cves for aggregate vulnerability presence. Default false.")
                     boolean includeSecurityInfo) {
 
         VersionPreference filter = parseVersionPreference(versionPreference);
@@ -402,7 +433,7 @@ public class DependencyService {
             }
         } catch (Exception e) {
             // If project context can't be determined, just omit it
-            logger.warn("[DependencyService] Could not enrich project context: {}", e.getMessage());
+            logger.warn("[DependencyService] Could not enrich project context");
         }
     }
 
@@ -496,7 +527,9 @@ public class DependencyService {
 
             String highest = "NONE";
             for (VulnerabilityEntry v : vulns) {
-                if (CveLookupService.meetsThreshold(v.severity(), highest)) {
+                if ("UNKNOWN".equals(v.severity())) {
+                    highest = "UNKNOWN";
+                } else if (!"UNKNOWN".equals(highest) && CveLookupService.meetsThreshold(v.severity(), highest)) {
                     highest = v.severity();
                 }
             }
@@ -518,54 +551,47 @@ public class DependencyService {
         } catch (Exception e) {
             // Network failures shouldn't break the version check — return partial result
             Map<String, Object> security = new LinkedHashMap<>();
-            security.put("cveCount", 0);
+            security.put("cveCount", null);
             security.put("highestSeverity", "UNKNOWN");
-            security.put("warning", "CVE lookup failed: " + e.getMessage());
+            security.put("warning", "CVE lookup failed");
+            security.put("lookupStatus", "incomplete");
             security.put("vulnerabilities", List.of());
             result.put("security", security);
         }
     }
 
     /**
-     * Bulk-scan a project's direct dependencies for known vulnerabilities.
+     * Bulk-scan a project's recognized direct literal declarations for known vulnerabilities.
      * <p>
-     * Parses the project's pom.xml or build.gradle to extract direct dependencies,
-     * then queries OSV.dev for each one. Returns a prioritized vulnerability report
-     * filtered by severity threshold.
+     * Reads a bounded POM or Gradle build file, extracts direct dependencies, and
+     * sends supported package coordinates to OSV.dev. The MCP projection returns
+     * aggregate counts and a completeness status; package and CVE identities stay local.
      * <p>
-     * <b>Performance:</b> Scans one dependency at a time with a 1-hour in-memory
-     * cache. For projects with 100+ dependencies, the scan may take several seconds.
-     * Set a higher {@code severityThreshold} to get faster results.
+     * <b>Performance:</b> Uncached coordinates are queried in batches of up to 100;
+     * an in-memory cache lasts one hour. A scan is incomplete if any dependency
+     * cannot be checked. OSV batch results omit severity, so presence counts are
+     * reported without asserting severity for those vulnerabilities.
      */
     @Tool(
             name = "scan_dependency_cves",
-            description = "Scan a project's direct dependencies for known vulnerabilities (CVEs) using OSV.dev. "
-                    + "Parses pom.xml or build.gradle to extract dependencies, queries OSV.dev for each, "
-                    + "and returns a prioritized vulnerability report filtered by severity threshold. "
-                    + "Use this to audit a project's dependencies for security issues. "
-                    + "Default threshold is HIGH (includes HIGH and CRITICAL). "
-                    + "Rate-limited — large projects may take several seconds.")
+            description =
+                    "Scan project-level Maven dependencies with explicit literal versions or selected literal Gradle dependency calls using OSV.dev. "
+                            + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
+                            + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
+                            + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
+                            + "Scans at most 500 coordinates in batches of up to 100; unknown severity is explicit.")
     public String scanDependencyCves(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir,
             @Schema(allowableValues = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "ALL"})
                     @ToolParam(
                             required = false,
-                            description = "Minimum severity to include: CRITICAL, HIGH (default), MEDIUM, LOW, or ALL")
+                            description =
+                                    "Minimum known severity for local details: CRITICAL, HIGH (default), MEDIUM, LOW, or ALL. Unknown-severity matches remain visible in aggregate counts.")
                     String severityThreshold) {
 
         if (projectDir == null || projectDir.isBlank()) {
             return JsonUtils.errorJson("projectDir is required");
-        }
-
-        Path dir;
-        try {
-            dir = Path.of(projectDir).toRealPath();
-        } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
-        }
-        if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
         }
 
         String threshold =
@@ -573,34 +599,26 @@ public class DependencyService {
 
         Map<String, Object> result = new LinkedHashMap<>();
 
-        // Detect build tool and file
-        String tool = null;
-        Path buildFile = null;
-
-        if (Files.exists(dir.resolve("pom.xml"))) {
-            tool = "maven";
-            buildFile = dir.resolve("pom.xml");
-        } else if (Files.exists(dir.resolve("build.gradle.kts"))) {
-            tool = "gradle";
-            buildFile = dir.resolve("build.gradle.kts");
-        } else if (Files.exists(dir.resolve("build.gradle"))) {
-            tool = "gradle";
-            buildFile = dir.resolve("build.gradle");
-        }
-
-        if (buildFile == null) {
-            return JsonUtils.errorJson(
-                    "No build files found (pom.xml, build.gradle, build.gradle.kts). " + "Cannot scan dependencies.");
-        }
-
-        result.put("project", Map.of("tool", tool, "dir", dir.toString()));
-
         try {
-            String content = Files.readString(buildFile);
-            List<CveLookupService.PackageRef> packages = extractPackages(content, tool);
+            BuildFileSnapshot buildFile = readScanBuildFileWithDeadline(
+                    Path.of(projectDir).toAbsolutePath().normalize());
+            if (buildFile == null) {
+                return JsonUtils.errorJson(
+                        "No build files found (pom.xml, build.gradle, build.gradle.kts). Cannot scan dependencies.");
+            }
+            result.put("project", Map.of("tool", buildFile.tool()));
+            List<CveLookupService.PackageRef> packages = extractPackages(buildFile.content(), buildFile.tool());
+            if (packages.size() > CveLookupService.MAX_SCAN_PACKAGES) {
+                return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
+            }
 
             // Bulk lookup
             Map<String, List<VulnerabilityEntry>> scanResults = cveLookup.bulkLookup(packages);
+            for (CveLookupService.PackageRef pkg : packages) {
+                if (!scanResults.containsKey(pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version())) {
+                    return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
+                }
+            }
 
             // Build vulnerability report
             List<Map<String, Object>> vulnerabilities = new ArrayList<>();
@@ -608,27 +626,33 @@ public class DependencyService {
             int vulnerableDeps = 0;
             int criticalCount = 0;
             int highCount = 0;
-            List<String> warnings = new ArrayList<>();
+            boolean severityUnknown = false;
 
             for (CveLookupService.PackageRef pkg : packages) {
                 String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
-                List<VulnerabilityEntry> vulns = scanResults.getOrDefault(key, List.of());
+                List<VulnerabilityEntry> vulns = scanResults.get(key);
+                if (!vulns.isEmpty()) vulnerableDeps++;
+                if (vulns.stream().anyMatch(v -> "UNKNOWN".equals(v.severity()))) {
+                    severityUnknown = true;
+                }
+                for (VulnerabilityEntry v : vulns) {
+                    if ("CRITICAL".equals(v.severity())) criticalCount++;
+                    else if ("HIGH".equals(v.severity())) highCount++;
+                }
 
                 // Filter by threshold
                 List<VulnerabilityEntry> filtered = vulns.stream()
-                        .filter(v ->
-                                threshold.equals("ALL") || CveLookupService.meetsThreshold(v.severity(), threshold))
+                        .filter(v -> "UNKNOWN".equals(v.severity())
+                                || threshold.equals("ALL")
+                                || CveLookupService.meetsThreshold(v.severity(), threshold))
                         .toList();
 
                 if (!filtered.isEmpty()) {
-                    vulnerableDeps++;
                     Map<String, Object> depVuln = new LinkedHashMap<>();
                     depVuln.put("dependency", key);
                     List<Map<String, Object>> cveList = new ArrayList<>();
                     for (VulnerabilityEntry v : filtered) {
                         cveList.add(v.toMap());
-                        if ("CRITICAL".equals(v.severity())) criticalCount++;
-                        else if ("HIGH".equals(v.severity())) highCount++;
                     }
                     depVuln.put("cves", cveList);
 
@@ -646,25 +670,75 @@ public class DependencyService {
                 }
             }
 
-            result.put(
-                    "scanSummary",
-                    Map.of(
-                            "totalDeps", totalDeps,
-                            "vulnerableDeps", vulnerableDeps,
-                            "criticalCount", criticalCount,
-                            "highCount", highCount));
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("totalDeps", totalDeps);
+            summary.put("vulnerableDeps", vulnerableDeps);
+            if (!severityUnknown) {
+                summary.put("criticalCount", criticalCount);
+                summary.put("highCount", highCount);
+            }
+            result.put("scanSummary", summary);
+            result.put("scanStatus", severityUnknown ? "severity_unknown" : "complete");
+            result.put("severityUnknown", severityUnknown);
 
             result.put("vulnerabilities", vulnerabilities);
             result.put("scannedAt", java.time.Instant.now().toString());
 
-            if (!warnings.isEmpty()) {
-                result.put("warnings", warnings);
-            }
-
             return JsonUtils.toJson(result);
 
-        } catch (IOException e) {
-            return JsonUtils.errorJson("Error scanning dependencies: " + e.getMessage());
+        } catch (BuildFileTooLargeException e) {
+            return JsonUtils.errorJson("Build configuration exceeds the 1 MiB scan limit");
+        } catch (CharacterCodingException e) {
+            return JsonUtils.errorJson("Build configuration is not valid UTF-8");
+        } catch (IncompleteDependencyScanException e) {
+            return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
+        } catch (IOException | InvalidPathException | UnsupportedOperationException | SecurityException e) {
+            return JsonUtils.errorJson("Cannot safely read build configuration");
+        }
+    }
+
+    private record BuildFileSnapshot(String tool, String content) {}
+
+    private static final class BuildFileTooLargeException extends IOException {}
+
+    private static BuildFileSnapshot readScanBuildFileWithDeadline(Path project) throws IOException {
+        Future<BuildFileSnapshot> pending;
+        try {
+            pending = SCAN_FILE_READER.submit(() -> readScanBuildFile(project));
+        } catch (RejectedExecutionException unavailable) {
+            throw new IOException("Dependency scan file reader unavailable");
+        }
+        try {
+            return pending.get(SCAN_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new IOException("Dependency scan file read timed out");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Dependency scan file read interrupted");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) throw io;
+            throw new IOException("Dependency scan file read failed");
+        } finally {
+            pending.cancel(true);
+        }
+    }
+
+    private static BuildFileSnapshot readScanBuildFile(Path project) throws IOException {
+        try (AnchoredProjectFileReader.ProjectDirectory directory = AnchoredProjectFileReader.open(project)) {
+            for (String filename : List.of("pom.xml", "build.gradle.kts", "build.gradle")) {
+                byte[] bytes = directory.readIfPresent(filename, MAX_SCAN_BUILD_FILE_BYTES);
+                if (bytes == null) continue;
+                if (bytes.length > MAX_SCAN_BUILD_FILE_BYTES) throw new BuildFileTooLargeException();
+                String content = StandardCharsets.UTF_8
+                        .newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes))
+                        .toString();
+                return new BuildFileSnapshot("pom.xml".equals(filename) ? "maven" : "gradle", content);
+            }
+            return null;
         }
     }
 
@@ -672,46 +746,10 @@ public class DependencyService {
      * Extract package references from build files.
      */
     private List<CveLookupService.PackageRef> extractPackages(String content, String tool) {
-        List<CveLookupService.PackageRef> packages = new ArrayList<>();
-
-        if ("maven".equals(tool)) {
-            // Extract <dependency> blocks from POM
-            String depsBlock = extractTag(content, "dependencies");
-            if (depsBlock == null) return packages;
-
-            String[] depSections = depsBlock.split("</dependency>");
-            for (String section : depSections) {
-                int start = section.indexOf("<dependency>");
-                if (start < 0) continue;
-                String depXml = section.substring(start);
-                String g = extractTag(depXml, "groupId");
-                String a = extractTag(depXml, "artifactId");
-                String v = extractTag(depXml, "version");
-                if (g != null && a != null && v != null && !v.contains("${")) {
-                    packages.add(new CveLookupService.PackageRef(g, a, v));
-                }
-            }
-        } else if ("gradle".equals(tool)) {
-            // Extract dependency declarations from Gradle build file
-            // Match implementation('group:artifact:version') patterns
-            java.util.regex.Pattern depPattern = java.util.regex.Pattern.compile(
-                    "(?:implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly)\\s*[(']\"?"
-                            + "([^:'\"\\s]+):([^:'\"\\s]+):([^:'\"\\s)]+)\"?[')]");
-            java.util.regex.Matcher m = depPattern.matcher(content);
-            while (m.find()) {
-                String g = m.group(1);
-                String a = m.group(2);
-                String v = m.group(3);
-                if (!v.contains("$") && !v.startsWith("+")) {
-                    packages.add(new CveLookupService.PackageRef(g, a, v));
-                }
-            }
-        }
-
-        return packages;
+        if ("maven".equals(tool)) return MavenPomScanParser.parse(content);
+        if ("gradle".equals(tool)) return GradleDependencyScanner.parse(content);
+        throw new IncompleteDependencyScanException();
     }
-
-    // ─── Supporting enums ───────────────────────────────────────────────
 
     public enum VersionPreference {
         /** Stable releases only — no snapshots, no milestones/RCs */

@@ -111,6 +111,10 @@ public final class ModelOutputPolicy {
     private final JsonMapper mapper = new JsonMapper();
 
     public String protect(String toolName, String output) {
+        boolean cveScan = "scan_dependency_cves".equals(toolName);
+        if (cveScan && (output == null || output.length() > MAX_RESULT_CHARS)) {
+            return incompleteCveScan();
+        }
         Map<String, Object> safe = new LinkedHashMap<>();
         safe.put("completed", true);
         if (output != null && output.length() > MAX_RESULT_CHARS) {
@@ -156,10 +160,18 @@ public final class ModelOutputPolicy {
                         copyArrayCount(root, "importedBoms", "importedBomCount", safe);
                     }
                     if ("scan_dependency_cves".equals(toolName)) {
-                        copyCounts(
-                                root.get("scanSummary"),
-                                Set.of("totalDeps", "vulnerableDeps", "criticalCount", "highCount"),
-                                safe);
+                        safe.put("scanStatus", error != null && !error.isNull() ? "incomplete" : "complete");
+                        JsonNode scanStatus = root.get("scanStatus");
+                        if (error == null && scanStatus != null && "severity_unknown".equals(scanStatus.asText())) {
+                            safe.put("scanStatus", "severity_unknown");
+                            safe.put("severityUnknown", true);
+                        }
+                        if (error == null || error.isNull()) {
+                            copyCounts(
+                                    root.get("scanSummary"),
+                                    Set.of("totalDeps", "vulnerableDeps", "criticalCount", "highCount"),
+                                    safe);
+                        }
                     }
                     if ("profile_build".equals(toolName)) {
                         copyDuration(root, "durationSeconds", safe);
@@ -296,10 +308,28 @@ public final class ModelOutputPolicy {
                 safe.remove("success");
             }
         }
+        if (cveScan) {
+            Object scanStatus = safe.get("scanStatus");
+            if (parsed == null
+                    || !parsed.isObject()
+                    || scanStatus == null
+                    || (!"incomplete".equals(scanStatus)
+                            && (!safe.containsKey("totalDeps") || !safe.containsKey("vulnerableDeps")))) {
+                return incompleteCveScan();
+            }
+            if ("severity_unknown".equals(scanStatus)) {
+                safe.remove("highCount");
+                safe.remove("criticalCount");
+            }
+        }
         if (safe.size() == 1) {
             safe.put("details", "No model-visible details");
         }
         return mapper.writeValueAsString(safe);
+    }
+
+    private String incompleteCveScan() {
+        return mapper.writeValueAsString(Map.of("completed", true, "isError", true, "scanStatus", "incomplete"));
     }
 
     private static void copySafeField(JsonNode source, String key, Set<String> allowed, Map<String, Object> target) {

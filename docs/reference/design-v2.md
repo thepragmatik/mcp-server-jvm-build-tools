@@ -37,13 +37,46 @@ The public tool descriptions state the result contract after the output policy, 
 
 | Tool | Model-visible result | Retained locally |
 |---|---|---|
+| `check_dependency_version` | Version and upgrade status; optional `includeSecurityInfo` does not expose security findings through MCP | Dependency identity and optional OSV findings |
 | `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
-| `scan_dependency_cves` | Scanned, vulnerable, critical, and high counts; bounded redacted warnings | Dependency and CVE identities |
+| `scan_dependency_cves` | `scanStatus`, recognized declaration count (`totalDeps`), and affected-dependency presence count (`vulnerableDeps`); `severityUnknown` when OSV omits severity. High/critical counts appear only when all returned severities are known. Failed or partial lookups return `scanStatus: incomplete` and no counts. | Dependency and CVE identities |
 
 These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
+For `check_dependency_version`, `includeSecurityInfo=true` still sends the supplied coordinates to OSV.dev but the current MCP projection withholds the findings. Agents should use `scan_dependency_cves` for aggregate presence until that optional lookup has a separately tested public result contract.
 
 The [configuration validator](configuration-validation.md) illustrates the same boundary for files: bounded local XML parsing creates local issues, then a finite template projection exposes only fixed configuration diagnostics and the aggregate count. The model receives neither parser exception text nor values read from the POM.
-Its build-file reads use `SecureDirectoryStream` to resist path-component replacement races. The central project guard now checks its build markers through one held project directory handle when that provider feature is available. On providers without it, the guard retains the earlier `Files.exists(..., NOFOLLOW_LINKS)` and `toRealPath()` check for each present marker. It denies symlinks that escape an allowed root with a generic error, but still accepts symlinks that resolve inside a root and cannot hold the project identity across checks. This compatibility fallback is not race-free. Configuration validation still fails closed if the feature is unavailable. Other tool reads and subprocess paths need an equivalent audit before stable 2.0.
+Its build-file reads use `SecureDirectoryStream` to resist path-component replacement races. The central project guard checks its build markers through one held project directory handle where supported. The CVE scan applies a held-directory read across POM, Gradle Kotlin, and Gradle Groovy marker priority, then admits only bounded coordinate-shaped values into typed OSV requests. On providers without secure directory streams, the guard retains canonical-path marker checks, which are not race-free; configuration validation and the CVE scan fail closed. Later tool reads and subprocess paths can still encounter replacements after the guard closes its handle and need a separate audit before stable 2.0.
+
+```mermaid
+flowchart LR
+    G["🟣 Configured-root guard"] --> H["🔵 Held project directory<br/>no symlink traversal"]
+    H --> F["🟢 First POM / KTS / Groovy file<br/>1 MiB + strict UTF-8"]
+    F --> C{"🟠 Maven coordinate<br/>shape and length?"}
+    C -- valid --> O["🟡 Typed OSV request<br/>coordinate fields only"]
+    O --> Q{"🟠 Complete OSV response?"}
+    Q -- yes --> R["🟢 Presence count + scan status<br/>severity claims only when known"]
+    Q -- no --> X
+    H -- unsafe path --> X["🔴 Fixed local error<br/>zero OSV requests"]
+    F -- invalid bytes or size --> X
+    C -- invalid --> X
+    classDef guard fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef anchor fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef local fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef decision fill:#ffedd5,stroke:#ea580c,color:#512600
+    classDef outbound fill:#fef9c3,stroke:#ca8a04,color:#443400
+    classDef stop fill:#fee2e2,stroke:#dc2626,color:#520909
+    class G guard
+    class H anchor
+    class F,R local
+    class C decision
+    class Q decision
+    class O outbound
+    class X stop
+```
+
+[OSV.dev](https://google.github.io/osv.dev/post-v1-querybatch/) receives dependency coordinates by design, so operators should treat the scan as an explicit network egress operation. The lexical gate cannot identify a secret deliberately encoded to resemble a valid Maven coordinate. A secure offline XML parser reads only direct `<project><dependencies><dependency>` children, even when `<dependencyManagement>` appears first; it accepts normal Maven namespaces. No project-level dependencies block yields zero recognized declarations. Every direct dependency needs an explicit literal group, artifact, and version; inherited or property-based versions make the scan incomplete before egress. Gradle extraction recognizes literal calls to `implementation`, `api`, `compileOnly`, `runtimeOnly`, `testImplementation`, and `testRuntimeOnly`, skipping comments and quoted code; dynamic arguments or escaped coordinate strings to those calls fail incomplete. Slashy Groovy strings and Kotlin backtick identifiers also fail incomplete until their syntax is supported safely. It does not resolve the transitive graph or other declaration styles. `totalDeps` counts recognized declarations, not all project dependencies. The batch API returns only vulnerability IDs and modification times, so a positive result increments `vulnerableDeps` without asserting that it meets the requested severity threshold. `severityUnknown: true` and `scanStatus: severity_unknown` identify that case; `highCount` and `criticalCount` are omitted. A complete empty response can show zero; unsupported declarations, invalid coordinates, HTTP failures, malformed or oversized responses, pagination, and more than 500 declarations produce a fixed incomplete result without counts. OSV responses are capped at 2 MiB, with a 10-second timeout per request and at most five 100-package batches. A clean result is a limited direct-declaration check, not a full project security audit.
+
+The local scan file read has a five-second deadline and one daemon worker with no queue. A named pipe or other nonregular marker is rejected through the held directory before opening it. Standard Java directory streams do not offer a nonblocking final-file open: a concurrent swap from a regular file to a pipe in the remaining check/open window can occupy that worker until the process restarts. Further scan calls then fail closed rather than accumulating blocked threads. If a private report exceeds the shared 256,000-character projection limit or cannot be parsed, the model receives an explicit incomplete status without counts. Untrusted projects still require OS-level isolation.
 
 Build execution and output analysis return `diagnostics` as structured objects: `severity` (`error` or `warning`), `category` (`compilation`, `test`, `dependency`, `configuration`, `execution`, or `other`), per-result `diagnosticRef`, optional per-result `fileRef`, `fileType` (`java`, `kt`, `scala`, `xml`, `gradle`, `kts`, or `sbt`) and positive `line`, and a redacted message of at most 500 characters. At most 12 distinct source diagnostics are returned, errors first; `diagnosticsTruncated: true` signals omitted entries. Recognized failure phrases retain the cause (for example, `cannot find symbol`) but normalize arbitrary identifiers, values, and dependency coordinates to placeholders. Unknown or suspicious text receives a generic local-inspection message. `diagnosticRef` distinguishes errors whose public fields otherwise match; `fileRef` groups messages from one file within a result but reveals no path. This is a triage contract: the user must inspect local build output to map a reference to a file and symbol before editing. The parser's raw log and command are removed before serialization for the model-visible policy, preserving final structured errors even when the original build output was large. Neither source excerpts nor raw file or symbol identities are emitted.
 
@@ -95,6 +128,8 @@ A configured root is a filesystem boundary, not a sandbox. The canonical path ch
 The runtime uses [MCP Java SDK 2.0.1](https://github.com/modelcontextprotocol/java-sdk/blob/main/VERSIONING.md), whose documented spec line is `2025-11-25`. The SDK BOM aligns all resolved MCP modules to 2.0.1. The HTTP profile registers the SDK's stateless servlet on `/mcp`; its packaged-jar smoke and automated integration tests exercise `initialize`, `tools/list`, and `tools/call`. Discovery advertises that revision only. The published 2026-07-28 revision is not yet supported by this Java SDK; an inactive `server/discover` handler remains a compatibility experiment, and `/mcp/discover` is only an informational probe. A servlet filter validates `Origin` on every MCP request before SDK dispatch and rejects untrusted loopback `Host` values, including when bearer authentication is disabled. It caches the configured Origin policy at startup. The official 2025-11-25 DNS rebinding scenario is a release gate; other conformance scenarios and both transports need client coverage before stable release.
 
 ## Performance budget
+
+Default Maven Central and OSV HTTP clients are shared per process rather than created for each service instance. This keeps selector-thread growth bounded when tools or tests construct many service objects; request deadlines and response caps still apply per call. The nonroot Docker verification retains its explicit process and memory ceilings as a resource regression gate.
 
 The hot path parses each tool argument once, checks canonical paths, runs the tool, then redacts a bounded result. The output policy limits parsing to the final 256,000 characters of a large result. The static callback array is built once; credential hashes are computed when keys load and incoming tokens use constant-time digest comparison. Maven, Gradle, and sbt process streams retain at most their first 32 KiB and last 96 KiB. Failed Gradle/sbt calls also retain at most 13 distinct complete candidate lines per stream, each at most 2 KiB; overflow raises diagnosticsTruncated conservatively. Both pipes drain concurrently in 8 KiB chunks, including unterminated lines; the dormant async task path still has bounded head/tail storage without middle-candidate capture. Subprocesses have a configurable timeout, and timeout, interruption, and async cancellation terminate descendants before the parent. The in-process Maven version probe uses the same bounded collector. HTTP MCP POST bodies are capped at 1 MiB by default, including requests without optional MCP headers; larger bodies receive 413 before SDK dispatch. These limits bound retained capture and accepted request size, not child-process memory or disk writes; isolate untrusted build scripts in a container.
 
