@@ -24,6 +24,26 @@ import org.junit.jupiter.api.Test;
 
 class MavenDiagnosticOutputTest {
     @Test
+    void replaysIdenticalClassResultsInOriginalHeadMiddleTailOrder() {
+        BoundedProcessOutput capture = new BoundedProcessOutput();
+        MavenDiagnosticOutput output = new MavenDiagnosticOutput(capture);
+        String perClass = "[INFO] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0 -- in example.PrivateSuiteCanary\n";
+        String finalTotal = "[INFO] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0\n";
+        String padding = "[INFO] noise\n".repeat(8_000);
+        byte[] source = (perClass + padding + perClass + finalTotal + padding + perClass + "[INFO] BUILD FAILURE\n")
+                .getBytes(StandardCharsets.UTF_8);
+        output.write(source, 0, source.length);
+        assertThat(capture.truncated()).isTrue();
+        String replay = output.snapshotForAnalysis(capture.snapshot(), new java.util.HashSet<>());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> summary = (java.util.Map<String, Object>)
+                new MavenOutputParser().parse(replay, 1, "test").get("testSummary");
+        assertThat(summary.get("total")).isEqualTo(3);
+        assertThat(summary.get("failed")).isEqualTo(3);
+        assertThat(output.diagnosticsTruncated()).isFalse();
+    }
+
+    @Test
     void retainsMiddleTestTotalAlongsideFullCompilerCandidateBudget() {
         MavenDiagnosticOutput output = new MavenDiagnosticOutput(new BoundedProcessOutput());
         for (int i = 1; i <= 13; i++) {

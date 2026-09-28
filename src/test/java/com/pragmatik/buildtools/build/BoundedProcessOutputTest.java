@@ -48,4 +48,16 @@ class BoundedProcessOutputTest {
         assertThat(output.truncated()).isFalse();
         assertThat(output.snapshot()).isEqualTo("first" + System.lineSeparator() + "last" + System.lineSeparator());
     }
+
+    @Test
+    void truncatedPartsKeepOnlyCompleteBoundaryLinesAndTheirOffsets() {
+        BoundedProcessOutput output = new BoundedProcessOutput();
+        byte[] source = ("first\n" + "x".repeat(200 * 1024) + "\nlast\n").getBytes(StandardCharsets.UTF_8);
+        output.write(source, 0, source.length);
+        BoundedProcessOutput.TruncatedParts parts = output.truncatedParts();
+        assertThat(parts.head()).isEqualTo("first\n");
+        assertThat(parts.tail()).isEqualTo("last\n");
+        assertThat(parts.headEndByte()).isEqualTo(6);
+        assertThat(parts.tailStartByte()).isEqualTo(source.length - 5);
+    }
 }

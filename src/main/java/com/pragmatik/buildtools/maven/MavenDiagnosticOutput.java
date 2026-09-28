@@ -20,10 +20,8 @@ import com.pragmatik.buildtools.build.BoundedProcessOutput;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -41,8 +39,9 @@ final class MavenDiagnosticOutput extends OutputStream {
 
     private final BoundedProcessOutput capture;
     private final byte[] line = new byte[MAX_LINE_BYTES];
-    private final List<String> diagnostics = new ArrayList<>(MAX_LINES);
-    private final List<String> testSummaries = new ArrayList<>(MAX_LINES);
+    private final List<Candidate> diagnostics = new ArrayList<>(MAX_LINES);
+    private final List<Candidate> testSummaries = new ArrayList<>(MAX_LINES);
+    private long position;
     private int length;
     private int prefixLength;
     private int ansiPrefixBytes;
@@ -50,6 +49,8 @@ final class MavenDiagnosticOutput extends OutputStream {
     private boolean candidate;
     private boolean overflow;
     private boolean diagnosticsTruncated;
+
+    private record Candidate(String text, long startByte, long endByte) {}
 
     MavenDiagnosticOutput(BoundedProcessOutput capture) {
         this.capture = capture;
@@ -67,10 +68,13 @@ final class MavenDiagnosticOutput extends OutputStream {
         int end = offset + count;
         for (int i = offset; i < end; ) {
             if (overflow) {
+                int start = i;
                 while (i < end && source[i] != '\n') {
                     i++;
                 }
+                position += i - start;
                 if (i < end) {
+                    position++;
                     finishLine();
                     i++;
                 }
@@ -82,6 +86,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     i++;
                 }
                 int segment = i - start;
+                position += segment;
                 if (segment > line.length - length) {
                     diagnosticsTruncated = true;
                     overflow = true;
@@ -90,6 +95,7 @@ final class MavenDiagnosticOutput extends OutputStream {
                     length += segment;
                 }
                 if (i < end) {
+                    position++;
                     finishLine();
                     i++;
                 }
@@ -98,39 +104,34 @@ final class MavenDiagnosticOutput extends OutputStream {
     }
 
     synchronized List<String> diagnostics() {
-        List<String> retained = new ArrayList<>(diagnostics.size() + testSummaries.size());
-        retained.addAll(diagnostics);
-        retained.addAll(testSummaries);
-        return List.copyOf(retained);
+        return orderedCandidates().stream().map(Candidate::text).toList();
     }
 
     synchronized String snapshotForAnalysis(String visibleOutput, Set<String> replayedCompilerLines) {
         if (!capture.truncated()) {
             return capture.snapshot();
         }
-        String head = capture.headSnapshot();
-        String tail = capture.tailSnapshot();
-        List<String> candidates = diagnostics();
-        Set<String> candidateSet = new HashSet<>(candidates);
-        Map<String, Integer> visible = new HashMap<>();
-        for (String capturedLine : (head + "\n" + tail).split("\\R")) {
-            String normalized = ANSI_SGR.matcher(capturedLine).replaceAll("");
-            if (candidateSet.contains(normalized)) {
-                visible.merge(normalized, 1, Integer::sum);
-            }
-        }
-        Map<String, Integer> seen = new HashMap<>();
+        BoundedProcessOutput.TruncatedParts parts = capture.truncatedParts();
         StringBuilder middle = new StringBuilder();
-        for (String line : candidates) {
-            if (MavenOutputParser.isTestSummaryLine(line)) {
-                if (seen.merge(line, 1, Integer::sum) > visible.getOrDefault(line, 0)) {
-                    middle.append(line).append('\n');
-                }
-            } else if (!visibleOutput.contains(line) && replayedCompilerLines.add(line)) {
-                middle.append(line).append('\n');
+        for (Candidate candidate : orderedCandidates()) {
+            if (candidate.endByte() <= parts.headEndByte() || candidate.startByte() >= parts.tailStartByte()) {
+                continue;
+            }
+            String text = candidate.text();
+            if (MavenOutputParser.isTestSummaryLine(text)
+                    || (!visibleOutput.contains(text) && replayedCompilerLines.add(text))) {
+                middle.append(text).append('\n');
             }
         }
-        return head + "\n" + middle + "\n" + tail;
+        return parts.head() + "\n" + middle + "\n" + parts.tail();
+    }
+
+    private List<Candidate> orderedCandidates() {
+        List<Candidate> retained = new ArrayList<>(diagnostics.size() + testSummaries.size());
+        retained.addAll(diagnostics);
+        retained.addAll(testSummaries);
+        retained.sort(Comparator.comparingLong(Candidate::startByte));
+        return retained;
     }
 
     synchronized boolean diagnosticsTruncated() {
@@ -138,6 +139,7 @@ final class MavenDiagnosticOutput extends OutputStream {
     }
 
     private void accept(byte value) {
+        position++;
         if (value == '\n') {
             finishLine();
             return;
@@ -189,18 +191,20 @@ final class MavenDiagnosticOutput extends OutputStream {
             int end = length > 0 && line[length - 1] == '\r' ? length - 1 : length;
             String text = ANSI_SGR.matcher(new String(line, 0, end, StandardCharsets.UTF_8))
                     .replaceAll("");
-            if (MavenOutputParser.isCompilerDiagnosticLine(text) && !diagnostics.contains(text)) {
+            Candidate retained = new Candidate(text, position - length - 1, position);
+            if (MavenOutputParser.isCompilerDiagnosticLine(text)
+                    && diagnostics.stream().noneMatch(d -> d.text().equals(text))) {
                 if (diagnostics.size() == MAX_LINES) {
                     diagnosticsTruncated = true;
                 } else {
-                    diagnostics.add(text);
+                    diagnostics.add(retained);
                 }
             } else if (MavenOutputParser.isTestSummaryLine(text)) {
                 if (testSummaries.size() == MAX_LINES) {
                     testSummaries.remove(0);
                     diagnosticsTruncated = true;
                 }
-                testSummaries.add(text);
+                testSummaries.add(retained);
             }
         }
         length = 0;
