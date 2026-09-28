@@ -22,6 +22,20 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 4. Measure callback overhead, process memory, bounded output behavior, and build latency on synthetic Maven, Gradle, and sbt fixtures. Set budgets only from measured baselines.
 5. Run the two independent PR reviews and address every inline finding. Keep the prerelease untagged until all checks are green.
 
+The release evidence matrix is a living gate, not a list of assumed passes. Attach the exact commit, environment, command, and summarized result to the release PR; a result on one machine is not a universal performance guarantee.
+
+| Gate | Evidence to attach | State at roadmap update | Owner |
+| --- | --- | --- | --- |
+| JDK 21/23/25, packaged stdio/HTTP, strict docs | CI checks, packaged protocol smoke, `mkdocs build --strict` | Recheck on final release head | Release engineer |
+| MCP protocol | Pinned official runner, advertised-capability scenarios and DNS-rebinding case on final jar | Recheck on final release head | Protocol engineer |
+| Privacy and adversarial cases | Synthetic canary matrix on both transports; counts/status only | In progress | Security reviewer |
+| Public contract | Generated runtime catalog and docs drift check | In progress | Docs engineer |
+| Performance | `scripts/benchmark-release-gate.py` aggregates for Maven, Gradle, sbt, callback and bounded-output stress, with warm-cache/offline provenance | In progress; no threshold yet | Performance engineer |
+| Dependencies | OWASP dependency scan with an NVD API key, or a recorded human decision on its release scope | **Blocked: key unavailable; not green** | Release engineer |
+| PR review | Two fresh-checkout role-tagged reviews on final SHA; all inline threads answered | Pending final SHA | Quality and adversarial reviewers |
+
+The release engineer must not tag `v2.0.0-rc.1` while a required row is failed, unknown, or blocked. For the dependency scan, configuring the key or explicitly scoping the gate is a release decision; a skipped scan is not a pass. The performance script deliberately has no invented latency or memory budget. Compare repeated runs on a pinned runner and cache state before proposing one.
+
 ## Stable 2.0 gate
 
 - Publish a migration guide for required roots, HTTP keys and scopes, catalog removals, result shape, and supported protocol revision.
@@ -32,8 +46,11 @@ This is the active 2.0 roadmap. The 1.x research history remains in Git history 
 
 ## After 2.0
 
-- Reintroduce build plans only with caller ownership, cancelable process trees, TTL, and a path check at execution.
-- Evaluate official MCP task support when the Java SDK exposes it; replace the dormant async task API rather than expanding a second task protocol.
-- Add a narrowly scoped diagnostic artifact mechanism if redacted messages prove too weak for build repair. The model sees an approved summary, while raw artifacts remain local.
-- Benchmark and optimize subprocess capture limits, Maven/Gradle caches, and parallel dependency lookups using recorded workloads.
-- Revisit the 2026-07-28 MCP revision only after SDK support and conformance tests exist.
+Order the next slices by observed user friction, with a measured baseline or test before choosing an implementation:
+
+1. **Repair from private diagnostics.** If redacted structured diagnostics cannot explain a real synthetic failure, provide a short-lived local artifact reference and a separate, explicit caller-approved share operation. Keep raw content local by default; scope artifact access to the caller and project, bound size and lifetime, and recheck the path at read time. Acceptance: injected instructions, private-path/email/secret canaries, cross-caller reads, symlink races, expiry, and oversized artifacts cannot reach model-visible results without approval. Avoid building a general file browser or log-export API.
+2. **Reduce repair round trips.** Observe a small set of representative repair sessions first. Then offer one constrained `diagnose → suggest → verify` operation or build-plan primitive only if it demonstrably reduces calls and time. It requires caller ownership, cancelable process trees, TTL, revalidated project paths at execution, and no stored credentials. Acceptance: deterministic synthetic repair fixture, cancellation/race tests, privacy-safe result, and a measured comparison with the current tool sequence. Keep the first slice to a single build tool and command family.
+3. **Improve hot-path cost with evidence.** Use the release-gate fixture and recorded workloads to profile subprocess capture, Maven/Gradle cache behavior, and parallel dependency lookup before tuning. Acceptance: the same tests and security/privacy cases pass, with an environment-matched latency/RSS comparison; no global budget inferred from a developer laptop.
+4. **Adopt official Tasks when stable in the Java SDK.** Treat MCP Tasks and the 2026-07-28 revision as experimental until SDK support and official conformance cover them. Replace the dormant custom async protocol rather than offering two competing task models. Acceptance: cancellation, ownership, expiry, interoperability, and migration tests with real clients.
+
+Architecture debt stays visible alongside features: decide whether to remove the dormant 11 `@Tool` methods and stale 1.x feature specs after the 2.0 contract stabilizes; first quantify their code, test, and review cost. Consolidate process execution and cache policies where measured duplication exists; preserve the single authorization/output-policy boundary for new tools; and keep the generated public catalog as the docs drift check. Each decision needs a failing test, a specific user or maintenance cost, or a measured hot path rather than a speculative rewrite.

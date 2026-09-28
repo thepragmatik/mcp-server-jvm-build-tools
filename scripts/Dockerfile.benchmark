@@ -1,0 +1,6 @@
+ARG SERVER_IMAGE=jvm-build-tools:2.0-local
+FROM ${SERVER_IMAGE}
+USER root
+RUN apk add --no-cache python3 procps
+USER buildtools
+ENTRYPOINT ["python3", "/bench/scripts/benchmark-release-gate.py"]
