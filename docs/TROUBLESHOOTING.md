@@ -30,7 +30,7 @@ Common problems and their solutions when using the MCP server for JVM build tool
    "args": ["-jar", "./target/mcp-server-jvm-build-tools.jar"]
 
    // RIGHT
-   "args": ["-jar", "/home/me/mcp-server-jvm-build-tools/target/mcp-server-jvm-build-tools.jar"]
+   "args": ["-jar", "/home/user/mcp-server-jvm-build-tools/target/mcp-server-jvm-build-tools.jar"]
    ```
 
 2. **Java not on PATH** — Use the absolute path to `java` in the `command` field:
@@ -291,7 +291,7 @@ sbt --no-colors compile  # let it download + compile
 1. Use absolute paths for volume mounts:
    ```bash
    docker run -i --rm \
-     -v /home/me/my-project:/projects/my-project \
+     -v /home/user/my-project:/projects/my-project \
      -v /opt/maven:/opt/maven \
      -e MAVEN_HOME=/opt/maven \
      mcp-server-jvm-build-tools

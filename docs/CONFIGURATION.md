@@ -372,7 +372,7 @@ When using Docker, your MCP client config runs the `docker run` command instead 
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-v", "/home/me/projects:/projects",
+        "-v", "/home/user/projects:/projects",
         "-v", "/opt/maven:/opt/maven",
         "-e", "MAVEN_HOME=/opt/maven",
         "mcp-server-jvm-build-tools"

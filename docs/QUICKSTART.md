@@ -98,13 +98,13 @@ Examples:
 
 ```
 # Maven project
-"Execute 'clean test' on /home/me/my-maven-app"
+"Execute 'clean test' on /home/user/my-maven-app"
 
 # Gradle project (auto-detects wrapper)
-"Run 'build' on /home/me/my-gradle-app"
+"Run 'build' on /home/user/my-gradle-app"
 
 # Check dependency versions
-"What version of Guava is available? My project is at /home/me/my-app"
+"What version of Guava is available? My project is at /home/user/my-app"
 ```
 
 ## Troubleshooting

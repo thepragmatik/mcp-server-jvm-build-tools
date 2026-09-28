@@ -213,23 +213,23 @@ Auto-detect which build tool(s) a project uses by scanning for build files.
 **Examples:**
 ```
 # Maven project
-Request:  detect_build_tool(projectDir="/home/me/maven-app")
+Request:  detect_build_tool(projectDir="/home/user/maven-app")
 Response: {"status":"success","detectedTools":["maven"],"toolCount":1,...}
 
 # Gradle project with wrapper
-Request:  detect_build_tool(projectDir="/home/me/gradle-app")
+Request:  detect_build_tool(projectDir="/home/user/gradle-app")
 Response: {"status":"success","detectedTools":["gradle"],"toolCount":1,
            "detections":[{"tool":"gradle","detected":true,
            "matchedFiles":["build.gradle.kts","settings.gradle.kts"],
            "wrappers":["gradlew"],"hints":["Kotlin DSL project"]}]}
 
 # Hybrid project (both pom.xml and build.gradle)
-Request:  detect_build_tool(projectDir="/home/me/hybrid-app")
+Request:  detect_build_tool(projectDir="/home/user/hybrid-app")
 Response: {"status":"success","detectedTools":["maven","gradle"],"toolCount":2,
            "warning":"Multiple build tools detected. Maven is prioritized."}
 
 # Non-JVM project
-Request:  detect_build_tool(projectDir="/home/me/python-app")
+Request:  detect_build_tool(projectDir="/home/user/python-app")
 Response: {"status":"success","detectedTools":[],"toolCount":0,
            "warning":"No build tool markers found."}
 ```
@@ -310,7 +310,7 @@ Response: {...,"currentVersion":"20.0","upgradeAvailable":true,"upgradeType":"MA
 
 # With project context (auto-detects build tool for correct syntax)
 Request:  check_dependency_version(groupId="org.slf4j", artifactId="slf4j-api",
-           projectDir="/home/me/gradle-app")
+           projectDir="/home/user/gradle-app")
 Response: {...,"detectedBuildTool":"gradle","dependencySyntax":{"gradle":"implementation('org.slf4j:slf4j-api:2.0.17')"}}
 ```
 
@@ -371,13 +371,13 @@ Execute a build and return structured JSON with parsed test results, errors, and
 ```
 # Maven test with structured output
 Request:  analyze_build_output(buildToolName="maven", buildToolHome="/opt/maven",
-           projectDir="/home/me/app", command="clean test")
+           projectDir="/home/user/app", command="clean test")
 Response: {"success":true,"tool":"maven","command":"clean test",
            "testSummary":{"total":15,"passed":15,"failed":0,"errors":0,"skipped":0},
            "errorCount":0,"warningCount":0}
 
 # Gradle build with failures
-Request:  analyze_build_output(projectDir="/home/me/app", command="build")
+Request:  analyze_build_output(projectDir="/home/user/app", command="build")
 Response: {"success":false,"tool":"gradle","command":"build",
            "errors":[{"file":"src/main/java/Foo.java","line":10,"severity":"ERROR",
            "message":"';' expected"}],"errorCount":1}
@@ -439,12 +439,12 @@ Validate build configuration files (pom.xml, build.gradle, build.gradle.kts) for
 **Examples:**
 ```
 # Valid pom.xml
-Request:  validate_build_configuration(projectDir="/home/me/valid-app")
-Response: {"valid":true,"tool":"maven","projectDir":"/home/me/valid-app","file":"pom.xml",
+Request:  validate_build_configuration(projectDir="/home/user/valid-app")
+Response: {"valid":true,"tool":"maven","projectDir":"/home/user/valid-app","file":"pom.xml",
            "issueCount":0,"issues":[]}
 
 # Invalid pom.xml
-Request:  validate_build_configuration(projectDir="/home/me/broken-app")
+Request:  validate_build_configuration(projectDir="/home/user/broken-app")
 Response: {"valid":false,"tool":"maven","file":"pom.xml","issueCount":2,
            "issues":[{"severity":"ERROR","path":"pom.xml",
            "message":"Missing required element: <groupId>",
