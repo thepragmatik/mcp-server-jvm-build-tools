@@ -1,5 +1,7 @@
 # Mission mcp-004: MCP Ecosystem Research & JVM Build Tools Enhancement
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
+
 **Date:** June 2026  
 **Status:** Documentation Complete
 

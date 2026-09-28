@@ -19,14 +19,16 @@ package com.pragmatik.buildtools.transport;
 import com.pragmatik.buildtools.application.McpServerIdentity;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Answers the {@code server/discover} JSON-RPC method (2026-07-28 RC, SEP-2575) on the
- * framework's Streamable HTTP protocol endpoint, {@code POST /mcp}.
+ * Experimental 2026 discovery handler retained for isolated compatibility tests.
+ * The active HTTP profile uses the MCP Java SDK's 2025-11-25 servlet transport
+ * on {@code POST /mcp}, which takes precedence over this MVC controller.
  * <p>
  * The standalone {@link McpDiscoverController} serves the dependency-free REST/JSON-RPC probe at
  * {@code /mcp/discover}; a protocol-speaking client, however, sends
@@ -51,6 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
  * present-and-contradictory header.
  */
 @RestController
+@Profile("experimental-discover")
 public class McpServerDiscoverJsonRpcController {
 
     /** The JSON-RPC method name this endpoint answers (2026-07-28 RC, SEP-2575). */

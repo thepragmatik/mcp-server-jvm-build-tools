@@ -49,3 +49,19 @@ site/
 /.mvn/wrapper/*
 !/.mvn/wrapper/maven-wrapper.properties
 .hermes/
+
+
+### Local secrets and private output ###
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+private/
+.local/
+.buildtools/

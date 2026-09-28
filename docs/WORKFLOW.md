@@ -1,146 +1,31 @@
-# Development Workflow — mcp-server-jvm-build-tools
+# Development workflow
 
-## Branch Strategy
+[The agent contributor guide](AGENTS.md) is the authoritative PR process. This page explains the cadence for the 2.0 line and replaces the older staging-first, shared-worker-file workflow.
 
-```
-                    feature branches
-                    (fix/*, feat/*, chore/*)
-                           │
-                           ▼  PR targets staging
-                      staging
-                    (integration)
-                           │
-                           ▼  PR targets main
-                        main
-                    (production)
-```
-
-## Rules
-
-### NEVER push directly to `main` or `staging`
-
-All changes must go through Pull Requests. Branch protection enforces:
-
-| Branch   | Force Push | Deletion | Admin Override | Required Checks |
-|----------|-----------|----------|----------------|-----------------|
-| `main`   | Blocked   | Blocked  | Blocked        | test (21, 23, 25) + Quality checks |
-| `staging`| Blocked   | Blocked  | Allowed        | test (21, 23, 25) + Quality checks |
-
-### PR Workflow
-
-```
-1. Create feature branch from main:
-   git checkout main && git pull && git checkout -b fix/my-fix
-
-2. Commit changes:
-   git add -A && git commit -m "fix: description"
-
-3. Push and create PR targeting staging:
-   git push origin fix/my-fix
-   gh pr create --base staging --head fix/my-fix
-
-4. CI runs automatically on staging:
-   - mvn test (JUnit tests)
-   - JDK 21, 23, 25 matrix
-   - Quality checks (license headers + compile warnings)
-
-5. Review and merge to staging:
-   gh pr merge <PR-number> --squash
-
-6. When ready for production, create integration PR:
-   gh pr create --base main --head staging
-
-7. CI runs again targeting main → merge when green
+```mermaid
+flowchart LR
+    Idea["🟣 Evidence + user need"] --> Branch["🔵 Branch from main"]
+    Branch --> Slice["🟢 TDD feature slice"]
+    Slice --> Verify{"🟠 Full verify + docs"}
+    Verify -- red --> Slice
+    Verify -- green --> PR["🔵 PR + CI"]
+    PR --> Reviews{"🟠 Adversarial + quality reviews"}
+    Reviews -- findings --> Slice
+    Reviews -- approved --> Merge["🟢 Squash merge"]
+    classDef purple fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef blue fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef green fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef orange fill:#ffedd5,stroke:#ea580c,color:#512600
+    class Idea purple
+    class Branch,PR blue
+    class Slice,Merge green
+    class Verify,Reviews orange
 ```
 
-### Commit Convention
+Start each slice with the user outcome, a failing test when behavior changes, and a concise threat/performance note. Implement the smallest coherent change, update the quickstart and architecture when contracts change, run focused tests, then `./mvnw -B verify --no-transfer-progress`. Check generated artifacts, not only source. For HTTP changes, run a packaged-jar smoke test. For protocol changes, run both transports and record the negotiated version.
 
-- `fix:` — bug fixes, security patches
-- `feat:` — new features (Gradle support, new tools)
-- `test:` — test additions and improvements
-- `ci:` — CI/CD pipeline changes
-- `chore:` — maintenance (license headers, formatting)
-- `docs:` — documentation
+Before a PR, run a local adversarial pass covering traversal, symlinks, unknown scopes, malformed JSON, oversized input, private canaries, and prompt injection in build output. Run `./scripts/docker-verify.sh` for a disposable offline clean-room build when the Docker image and local Maven cache are available. The container uses a read-only cache and no network, socket, or host secret mounts.
 
-### Quality Gates
+Open a PR targeting `main` and wait for CI. Two independent reviewers each use a fresh checkout and run full verify: one focuses on adversarial security and correctness, the other on code quality, SOLID boundaries, performance, tests, and docs. They leave inline findings and role-tagged verdicts in the GitHub PR. Address every thread and rerun gates. Merge only when CI and both verdicts are green. A release candidate adds protocol conformance, privacy canary, container smoke, strict docs build, migration guide, and version consistency checks.
 
-Every PR must pass:
-1. **JUnit tests** — 397 tests, 0 failures required
-2. **Coverage** — JaCoCo `check` enforced via `verify`; build fails below 60% line / 50% branch (baseline 67% instruction / 57% branch / 67% line)
-3. **License headers** — mvn license:format runs (non-blocking)
-4. **Compile warnings** — mvn compile -Dmaven.compiler.showWarnings=true
-
-### Cross-Review Workflow
-
-Every PR must pass a security review by `worker-adversarial` before merging.
-Reviews are posted to GitHub for a permanent audit trail.
-
-**Protocol (strict — do not deviate):**
-
-1. Write review task to shared filesystem:
-   ```
-   /shared/inputs/worker-adversarial/task-N.md
-   ```
-2. Wait for worker output (~2-5 minutes):
-   ```
-   /shared/outputs/worker-adversarial/prN-review.md
-   ```
-3. Verify review exists, then post to GitHub:
-   ```
-   gh pr review N --comment --body "$(cat /shared/outputs/worker-adversarial/prN-review.md)"
-   ```
-4. Address any issues, push fixes, comment on PR with resolution.
-5. Only merge when review verdict is PASS (no blocking issues remain).
-
-**Cross-dispatch protocol:** When one worker produces output, another reviews it:
-- `worker-build` output → `worker-mcp` reviews protocol compliance
-- `worker-mcp` output → `worker-quality` reviews testability
-- `worker-quality` output → `worker-adversarial` reviews security
-- `worker-adversarial` output → `worker-build` reviews build feasibility
-- `worker-cicd` output → `worker-adversarial` reviews pipeline security
-
-### Current State
-
-| Component          | Status                                                    |
-|--------------------|-----------------------------------------------------------|
-| Main branch        | Production — must stay clean                              |
-| Staging branch     | All 5 features integrated, CI green                       |
-| Current State       | All features integrated and merged to staging. Production integration PR target: main.               |
-| Coverage            | JaCoCo enforced via verify — min 60% line / 50% branch    |
-| Tests               | 397 across 23 test classes (GradleServiceTest: 64, SbtBuildToolTest: 51, DependencyServiceTest: 47, ToolAuthorizationServiceTest: 25, MavenSecurityTest: 20, BuildAuthServiceTest: 20, MavenInvokerTest: 17, SupplyChainServiceTest: 14, BuildOutputParserTest: 14, MavenIntegrationTest: 13, BuildConfigurationValidationTest: 13, SyncProcessRunnerTest: 11, BuildCacheServiceTest: 11, ResourceTemplateServiceTest: 10, BuildConfigValidatorTest: 10, TestFlakinessServiceTest: 9, AsyncBuildServiceTest: 9, SbtProjectServiceTest: 8, DependencyResourceServiceTest: 7, DependencyConflictServiceTest: 7, JavaVersionServiceTest: 6, BuildPerformanceServiceTest: 6, TransportConfigTest: 5) |
-
-### Recovery
-
-If a bad commit reaches main:
-```bash
-git checkout main
-git revert <bad-commit-hash>
-git push origin main
-```
-Never use `git push --force` or `git reset --hard` on main or staging.
-
-## Swarm Automation Workflow
-
-PRs created by the Metaswarm hierarchical agent swarm follow this process:
-
-1. **Creation**: Engineer agents create feature branches from main, implement changes, and open PRs targeting staging.
-2. **Adversarial Review**: Security-auditor agent reviews every PR for:
-   - Security vulnerabilities (secrets, unsafe code patterns)
-   - Code quality (exception handling, logging)
-   - Conventional commit compliance
-3. **CI Verification**: All PR checks must pass (JDK 21, 23, 25 + Quality checks).
-4. **Remediation**: If CI fails or reviewer requests changes, engineer agents fix issues and push updates.
-5. **Merge to Staging**: Once CI passes and review is complete, PRs are merged to staging.
-6. **Production**: Staging PRs to main are left for human review per the branch strategy.
-
-### Automated PR Naming Convention
-- feat/* for new features
-- fix/* for bug fixes
-- docs/* for documentation
-- chore/* for maintenance
-
-### Agent Roles
-- **mission_controller** (T1A Pro): Strategic planning, architecture decisions
-- **security_auditor** (T1B Flash): Adversarial PR review, security scanning
-- **sandbox_engineer** (T3 Local): Code changes, branch creation
-- **catch_all** (T2 Local): Dead-letter task recovery
+Never paste private user data, credentials, home paths, or raw build output into issues, PRs, CI logs, tests, or model prompts. Use synthetic `.invalid` examples and report counts/status rather than values.

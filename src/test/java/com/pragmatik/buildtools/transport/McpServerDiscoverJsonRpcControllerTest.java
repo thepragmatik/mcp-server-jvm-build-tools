@@ -116,8 +116,8 @@ class McpServerDiscoverJsonRpcControllerTest {
                     .andExpect(jsonPath("$.id").value(7))
                     .andExpect(jsonPath("$.result").exists())
                     .andExpect(jsonPath("$.result.serverInfo.name").value(SERVER_NAME))
-                    .andExpect(jsonPath("$.result.protocolVersions.length()").value(3))
-                    .andExpect(jsonPath("$.result.protocolVersions[2]").value("2026-07-28"))
+                    .andExpect(jsonPath("$.result.protocolVersions.length()").value(1))
+                    .andExpect(jsonPath("$.result.protocolVersions[0]").value("2025-11-25"))
                     .andExpect(jsonPath("$.result.capabilities").exists());
         }
 
@@ -196,7 +196,7 @@ class McpServerDiscoverJsonRpcControllerTest {
             chained.perform(post("/mcp").contentType(MediaType.APPLICATION_JSON).content(DISCOVER_BODY))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.result.serverInfo.name").value(SERVER_NAME))
-                    .andExpect(jsonPath("$.result.protocolVersions[2]").value("2026-07-28"));
+                    .andExpect(jsonPath("$.result.protocolVersions[0]").value("2025-11-25"));
         }
 
         @Test
@@ -219,23 +219,28 @@ class McpServerDiscoverJsonRpcControllerTest {
         @Test
         @DisplayName("a valid-token non-discover POST /mcp still reaches the handler with its body intact")
         void validTokenNonDiscoverBodyReachesHandler() throws Exception {
-            OAuthResourceServerFilter oauthFilter = new OAuthResourceServerFilter(
-                    new OAuthResourceServerConfig(true, "", List.of()), new ToolAuthorizationService());
+            System.setProperty("buildtools.api.key.integration", "integration-test-only");
+            try {
+                OAuthResourceServerFilter oauthFilter = new OAuthResourceServerFilter(
+                        new OAuthResourceServerConfig(true, "", List.of()), new ToolAuthorizationService());
 
-            MockMvc chained = MockMvcBuilders.standaloneSetup(jsonRpcController)
-                    .addFilters(oauthFilter, headerFilter)
-                    .build();
+                MockMvc chained = MockMvcBuilders.standaloneSetup(jsonRpcController)
+                        .addFilters(oauthFilter, headerFilter)
+                        .build();
 
-            // The exemption check buffers the body for method inspection; the authenticated
-            // request must still carry a replayable body downstream (the -32601 envelope
-            // proves the handler parsed the real method, not an empty body).
-            chained.perform(post("/mcp")
-                            .header("Authorization", "Bearer dev-key-unsafe-do-not-use-in-production")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(9))
-                    .andExpect(jsonPath("$.error.code").value(-32601));
+                // The exemption check buffers the body for method inspection; the authenticated
+                // request must still carry a replayable body downstream (the -32601 envelope
+                // proves the handler parsed the real method, not an empty body).
+                chained.perform(post("/mcp")
+                                .header("Authorization", "Bearer integration-test-only")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.id").value(9))
+                        .andExpect(jsonPath("$.error.code").value(-32601));
+            } finally {
+                System.clearProperty("buildtools.api.key.integration");
+            }
         }
     }
 

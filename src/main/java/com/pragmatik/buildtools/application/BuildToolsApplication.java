@@ -26,8 +26,11 @@ import com.pragmatik.buildtools.dependency.DependencyService;
 import com.pragmatik.buildtools.plan.BuildPlanService;
 import com.pragmatik.buildtools.sbt.SbtProjectService;
 import com.pragmatik.buildtools.security.BuildAuthService;
+import com.pragmatik.buildtools.security.ModelOutputPolicy;
+import com.pragmatik.buildtools.security.ProjectAccessPolicy;
 import com.pragmatik.buildtools.security.ToolAuthorizationService;
 import com.pragmatik.buildtools.tool.DeterministicToolCallbackProvider;
+import com.pragmatik.buildtools.tool.GuardedToolCallbackProvider;
 import com.pragmatik.buildtools.tool.JavaVersionService;
 import com.pragmatik.buildtools.tool.PromptService;
 import com.pragmatik.buildtools.tool.ResourceTemplateService;
@@ -77,7 +80,9 @@ public class BuildToolsApplication {
             JavaVersionService javaVersionService,
             ToolAuthorizationService toolAuthorizationService,
             BuildPlanService buildPlanService,
-            CiCdFlowService ciCdFlowService) {
+            CiCdFlowService ciCdFlowService,
+            ProjectAccessPolicy projectAccessPolicy,
+            ModelOutputPolicy modelOutputPolicy) {
         ToolCallbackProvider methodProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(toolObjects(
                         buildToolsService,
@@ -95,7 +100,8 @@ public class BuildToolsApplication {
                         buildPlanService,
                         ciCdFlowService))
                 .build();
-        return new DeterministicToolCallbackProvider(methodProvider);
+        return new GuardedToolCallbackProvider(
+                new DeterministicToolCallbackProvider(methodProvider), projectAccessPolicy, modelOutputPolicy);
     }
 
     /**

@@ -1,5 +1,7 @@
 # Test Plan — JVM Build Tools MCP Server (Docker)
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](../user-guide/quickstart-v2.md) and [2.0 design review](design-v2.md) for the current public contract.
+
 > **Document:** ARCH-2 usability and performance test plan  
 > **Server:** mcp-server-jvm-build-tools v1.0.0 (28 MCP tools, Maven/Gradle/SBT)  
 > **Environment:** Docker (eclipse-temurin:21-jre-alpine + Maven/Gradle 9.6.1/SBT 2.0.3)  

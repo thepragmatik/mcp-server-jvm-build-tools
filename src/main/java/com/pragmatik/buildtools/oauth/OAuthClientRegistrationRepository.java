@@ -92,12 +92,7 @@ public class OAuthClientRegistrationRepository implements InitializingBean {
             OAuthClientRegistration registration =
                     new OAuthClientRegistration(clientId, clientSecret, scopes, grantTypes, ttl, jwkSetUri);
             registrations.put(clientId, registration);
-            log.info(
-                    "Registered OAuth client: {} (scopes={}, grant-types={}, ttl={}s)",
-                    clientId,
-                    scopes,
-                    grantTypes,
-                    ttl);
+            log.info("Registered OAuth client (scope count={}, ttl={}s)", scopes.size(), ttl);
         }
         log.info("OAuth client registration: {} client(s) loaded", registrations.size());
     }
