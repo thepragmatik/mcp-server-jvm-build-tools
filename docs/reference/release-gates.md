@@ -57,6 +57,12 @@ blockers.
 
 The black-box adversarial probes send only synthetic data. They require:
 
+- A packaged Maven analysis call with a compiler diagnostic in the discarded
+  middle of a 24 MiB synthetic stream to retain a useful redacted result on
+  both HTTP and stdio. The probe checks structured/text parity, truthful
+  output truncation, and absence of synthetic path, email, secret, symbol, and
+  prompt-injection canaries.
+
 - Malformed JSON-RPC to return the generic JSON-RPC `-32700` parse error in a
   small HTTP 400 response, without a synthetic private canary or exception
   internals anywhere in the body.

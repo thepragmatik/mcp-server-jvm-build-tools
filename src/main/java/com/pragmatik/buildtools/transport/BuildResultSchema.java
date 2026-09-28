@@ -58,6 +58,7 @@ final class BuildResultSchema {
         fields.put("success", booleanField());
         fields.put("isError", booleanField());
         fields.put("truncated", booleanField());
+        fields.put("outputTruncated", Map.of("const", true));
         fields.put("errorCount", count());
         fields.put("warningCount", count());
         fields.put("testSummary", summary());

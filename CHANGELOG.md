@@ -2,6 +2,7 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- Maven build analysis now preserves a bounded set of compiler diagnostics from the middle of large process output, while keeping raw logs local. The structured result marks retained-output and diagnostic truncation explicitly.
 - Three static native MCP build-workflow prompts are available over stdio and HTTP; HTTP retrieval requires `prompt:read`. The legacy `prompt_*` tools remain.
 
 - Failed test assertions with `expected` values and source locations remain test diagnostics rather than compiler errors.

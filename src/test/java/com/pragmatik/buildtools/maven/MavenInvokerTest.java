@@ -31,6 +31,60 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 
 @DisplayName("MavenInvoker unit tests")
 class MavenInvokerTest {
+    @Test
+    @DisplayName("analysis retains a compiler error from the discarded middle of a large Maven log")
+    void analysisRetainsMiddleCompilerError(@TempDir Path projectDir) throws Exception {
+        Path mavenHome = Files.createDirectory(projectDir.resolve("maven-home"));
+        Path bin = Files.createDirectory(mavenHome.resolve("bin"));
+        Path fakeMaven = bin.resolve("mvn");
+        Files.writeString(
+                fakeMaven,
+                "#!/bin/sh\n"
+                        + "yes '[INFO] padding' | head -n 4096\n"
+                        + "printf '[ERROR] /synthetic/Sample.java:[42,1] cannot find symbol\\n'\n"
+                        + "yes '[INFO] tail padding' | head -n 1400000\n"
+                        + "printf '[INFO] BUILD FAILURE\\n'\n"
+                        + "exit 1\n");
+        assertThat(fakeMaven.toFile().setExecutable(true)).isTrue();
+
+        MavenInvoker.AnalysisResult result =
+                MavenInvoker.executeForAnalysis(mavenHome.toString(), new String[] {"compile"}, projectDir.toString());
+
+        assertThat(result.exitCode()).isEqualTo(1);
+        assertThat(result.outputTruncated()).isTrue();
+        assertThat(new MavenOutputParser()
+                        .parse(result.output(), result.exitCode(), "compile")
+                        .get("errorCount"))
+                .isEqualTo(1);
+        assertThat(result.output().length()).isLessThan(160_000);
+    }
+
+    @Test
+    @DisplayName("analysis does not duplicate a retained head error when preserving a middle error")
+    void analysisAvoidsRetainedDiagnosticDuplicates(@TempDir Path projectDir) throws Exception {
+        Path mavenHome = Files.createDirectory(projectDir.resolve("maven-home"));
+        Path bin = Files.createDirectory(mavenHome.resolve("bin"));
+        Path fakeMaven = bin.resolve("mvn");
+        Files.writeString(
+                fakeMaven,
+                "#!/bin/sh\n"
+                        + "printf '[ERROR] /synthetic/Head.java:[3,1] cannot find symbol\\n'\n"
+                        + "yes '[INFO] padding' | head -n 4096\n"
+                        + "printf '[ERROR] /synthetic/Middle.java:[42,1] cannot find symbol\\n'\n"
+                        + "yes '[INFO] tail padding' | head -n 1400000\n"
+                        + "printf '[INFO] BUILD FAILURE\\n'\n"
+                        + "exit 1\n");
+        assertThat(fakeMaven.toFile().setExecutable(true)).isTrue();
+
+        MavenInvoker.AnalysisResult result =
+                MavenInvoker.executeForAnalysis(mavenHome.toString(), new String[] {"compile"}, projectDir.toString());
+        var parsed = new MavenOutputParser().parse(result.output(), result.exitCode(), "compile");
+
+        assertThat(parsed.get("errorCount")).isEqualTo(2);
+        assertThat(result.outputTruncated()).isTrue();
+        assertThat(result.diagnosticsTruncated()).isFalse();
+        assertThat(result.output()).contains("BUILD FAILURE");
+    }
 
     @Nested
     @DisplayName("getCommands()")

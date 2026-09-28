@@ -121,6 +121,7 @@ not depend on the older `buildtools.auth.enabled` switch.
 |----------|---------------|--------|
 | MCP HTTP POST body | 1 MiB by default | Oversized requests receive 413 before SDK dispatch. |
 | Process stdout and stderr | 32 KiB head + 96 KiB tail **per stream** | Readers keep draining large or unterminated output without retaining whole logs. |
+| Maven analysis compiler candidates | At most 13 complete lines of 2 KiB per stream | Recognized middle-of-log compiler errors survive head/tail truncation; excessive or oversized candidates set `diagnosticsTruncated`. |
 | Tool-result projection input | final 256,000 characters | The projector never parses an unbounded returned string. |
 | Model-visible diagnostics | at most 12; messages at most 500 characters | Includes severity, category, and per-result references; raw logs, commands, file paths, and symbols remain local. |
 
@@ -130,6 +131,11 @@ arbitrary text can contain private information that patterns cannot
 prove absent. Keep raw logs local and use synthetic privacy canaries in
 tests. The [release gates](release-gates.md) measure real workloads
 instead of inferring latency improvements from source inspection.
+Maven analysis retains the existing head/tail capture and timeout behavior;
+its additional bounded private collector runs on the same process-drain path
+without starting another build. `outputTruncated` distinguishes local capture
+truncation from the model-visible `truncated` result-size flag. Gradle and sbt
+still use their existing execution paths.
 
 ## Architecture review findings
 

@@ -20,6 +20,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -186,7 +187,7 @@ public final class SyncProcessRunner {
     }
 
     /** Drain raw bytes so a single unterminated line cannot allocate without bound. */
-    public static Thread drain(InputStream stream, BoundedProcessOutput sink, String threadName) {
+    public static Thread drain(InputStream stream, OutputStream sink, String threadName) {
         Thread thread = new Thread(
                 () -> {
                     try (InputStream source = stream) {
