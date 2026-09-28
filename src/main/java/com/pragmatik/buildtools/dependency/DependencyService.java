@@ -27,10 +27,6 @@ import com.pragmatik.buildtools.tool.JsonUtils;
 import com.pragmatik.buildtools.tool.XmlUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -72,12 +68,7 @@ public class DependencyService {
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyService.class);
 
-    private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
     private static final int MAX_SCAN_BUILD_FILE_BYTES = 1024 * 1024;
-    private static final HttpClient MAVEN_CENTRAL_HTTP_CLIENT = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(5))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
     private static final int SCAN_READ_TIMEOUT_SECONDS = 5;
     // Zero queue and one daemon keep a blocked native file-open race from creating
     // an unbounded number of threads or stalling request threads indefinitely.
@@ -88,18 +79,27 @@ public class DependencyService {
                 return worker;
             });
 
-    private final HttpClient httpClient;
+    private final MavenMetadataClient metadataClient;
     private final BuildToolProvider buildToolProvider;
     private final PomDependencyResolver pomResolver;
     private final CveLookupService cveLookup;
 
     @Autowired
     public DependencyService(BuildToolProvider buildToolProvider) {
-        this(buildToolProvider, new CveLookupService());
+        this(buildToolProvider, new MavenMetadataClient(), new CveLookupService());
     }
 
     DependencyService(BuildToolProvider buildToolProvider, CveLookupService cveLookup) {
-        this.httpClient = MAVEN_CENTRAL_HTTP_CLIENT;
+        this(buildToolProvider, new MavenMetadataClient(), cveLookup);
+    }
+
+    DependencyService(BuildToolProvider buildToolProvider, MavenMetadataClient metadataClient) {
+        this(buildToolProvider, metadataClient, new CveLookupService());
+    }
+
+    private DependencyService(
+            BuildToolProvider buildToolProvider, MavenMetadataClient metadataClient, CveLookupService cveLookup) {
+        this.metadataClient = Objects.requireNonNull(metadataClient);
         this.buildToolProvider = buildToolProvider;
         this.pomResolver = new PomDependencyResolver();
         this.cveLookup = Objects.requireNonNull(cveLookup);
@@ -121,11 +121,10 @@ public class DependencyService {
             name = "check_dependency_version",
             description = "Check if a newer version exists for a Maven Central dependency. "
                     + "Use this to determine whether a dependency can be upgraded. "
-                    + "Returns a JSON object with latest version, all versions, "
-                    + "stability classification, and upgrade type (major/minor/patch). "
-                    + "Provide projectDir to get build-tool-specific dependency syntax. "
-                    + "includeSecurityInfo opts into sending the supplied coordinates to OSV.dev for local enrichment; "
-                    + "the public MCP result withholds those security details.")
+                    + "Sends bounded Maven group and artifact coordinates to Maven Central; redirects are refused. "
+                    + "The model receives safe version/count fields, not the full metadata or coordinates. "
+                    + "Provide projectDir for local build-tool context. Set includeSecurityInfo=true to query OSV.dev "
+                    + "for the supplied currentVersion; coordinates leave the host, while MCP withholds security findings.")
     public String checkDependencyVersion(
             @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
                     String groupId,
@@ -153,33 +152,26 @@ public class DependencyService {
 
         VersionPreference filter = parseVersionPreference(versionPreference);
 
-        if (groupId == null || groupId.isBlank()) {
-            return JsonUtils.errorJson("groupId is required");
-        }
-        if (artifactId == null || artifactId.isBlank()) {
-            return JsonUtils.errorJson("artifactId is required");
+        if (!MavenMetadataClient.validCoordinates(groupId, artifactId)) {
+            return JsonUtils.errorJson("Invalid Maven group or artifact ID");
         }
 
         try {
-            String groupPath = groupId.replace('.', '/');
-            String metadataUrl =
-                    String.format("%s/%s/%s/maven-metadata.xml", MAVEN_CENTRAL_BASE, groupPath, artifactId);
-
-            HttpRequest request =
-                    HttpRequest.newBuilder().uri(URI.create(metadataUrl)).GET().build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
+            MavenMetadataClient.Response response = metadataClient.fetch(groupId, artifactId);
             if (response.statusCode() == 404) {
-                return JsonUtils.errorJson("Dependency not found on Maven Central: " + groupId + ":" + artifactId);
+                return JsonUtils.errorJson("Dependency metadata not found on Maven Central");
             }
             if (response.statusCode() != 200) {
-                return JsonUtils.errorJson(
-                        "Maven Central returned HTTP " + response.statusCode() + " for " + groupId + ":" + artifactId);
+                return JsonUtils.errorJson("Maven Central metadata request failed");
             }
-
-            String xmlBody = response.body();
-            if (xmlBody == null || xmlBody.isBlank()) {
-                return JsonUtils.errorJson("No metadata found for " + groupId + ":" + artifactId);
+            String xmlBody = StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(response.body()))
+                    .toString();
+            if (xmlBody.isBlank()) {
+                return JsonUtils.errorJson("Maven Central metadata is empty");
             }
 
             Map<String, Object> result = parseMetadata(groupId, artifactId, xmlBody, filter);
@@ -200,12 +192,12 @@ public class DependencyService {
             return JsonUtils.toJson(result);
 
         } catch (IOException e) {
-            return JsonUtils.errorJson("Network error checking dependency version: " + e.getMessage());
+            return JsonUtils.errorJson("Maven Central metadata request failed");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return JsonUtils.errorJson("Request interrupted checking dependency version");
-        } catch (Exception e) {
-            return JsonUtils.errorJson("Error checking dependency version: " + e.getMessage());
+            return JsonUtils.errorJson("Maven Central metadata request interrupted");
+        } catch (RuntimeException e) {
+            return JsonUtils.errorJson("Maven Central metadata is invalid");
         }
     }
 
@@ -281,15 +273,11 @@ public class DependencyService {
         result.put("artifactId", artifactId);
         result.put("status", "success");
 
-        // Extract <versioning> section
-        String versioning = extractTag(xmlBody, "versioning");
-        String latest = extractTag(versioning, "latest");
-        String release = extractTag(versioning, "release");
-        String lastUpdated = extractTag(versioning, "lastUpdated");
-
-        // Extract all versions
-        String versionsBlock = extractTag(versioning, "versions");
-        List<String> allVersions = extractAllTags(versionsBlock, "version");
+        MavenMetadataParser.Metadata metadata = MavenMetadataParser.parse(xmlBody);
+        String latest = metadata.latest();
+        String release = metadata.release();
+        String lastUpdated = metadata.lastUpdated();
+        List<String> allVersions = metadata.versions();
 
         result.put("latestVersion", latest != null ? latest : release);
         result.put("releaseVersion", release);

@@ -140,8 +140,8 @@ credentials. See the [current HTTP authentication guide](docs/reference/http-aut
 
 Runtime OSV queries send only bounded Maven group, artifact, and version
 coordinates. Coordinates containing whitespace, control characters, quotes, or
-unsupported punctuation are skipped before the HTTP request; the CVE scan
-reports an aggregate skipped count. OSV responses and transport failures do
+unsupported punctuation cause a fixed incomplete scan before the HTTP request.
+OSV responses and transport failures do
 not cause raw package coordinates or exception messages to be logged.
 The scan reads the first present POM or Gradle build file through one held,
 no-symlink project directory handle. An unsafe path, unsupported filesystem,
@@ -149,6 +149,9 @@ file over 1 MiB, or invalid UTF-8 fails before any OSV request. OSV receives
 valid dependency coordinates by design; run the scan only when that egress is
 acceptable for the project. The OSV HTTP client does not follow redirects, so
 dependency coordinates are not forwarded to a redirect target.
+
+`check_dependency_version` sends Maven group and artifact coordinates to the fixed Maven Central metadata endpoint. It rejects malformed or overlong coordinates before network access, refuses redirects, and accepts at most 1 MiB of strict UTF-8 XML within a ten-second request deadline. DTDs and external entities are disabled; network, parser, and malformed-response errors return fixed text without caller values. Setting `includeSecurityInfo=true` also queries OSV.dev for the supplied version; use that option only when dependency-inventory egress is acceptable.
+The current MCP result withholds those optional OSV findings; use `scan_dependency_cves` for aggregate presence.
 
 The server holds its **own** dependencies to the same bar as the SBOM /
 supply-chain tooling it ships to users (issue #78). The keyless
