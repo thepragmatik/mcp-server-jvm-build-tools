@@ -16,7 +16,6 @@
  */
 package com.pragmatik.buildtools.dependency;
 
-import com.pragmatik.buildtools.build.BuildTool;
 import com.pragmatik.buildtools.build.BuildToolProvider;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -66,8 +65,6 @@ public class DependencyResourceService {
         }
 
         String projectName = dir.getFileName().toString();
-        BuildTool detected = toolProvider.resolve(null, dir);
-
         List<Map<String, Object>> resources = new ArrayList<>();
 
         if (Files.exists(dir.resolve("pom.xml"))) {
@@ -106,7 +103,11 @@ public class DependencyResourceService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("project", projectName);
         result.put("projectDir", dir.toString());
-        result.put("detectedTool", detected.getName());
+        result.put(
+                "detectedTool",
+                resources.size() == 1
+                        ? toolProvider.resolve(null, dir).getName()
+                        : resources.isEmpty() ? "unknown" : "mixed");
         result.put("resourceCount", resources.size());
         result.put("resources", resources);
 

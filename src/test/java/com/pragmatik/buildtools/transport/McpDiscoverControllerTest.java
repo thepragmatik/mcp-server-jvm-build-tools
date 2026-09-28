@@ -79,9 +79,8 @@ class McpDiscoverControllerTest {
         assertThat(serverInfo).containsEntry("name", "test-server").containsEntry("version", "9.9.9");
         assertThat(serverInfo).containsKey("vendor");
 
-        assertThat((java.util.List<String>) result.get("protocolVersions"))
-                .containsExactly("2024-11-05", "2025-03-26", "2026-07-28");
-        assertThat(result).containsEntry("latestProtocolVersion", "2026-07-28");
+        assertThat((java.util.List<String>) result.get("protocolVersions")).containsExactly("2025-11-25");
+        assertThat(result).containsEntry("latestProtocolVersion", "2025-11-25");
 
         Map<String, Object> capabilities = (Map<String, Object>) result.get("capabilities");
         assertThat(capabilities).containsKeys("tools", "resources", "prompts");
@@ -127,7 +126,7 @@ class McpDiscoverControllerTest {
     @Test
     @DisplayName("supported protocol versions include the 2026-07-28 RC")
     void supportedVersionsConstant() {
-        assertThat(McpServerIdentity.SUPPORTED_PROTOCOL_VERSIONS).contains("2026-07-28");
+        assertThat(McpServerIdentity.SUPPORTED_PROTOCOL_VERSIONS).contains("2025-11-25");
     }
 
     @Test

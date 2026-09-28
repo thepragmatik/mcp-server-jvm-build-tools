@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
  * Maintains an ordered map of registered build tools. New tools are registered
  * via the constructor. Auto-detection iterates the registry in insertion order,
  * calling {@link BuildTool#isProject(Path)} on each tool until a match is found.
- * Falls back to Maven if no marker files are detected (backward compatibility).
+ * Requires one unambiguous marker match when no tool name is given.
  */
 @Component
 public class BuildToolProvider {
@@ -70,7 +70,7 @@ public class BuildToolProvider {
      * <p>
      * If a specific tool name is provided, returns that tool directly.
      * Otherwise auto-detects by checking project markers for each registered
-     * tool in insertion order. Falls back to Maven if no markers match.
+     * tool in insertion order. Markerless and hybrid projects require an explicit tool name.
      *
      * @param name       optional build tool name (null for auto-detect)
      * @param projectDir project directory to inspect for markers (only used for auto-detect)
@@ -83,16 +83,19 @@ public class BuildToolProvider {
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Unknown build tool: " + name + ". Registered tools: " + registry.keySet()));
         }
-        // Auto-detect from project markers
-        if (projectDir != null) {
-            for (BuildTool tool : registry.values()) {
-                if (tool.isProject(projectDir)) {
-                    return tool;
-                }
-            }
+        if (projectDir == null) {
+            throw new IllegalArgumentException("Project directory is required for build tool detection");
         }
-        // Fallback to Maven for backward compatibility
-        return registry.get("maven");
+        List<BuildTool> matches = registry.values().stream()
+                .filter(tool -> tool.isProject(projectDir))
+                .toList();
+        if (matches.isEmpty()) {
+            throw new IllegalArgumentException("No supported build tool markers found");
+        }
+        if (matches.size() > 1) {
+            throw new IllegalArgumentException("Multiple build tools detected; specify buildToolName");
+        }
+        return matches.getFirst();
     }
 
     /**

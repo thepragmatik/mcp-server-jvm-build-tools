@@ -596,14 +596,23 @@ class GradleServiceTest {
         }
 
         @Test
-        @DisplayName("provider resolves Maven before Gradle (insertion order) when both markers exist")
-        void providerResolvesMavenFirstWhenBothMarkersExist(@TempDir Path projectDir) throws IOException {
+        @DisplayName("provider requires explicit tool selection when markers conflict")
+        void providerRejectsAmbiguousMarkers(@TempDir Path projectDir) throws IOException {
             Files.createFile(projectDir.resolve("pom.xml"));
             Files.createFile(projectDir.resolve("build.gradle"));
             BuildToolProvider provider = new BuildToolProvider();
-            // Maven registered first, so it should be detected first
-            BuildTool resolved = provider.resolve(null, projectDir);
-            assertThat(resolved.getName()).isEqualTo("maven");
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> provider.resolve(null, projectDir))
+                    .withMessageContaining("Multiple build tools");
+            assertThat(provider.resolve("maven", projectDir).getName()).isEqualTo("maven");
+        }
+
+        @Test
+        void providerRejectsMarkerlessProject(@TempDir Path projectDir) {
+            BuildToolProvider provider = new BuildToolProvider();
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> provider.resolve(null, projectDir))
+                    .withMessageContaining("No supported build tool");
         }
 
         @Test

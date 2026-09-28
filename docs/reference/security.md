@@ -1,5 +1,7 @@
 # Security
 
+> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](../user-guide/quickstart-v2.md) and [2.0 design review](design-v2.md) for the current public contract.
+
 This server executes build commands (Maven, Gradle, SBT) on behalf of LLM agents. Security is a
 first-class concern, addressed through **defense in depth** — several independent layers that
 constrain *what* can run before any process is spawned.

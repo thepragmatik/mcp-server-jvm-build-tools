@@ -174,7 +174,48 @@ public class OAuthResourceServerFilter implements Filter {
             return;
         }
 
+        if (effectiveReq instanceof McpHeaderValidationFilter.CachedBodyHttpServletRequest buffered) {
+            String toolName = toolCallName(buffered);
+            if (toolName != null && !authorizationService.isToolAuthorizedForToken(token, toolName)) {
+                httpRes.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                httpRes.setHeader(
+                        "WWW-Authenticate",
+                        buildChallenge("insufficient_scope", "Tool scope required", config.metadataUrl(httpReq)));
+                httpRes.setContentType("application/json");
+                httpRes.getWriter().write("{\"error\":\"insufficient_scope\"}");
+                return;
+            }
+        }
+
         chain.doFilter(effectiveReq, response);
+    }
+
+    /**
+     * Returns null for a non-tool call, or an empty name for malformed/batched input
+     * so the permission check fails closed.
+     */
+    private String toolCallName(McpHeaderValidationFilter.CachedBodyHttpServletRequest request) {
+        if (request.exceedsLimit()) {
+            return "";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(request.getInputStream());
+            if (root == null || !root.isObject()) {
+                return "";
+            }
+            JsonNode method = root.get("method");
+            if (method == null || !method.isTextual()) {
+                return "";
+            }
+            if (!"tools/call".equals(method.asText())) {
+                return null;
+            }
+            JsonNode params = root.get("params");
+            JsonNode name = params == null ? null : params.get("name");
+            return name != null && name.isTextual() ? name.asText() : "";
+        } catch (JacksonException e) {
+            return "";
+        }
     }
 
     /**

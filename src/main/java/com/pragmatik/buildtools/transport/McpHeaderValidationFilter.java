@@ -192,28 +192,21 @@ public class McpHeaderValidationFilter implements Filter {
             // Malformed / non-JSON body: not our concern. Let the transport handle it.
             // Jackson 3 surfaces parse failures as the unchecked JacksonException
             // (it no longer extends IOException), so this catch must name it explicitly.
-            log.debug("Skipping MCP header validation for unparseable body: {}", parseFailure.getMessage());
+            log.debug("Skipping MCP header validation for unparseable body");
             chain.doFilter(cached, response);
             return;
         }
 
         // Mcp-Method disagreement: only when we positively read a different method.
         if (parsed && headerMethod != null && bodyMethod != null && !headerMethod.equals(bodyMethod)) {
-            rejectMismatch(
-                    httpRes,
-                    bodyId,
-                    "Mcp-Method header '" + headerMethod + "' does not match JSON-RPC body method '" + bodyMethod
-                            + "'");
+            rejectMismatch(httpRes, bodyId, "Mcp-Method header does not match JSON-RPC body method");
             return;
         }
 
         // Mcp-Name disagreement: header must match this server's configured identity.
         final String configuredName = trimToNull(identity.name());
         if (headerName != null && configuredName != null && !headerName.equals(configuredName)) {
-            rejectMismatch(
-                    httpRes,
-                    bodyId,
-                    "Mcp-Name header '" + headerName + "' does not match this server's name '" + configuredName + "'");
+            rejectMismatch(httpRes, bodyId, "Mcp-Name header does not match this server's name");
             return;
         }
 

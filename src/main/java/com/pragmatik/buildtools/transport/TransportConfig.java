@@ -16,10 +16,21 @@
  */
 package com.pragmatik.buildtools.transport;
 
+import com.pragmatik.buildtools.security.OAuthResourceServerConfig;
+import com.pragmatik.buildtools.security.ProjectAccessPolicy;
+import com.pragmatik.buildtools.security.ToolAuthorizationService;
 import java.util.Arrays;
+import java.util.List;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -28,12 +39,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * <p>
  * Configures CORS for web-based MCP clients and dashboards.
  * <p>
- * <b>2026-07-28 RC alignment:</b> the Streamable HTTP transport is now stateless
- * (no protocol-level sessions, no {@code Mcp-Session-Id}). The CORS allow-list
- * exposes the standard request headers required by the RC ({@code Mcp-Method} and
- * {@code Mcp-Name}, SEP-2243) and no longer advertises the removed
- * {@code Mcp-Session-Id} header (SEP-2575). See
- * {@code docs/mcp-2026-07-28-transport-audit.md} for the full audit.
+ * The active SDK transport is stateless and implements the 2025-11-25 MCP
+ * protocol revision. Draft 2026 headers are permitted for compatibility,
+ * but they are not a conformance claim.
  * <p>
  * <b>Secure defaults:</b> cross-origin access is restricted to local origins
  * ({@code http://localhost:8080}, {@code http://127.0.0.1:8080}) unless the
@@ -52,6 +60,33 @@ public class TransportConfig {
      * tests assert against), so the two cannot drift.
      */
     static final String DEFAULT_ALLOWED_ORIGINS = "http://localhost:8080,http://127.0.0.1:8080";
+
+    @Bean
+    @Profile("http")
+    public SmartInitializingSingleton httpExposureGuard(
+            @Value("${server.address:127.0.0.1}") String address,
+            ProjectAccessPolicy projects,
+            OAuthResourceServerConfig auth,
+            ToolAuthorizationService credentials) {
+        return () -> {
+            if (!isLoopback(address)) {
+                if (projects.roots().isEmpty()
+                        || !auth.enforcementEnabled()
+                        || !credentials.hasConfiguredCredentials()
+                        || usesWildcard()) {
+                    throw new IllegalStateException(
+                            "Non-loopback HTTP requires project roots, bearer authentication, configured credentials, and restricted CORS");
+                }
+            }
+        };
+    }
+
+    static boolean isLoopback(String address) {
+        return "127.0.0.1".equalsIgnoreCase(address)
+                || "localhost".equalsIgnoreCase(address)
+                || "::1".equals(address)
+                || "0:0:0:0:0:0:0:1".equals(address);
+    }
 
     /**
      * Comma-separated list of CORS origins permitted to call the {@code /mcp/**}
@@ -130,5 +165,30 @@ public class TransportConfig {
                 }
             }
         };
+    }
+
+    /** Servlet transport bypasses MVC, so its endpoint needs a servlet CORS filter. */
+    @Bean
+    @Profile("http")
+    public FilterRegistrationBean<CorsFilter> mcpCorsFilter() {
+        CorsConfiguration cors = new CorsConfiguration();
+        String[] origins = parsedAllowedOrigins();
+        if (containsWildcard(origins)) {
+            cors.setAllowedOriginPatterns(List.of(origins));
+        } else {
+            cors.setAllowedOrigins(List.of(origins));
+        }
+        cors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("Mcp-Method", "Mcp-Name", "Content-Type", "Authorization", "Accept", "Origin"));
+        cors.setAllowCredentials(true);
+        cors.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // The URL registration limits this filter to MCP paths. With an exact
+        // servlet mapping the lookup path is servlet-relative, often empty.
+        source.registerCorsConfiguration("/**", cors);
+        FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(source));
+        registration.addUrlPatterns("/mcp", "/mcp/*");
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return registration;
     }
 }

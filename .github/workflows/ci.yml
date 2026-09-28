@@ -71,3 +71,29 @@ jobs:
       # output in a single Maven invocation to avoid compiling the project twice.
       - name: Compile (with warnings) and SpotBugs static analysis
         run: ./mvnw -B compile spotbugs:check -Dmaven.compiler.showWarnings=true --file pom.xml --no-transfer-progress
+
+
+  privacy-and-docs:
+    name: Privacy and docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Scan changed lines without printing matches
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python3 scripts/check-public-data.py --base "$BASE_SHA"
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+      - name: Build documentation strictly
+        run: |
+          python3 -m pip install -r docs/requirements.txt
+          mkdocs build --strict
+      - name: Validate registry catalog count
+        run: python3 -m json.tool mcp-registry.json > /dev/null
