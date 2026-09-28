@@ -23,17 +23,12 @@ import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
-import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Implementation;
 import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
-import io.modelcontextprotocol.spec.McpSchema.TextContent;
-import io.modelcontextprotocol.spec.McpSchema.Tool;
 import io.modelcontextprotocol.spec.McpServerSession;
 import io.modelcontextprotocol.spec.McpServerTransportProvider;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -138,39 +133,9 @@ public class McpServerTransportConfiguration {
         // Convert Spring AI @Tool callbacks to MCP SyncToolSpecifications
         List<SyncToolSpecification> toolSpecs = new ArrayList<>();
         for (ToolCallback callback : toolCallbackProvider.getToolCallbacks()) {
-            var def = callback.getToolDefinition();
-            String inputSchemaStr = def.inputSchema();
-            Map<String, Object> inputSchema;
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> parsed = jsonMapper.readValue(inputSchemaStr, Map.class);
-                inputSchema = parsed;
-            } catch (IOException e) {
-                log.warn(
-                        "Failed to parse input schema for tool '{}', using empty schema: {}",
-                        def.name(),
-                        e.getMessage());
-                inputSchema = Map.of("type", "object", "properties", Map.of());
-            }
-
-            Tool tool = Tool.builder(def.name())
-                    .description(def.description())
-                    .inputSchema(inputSchema)
-                    .build();
-            SyncToolSpecification spec = new SyncToolSpecification(tool, (exchange, callRequest) -> {
-                try {
-                    String inputJson = jsonMapper.writeValueAsString(callRequest.arguments());
-                    String resultJson = callback.call(inputJson);
-                    return new CallToolResult(List.of(new TextContent(resultJson)), Boolean.FALSE, null, null);
-                } catch (Exception e) {
-                    log.error("Tool '{}' execution failed", def.name(), e);
-                    return new CallToolResult(
-                            List.of(new TextContent("Tool execution error: " + e.getMessage())),
-                            Boolean.TRUE,
-                            null,
-                            null);
-                }
-            });
+            SyncToolSpecification spec = new SyncToolSpecification(
+                    McpToolAdapter.tool(callback, jsonMapper),
+                    (exchange, request) -> McpToolAdapter.call(callback, jsonMapper, request));
             toolSpecs.add(spec);
         }
 
@@ -182,7 +147,7 @@ public class McpServerTransportConfiguration {
                 .capabilities(capabilities)
                 .tools(toolSpecs)
                 .jsonMapper(jsonMapper)
-                .validateToolInputs(false)
+                .validateToolInputs(true)
                 .build();
     }
 }

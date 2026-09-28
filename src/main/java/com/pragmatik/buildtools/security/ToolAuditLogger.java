@@ -79,7 +79,7 @@ public final class ToolAuditLogger {
             Files.createDirectories(auditLogPath.getParent());
             Files.writeString(auditLogPath, event + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            log.warn("Failed to write audit log entry to {}: {}", auditLogPath, e.getMessage());
+            log.warn("Failed to write audit log entry; details withheld by privacy policy");
         }
     }
 
@@ -90,7 +90,7 @@ public final class ToolAuditLogger {
             int from = Math.max(0, lines.size() - count);
             return lines.subList(from, lines.size());
         } catch (IOException e) {
-            log.warn("Failed to read audit log: {}", e.getMessage());
+            log.warn("Failed to read audit log; details withheld by privacy policy");
             return List.of();
         }
     }

@@ -142,8 +142,8 @@ class StdioDiscoverProbeTest {
         var result = tree.get("result");
         assertThat(result).isNotNull();
         assertThat(result.get("serverInfo").get("name").asString()).isEqualTo(SERVER_NAME);
-        assertThat(result.get("protocolVersions").size()).isEqualTo(3);
-        assertThat(result.get("protocolVersions").get(2).asString()).isEqualTo("2026-07-28");
+        assertThat(result.get("protocolVersions").size()).isEqualTo(1);
+        assertThat(result.get("protocolVersions").get(0).asString()).isEqualTo("2025-11-25");
         assertThat(result.get("capabilities")).isNotNull();
     }
 

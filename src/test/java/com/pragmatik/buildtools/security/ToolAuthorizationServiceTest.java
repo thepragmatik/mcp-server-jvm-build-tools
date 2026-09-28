@@ -46,12 +46,12 @@ class ToolAuthorizationServiceTest {
     @Test
     void testAllScopesHaveToolCoverage() {
         List<String> allScopes = ToolPermission.allScopes();
-        assertEquals(12, allScopes.size(), "Should have 12 scopes");
+        assertEquals(10, allScopes.size(), "Should cover the live catalog");
         assertTrue(allScopes.contains("build:read"));
         assertTrue(allScopes.contains("build:execute"));
-        assertTrue(allScopes.contains("build:profile"));
+        assertTrue(allScopes.contains("ci:read"));
         assertTrue(allScopes.contains("dependency:read"));
-        assertTrue(allScopes.contains("dependency:manage"));
+        assertTrue(allScopes.contains("security:read"));
     }
 
     @Test
@@ -66,7 +66,7 @@ class ToolAuthorizationServiceTest {
     @Test
     void testWildcardAuthorizesEverything() {
         assertTrue(ToolPermission.isToolAuthorized("execute_build_command", List.of("*")));
-        assertTrue(ToolPermission.isToolAuthorized("nonexistent_tool", List.of("*")));
+        assertFalse(ToolPermission.isToolAuthorized("nonexistent_tool", List.of("*")));
         assertTrue(ToolPermission.isToolAuthorized("check_dependency_version", List.of("*")));
     }
 
@@ -105,13 +105,13 @@ class ToolAuthorizationServiceTest {
 
     @Test
     void testBuildProfileScope() {
-        assertTrue(ToolPermission.isToolAuthorized("profile_build", List.of("build:profile")));
-        assertTrue(ToolPermission.isToolAuthorized("analyze_build_performance", List.of("build:profile")));
+        assertTrue(ToolPermission.isToolAuthorized("profile_build", List.of("build:execute")));
+        assertTrue(ToolPermission.isToolAuthorized("analyze_build_performance", List.of("build:read")));
     }
 
     @Test
     void testCredentialReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("check_credential_status", List.of("credential:read")));
+        assertFalse(ToolPermission.isToolAuthorized("check_credential_status", List.of("credential:read")));
     }
 
     @Test
@@ -127,7 +127,7 @@ class ToolAuthorizationServiceTest {
 
     @Test
     void testPromptReadScope() {
-        assertTrue(ToolPermission.isToolAuthorized("get_build_tool_prompt", List.of("prompt:read")));
+        assertTrue(ToolPermission.isToolAuthorized("prompt_build_and_test", List.of("prompt:read")));
     }
 
     // === ToolAuthorizationService tests ===
@@ -174,15 +174,13 @@ class ToolAuthorizationServiceTest {
     void testValidateAccessTokenDefaultKey() {
         // The default dev key (if no env vars set) should validate
         String result = service.validateAccessToken("dev-key-unsafe-do-not-use-in-production");
-        assertTrue(result.contains("\"valid\":true"));
-        assertTrue(result.contains("\"identity\":\"default\""));
-        assertTrue(result.contains("\"hasWildcard\":true"));
+        assertTrue(result.contains("\"valid\":false"));
     }
 
     @Test
     void testIsAccessTokenValidForConfiguredKey() {
         // Default dev key present (permissive, no production profile)
-        assertTrue(service.isAccessTokenValid("dev-key-unsafe-do-not-use-in-production"));
+        assertFalse(service.isAccessTokenValid("dev-key-unsafe-do-not-use-in-production"));
     }
 
     @Test

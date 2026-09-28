@@ -59,7 +59,11 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.details
@@ -116,12 +120,14 @@ extra:
 nav:
   - User Guide:
       - Overview: user-guide/overview.md
+      - Quickstart 2.0: user-guide/quickstart-v2.md
       - Installation: user-guide/installation.md
       - Configuration: user-guide/configuration.md
       - Usage: user-guide/usage.md
       - Examples: user-guide/examples.md
   - Reference:
       - Architecture: reference/architecture.md
+      - Design 2.0: reference/design-v2.md
       - Tools / MCP API: reference/tools.md
       - Configuration Reference: reference/configuration.md
       - Security: reference/security.md

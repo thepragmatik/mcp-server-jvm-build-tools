@@ -139,7 +139,7 @@ public class ToolAuthorizationService {
                 if (keyValue != null && !keyValue.isBlank()) {
                     String scopesEnv = System.getenv("BUILDTOOLS_API_KEY_" + suffix + "_SCOPES");
                     List<String> scopes = parseScopes(scopesEnv);
-                    keys.put(suffix, new ToolApiKey(keyValue, scopes));
+                    keys.put(suffix, new ToolApiKey(digest(keyValue), scopes));
                 }
             }
         }
@@ -153,30 +153,22 @@ public class ToolAuthorizationService {
                 if (!keyValue.isBlank()) {
                     String scopesProp = System.getProperty("buildtools.api.key." + suffix + ".scopes", "");
                     List<String> scopes = parseScopes(scopesProp);
-                    keys.put(suffix, new ToolApiKey(keyValue, scopes));
+                    keys.put(suffix, new ToolApiKey(digest(keyValue), scopes));
                 }
             }
-        }
-
-        // Default development key if none configured. NEVER created under a production profile or
-        // when authorization is enforcing, so the unsafe default cannot be live in a hardened
-        // deployment (issue #89, complements #83). In that case the store is left empty: no token
-        // validates until the operator configures real BUILDTOOLS_API_KEY_* credentials.
-        if (keys.isEmpty() && !suppressDevKey) {
-            keys.put("default", new ToolApiKey("dev-key-unsafe-do-not-use-in-production", List.of("*")));
         }
 
         return Collections.unmodifiableMap(keys);
     }
 
     private List<String> parseScopes(String scopesStr) {
-        if (scopesStr == null || scopesStr.isBlank()) return List.of("*");
+        if (scopesStr == null || scopesStr.isBlank()) return List.of();
         List<String> scopes = new ArrayList<>();
         for (String s : scopesStr.split(",")) {
             String trimmed = s.trim().toLowerCase();
             if (!trimmed.isEmpty()) scopes.add(trimmed);
         }
-        return scopes.isEmpty() ? List.of("*") : scopes;
+        return scopes;
     }
 
     /**
@@ -419,11 +411,10 @@ public class ToolAuthorizationService {
         }
 
         // Hash the token for lookup
-        String tokenHash = sha256(token);
+        byte[] tokenHash = digest(token);
 
         for (Map.Entry<String, ToolApiKey> entry : apiKeys.entrySet()) {
-            String keyHash = sha256(entry.getValue().key);
-            if (tokenHash.equals(keyHash)) {
+            if (MessageDigest.isEqual(tokenHash, entry.getValue().digest)) {
                 result.put("valid", true);
                 result.put("identity", entry.getKey());
                 result.put("scopes", entry.getValue().scopes);
@@ -475,9 +466,9 @@ public class ToolAuthorizationService {
             authFailureCount.incrementAndGet();
             return false;
         }
-        String tokenHash = sha256(token);
+        byte[] tokenHash = digest(token);
         for (ToolApiKey key : apiKeys.values()) {
-            if (tokenHash.equals(sha256(key.key))) {
+            if (MessageDigest.isEqual(tokenHash, key.digest)) {
                 authSuccessCount.incrementAndGet();
                 return true;
             }
@@ -486,16 +477,31 @@ public class ToolAuthorizationService {
         return false;
     }
 
+    public boolean isToolAuthorizedForToken(String token, String toolName) {
+        if (token == null || token.isBlank() || !ToolPermission.isKnownTool(toolName)) {
+            return false;
+        }
+        byte[] tokenHash = digest(token);
+        for (ToolApiKey key : apiKeys.values()) {
+            if (MessageDigest.isEqual(tokenHash, key.digest) && ToolPermission.isToolAuthorized(toolName, key.scopes)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasConfiguredCredentials() {
+        return !apiKeys.isEmpty();
+    }
+
     /**
      * SHA-256 hash for token comparison.
      */
-    private static String sha256(String input) {
+    private static byte[] digest(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("SHA-256 not available", e);
+            return MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
@@ -516,5 +522,5 @@ public class ToolAuthorizationService {
     /**
      * Internal representation of an API key.
      */
-    private record ToolApiKey(String key, List<String> scopes) {}
+    private record ToolApiKey(byte[] digest, List<String> scopes) {}
 }

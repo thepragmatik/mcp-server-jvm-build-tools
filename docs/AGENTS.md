@@ -59,7 +59,7 @@ leave it out.
    unaddressed. If code changed, re-run CI and ask both reviewers to re-confirm
    their blocking comments are resolved.
 7. **GATE 4 — Merge (squash).** Once all of the following are true:
-   - CI green (all 4 checks pass)
+   - CI green (all required checks pass)
    - Both reviews posted and verdicts are APPROVE
    - Every review comment has a response (accepted+implemented or declined with rationale)
 

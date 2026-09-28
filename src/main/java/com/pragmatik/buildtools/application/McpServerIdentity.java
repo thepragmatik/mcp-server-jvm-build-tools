@@ -54,7 +54,7 @@ public class McpServerIdentity {
     public static final String VENDOR = "The Pragmatik";
 
     /** Protocol versions this server can speak (oldest to newest). */
-    public static final List<String> SUPPORTED_PROTOCOL_VERSIONS = List.of("2024-11-05", "2025-03-26", "2026-07-28");
+    public static final List<String> SUPPORTED_PROTOCOL_VERSIONS = List.of("2025-11-25");
 
     /** MCP {@code cacheScope} value permitting shared intermediaries to cache a response. */
     public static final String CACHE_SCOPE_PUBLIC = "public";
