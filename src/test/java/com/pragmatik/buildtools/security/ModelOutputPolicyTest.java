@@ -40,6 +40,18 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void projectsKotlinErrorPrefixWithoutLeakingPrivateText() {
+        String output = "{\"exitCode\":1,\"rawOutput\":\"e: unresolved reference: "
+                + "/synthetic/private/Sample.kt:42 alice@example.invalid token=SYNTHETIC_SECRET\"}";
+        String safe = policy.protect("execute_build_command", output);
+        assertTrue(safe.contains("\"category\":\"compilation\""));
+        assertTrue(safe.contains("\"severity\":\"error\""));
+        assertFalse(safe.contains("/synthetic/private"));
+        assertFalse(safe.contains("alice@example.invalid"));
+        assertFalse(safe.contains("SYNTHETIC_SECRET"));
+    }
+
+    @Test
     void executeStatusUsesAuthoritativeExitCodeOverMisleadingOutput() {
         String raw =
                 "{\"exitCode\":1,\"success\":false,\"rawOutput\":\"BUILD SUCCESS /synthetic/private alice@example.invalid\"}";

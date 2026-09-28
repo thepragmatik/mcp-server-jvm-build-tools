@@ -21,8 +21,9 @@ def load(name, path):
     return module
 
 
-def fixture(root, tool, final_partial=False):
-    label = tool + ("-eof" if final_partial else "")
+def fixture(root, tool, case):
+    final_partial = case == "final-partial"
+    label = tool + "-" + case
     home = root / label
     (home / "bin").mkdir(parents=True)
     project = root / (label + "-project")
@@ -35,6 +36,11 @@ def fixture(root, tool, final_partial=False):
         "[error] /synthetic/private/Sample.scala:42: cannot find symbol "
         "test.user@example.invalid token=SYNTHETIC_SECRET"
     )
+    if case == "colored-kotlin":
+        diagnostic = (
+            "\\x1b[31me: unresolved reference: /synthetic/private/Sample.kt:42 "
+            "test.user@example.invalid token=SYNTHETIC_SECRET\\x1b[0m"
+        )
     emitter = home / "emit.py"
     if final_partial:
         program = (
@@ -96,9 +102,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mcp-middle-gate-") as temporary:
         root = Path(temporary)
         fixtures = {
-            (tool, case): fixture(root, tool, case == "final-partial")
+            (tool, case): fixture(root, tool, case)
             for tool in ("gradle", "sbt")
-            for case in ("middle", "final-partial")
+            for case in (("middle", "final-partial", "colored-kotlin")
+                         if tool == "gradle" else ("middle", "final-partial"))
         }
         env = os.environ.copy()
         env["BUILDTOOLS_PROJECTS_ALLOWED_ROOTS"] = str(root)

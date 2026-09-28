@@ -15,7 +15,7 @@ parity, and private canary suppression without printing build logs.
 
 The release workflow also runs the packaged Gradle/sbt middle-diagnostic probe
 on HTTP and stdio. It drives a 28 MiB synthetic failure on stdout or stderr, plus a competing-stream
-case whose final stderr error has no newline, then checks analysis and execution, structured/text parity, exit status, and
+case whose final stderr error has no newline, and a colored Kotlin `e:` error in the discarded middle of a Gradle stream. It then checks analysis and execution, structured/text parity, exit status, and
 synthetic path/email/secret suppression.
 
 The official scenarios selected for this product are `server-initialize`,

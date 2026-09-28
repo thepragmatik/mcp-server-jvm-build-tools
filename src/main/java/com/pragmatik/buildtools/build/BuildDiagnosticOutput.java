@@ -141,8 +141,23 @@ final class BuildDiagnosticOutput extends OutputStream {
 
     private boolean startsWith(String prefix) {
         int start = 0;
-        while (start < length && (line[start] == ' ' || line[start] == '\t')) {
-            start++;
+        while (start < length) {
+            if (line[start] == ' ' || line[start] == '\t') {
+                start++;
+                continue;
+            }
+            if (line[start] == 0x1b && start + 2 < length && line[start + 1] == '[') {
+                int end = start + 2;
+                while (end < length
+                        && ((line[end] >= '0' && line[end] <= '9') || line[end] == ';' || line[end] == ':')) {
+                    end++;
+                }
+                if (end < length && line[end] == 'm') {
+                    start = end + 1;
+                    continue;
+                }
+            }
+            break;
         }
         if (length - start < prefix.length()) {
             return false;

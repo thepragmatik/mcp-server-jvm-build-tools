@@ -35,6 +35,18 @@ class BuildDiagnosticOutputTest {
     }
 
     @Test
+    void coloredKotlinErrorInDiscardedMiddleIsRetained() throws Exception {
+        BoundedProcessOutput capture = new BoundedProcessOutput();
+        BuildDiagnosticOutput output = new BuildDiagnosticOutput(capture, "gradle");
+        output.write(("x".repeat(BoundedProcessOutput.HEAD_BYTES) + "\n").getBytes(StandardCharsets.UTF_8));
+        output.write(" \u001b[31m\u001b[1m e: unresolved reference: fixtureSymbol\u001b[0m\n"
+                .getBytes(StandardCharsets.UTF_8));
+        output.write("y".repeat(BoundedProcessOutput.TAIL_BYTES + 1).getBytes(StandardCharsets.UTF_8));
+        assertThat(capture.snapshot()).doesNotContain("fixtureSymbol");
+        assertThat(output.diagnostics()).containsExactly("  e: unresolved reference: fixtureSymbol");
+        assertThat(output.diagnosticsTruncated()).isTrue();
+    }
+
     void uniqueLimitAndOversizedLineSignalOmissions() throws Exception {
         BuildDiagnosticOutput output = new BuildDiagnosticOutput(new BoundedProcessOutput(), "gradle");
         for (int i = 1; i <= 13; i++) {
