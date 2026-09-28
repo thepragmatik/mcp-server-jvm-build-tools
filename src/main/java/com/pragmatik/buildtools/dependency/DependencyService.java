@@ -509,7 +509,9 @@ public class DependencyService {
 
             String highest = "NONE";
             for (VulnerabilityEntry v : vulns) {
-                if (CveLookupService.meetsThreshold(v.severity(), highest)) {
+                if ("UNKNOWN".equals(v.severity())) {
+                    highest = "UNKNOWN";
+                } else if (!"UNKNOWN".equals(highest) && CveLookupService.meetsThreshold(v.severity(), highest)) {
                     highest = v.severity();
                 }
             }
@@ -531,9 +533,10 @@ public class DependencyService {
         } catch (Exception e) {
             // Network failures shouldn't break the version check — return partial result
             Map<String, Object> security = new LinkedHashMap<>();
-            security.put("cveCount", 0);
+            security.put("cveCount", null);
             security.put("highestSeverity", "UNKNOWN");
             security.put("warning", "CVE lookup failed");
+            security.put("lookupStatus", "incomplete");
             security.put("vulnerabilities", List.of());
             result.put("security", security);
         }
@@ -544,26 +547,28 @@ public class DependencyService {
      * <p>
      * Reads a bounded POM or Gradle build file, extracts direct dependencies, and
      * sends supported package coordinates to OSV.dev. The MCP projection returns
-     * aggregate counts and safe warnings; package and CVE identities stay local.
+     * aggregate counts and a completeness status; package and CVE identities stay local.
      * <p>
      * <b>Performance:</b> Uncached coordinates are queried in batches of up to 100;
-     * an in-memory cache lasts one hour. The severity threshold filters results
-     * after lookup and does not reduce outbound query work.
+     * an in-memory cache lasts one hour. A scan is incomplete if any dependency
+     * cannot be checked. OSV batch results omit severity, so presence counts are
+     * reported without asserting severity for those vulnerabilities.
      */
     @Tool(
             name = "scan_dependency_cves",
             description = "Scan direct Maven or Gradle dependencies for known vulnerabilities using OSV.dev. "
                     + "Sends supported package coordinates and versions to OSV.dev. Accepts build files up to 1 MiB "
-                    + "through a no-symlink project handle. MCP returns aggregate counts and safe warnings; "
+                    + "through a no-symlink project handle. MCP returns aggregate counts and scan status; "
                     + "package and CVE identities stay local. Default threshold is HIGH, including CRITICAL. "
-                    + "Uncached coordinates are queried in batches of up to 100.")
+                    + "Scans at most 500 coordinates in batches of up to 100; unknown severity is explicit.")
     public String scanDependencyCves(
             @ToolParam(required = true, description = "Path to the project directory containing build files")
                     String projectDir,
             @Schema(allowableValues = {"CRITICAL", "HIGH", "MEDIUM", "LOW", "ALL"})
                     @ToolParam(
                             required = false,
-                            description = "Minimum severity to include: CRITICAL, HIGH (default), MEDIUM, LOW, or ALL")
+                            description =
+                                    "Minimum known severity for local details: CRITICAL, HIGH (default), MEDIUM, LOW, or ALL. Unknown-severity matches remain visible in aggregate counts.")
                     String severityThreshold) {
 
         if (projectDir == null || projectDir.isBlank()) {
@@ -584,9 +589,17 @@ public class DependencyService {
             }
             result.put("project", Map.of("tool", buildFile.tool()));
             List<CveLookupService.PackageRef> packages = extractPackages(buildFile.content(), buildFile.tool());
+            if (packages.size() > CveLookupService.MAX_SCAN_PACKAGES) {
+                return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
+            }
 
             // Bulk lookup
             Map<String, List<VulnerabilityEntry>> scanResults = cveLookup.bulkLookup(packages);
+            for (CveLookupService.PackageRef pkg : packages) {
+                if (!scanResults.containsKey(pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version())) {
+                    return JsonUtils.errorJson("Dependency vulnerability scan incomplete");
+                }
+            }
 
             // Build vulnerability report
             List<Map<String, Object>> vulnerabilities = new ArrayList<>();
@@ -594,35 +607,33 @@ public class DependencyService {
             int vulnerableDeps = 0;
             int criticalCount = 0;
             int highCount = 0;
-            List<String> warnings = new ArrayList<>();
-            long skippedDeps = packages.stream()
-                    .filter(pkg ->
-                            !scanResults.containsKey(pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version()))
-                    .count();
-            if (skippedDeps > 0) {
-                warnings.add(skippedDeps
-                        + " dependencies were skipped because their coordinates are not supported for OSV lookup");
-            }
+            boolean severityUnknown = false;
 
             for (CveLookupService.PackageRef pkg : packages) {
                 String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
-                List<VulnerabilityEntry> vulns = scanResults.getOrDefault(key, List.of());
+                List<VulnerabilityEntry> vulns = scanResults.get(key);
+                if (!vulns.isEmpty()) vulnerableDeps++;
+                if (vulns.stream().anyMatch(v -> "UNKNOWN".equals(v.severity()))) {
+                    severityUnknown = true;
+                }
+                for (VulnerabilityEntry v : vulns) {
+                    if ("CRITICAL".equals(v.severity())) criticalCount++;
+                    else if ("HIGH".equals(v.severity())) highCount++;
+                }
 
                 // Filter by threshold
                 List<VulnerabilityEntry> filtered = vulns.stream()
-                        .filter(v ->
-                                threshold.equals("ALL") || CveLookupService.meetsThreshold(v.severity(), threshold))
+                        .filter(v -> "UNKNOWN".equals(v.severity())
+                                || threshold.equals("ALL")
+                                || CveLookupService.meetsThreshold(v.severity(), threshold))
                         .toList();
 
                 if (!filtered.isEmpty()) {
-                    vulnerableDeps++;
                     Map<String, Object> depVuln = new LinkedHashMap<>();
                     depVuln.put("dependency", key);
                     List<Map<String, Object>> cveList = new ArrayList<>();
                     for (VulnerabilityEntry v : filtered) {
                         cveList.add(v.toMap());
-                        if ("CRITICAL".equals(v.severity())) criticalCount++;
-                        else if ("HIGH".equals(v.severity())) highCount++;
                     }
                     depVuln.put("cves", cveList);
 
@@ -640,20 +651,19 @@ public class DependencyService {
                 }
             }
 
-            result.put(
-                    "scanSummary",
-                    Map.of(
-                            "totalDeps", totalDeps,
-                            "vulnerableDeps", vulnerableDeps,
-                            "criticalCount", criticalCount,
-                            "highCount", highCount));
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("totalDeps", totalDeps);
+            summary.put("vulnerableDeps", vulnerableDeps);
+            if (!severityUnknown) {
+                summary.put("criticalCount", criticalCount);
+                summary.put("highCount", highCount);
+            }
+            result.put("scanSummary", summary);
+            result.put("scanStatus", severityUnknown ? "severity_unknown" : "complete");
+            result.put("severityUnknown", severityUnknown);
 
             result.put("vulnerabilities", vulnerabilities);
             result.put("scannedAt", java.time.Instant.now().toString());
-
-            if (!warnings.isEmpty()) {
-                result.put("warnings", warnings);
-            }
 
             return JsonUtils.toJson(result);
 

@@ -38,7 +38,7 @@ The public tool descriptions state the result contract after the output policy, 
 | Tool | Model-visible result | Retained locally |
 |---|---|---|
 | `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
-| `scan_dependency_cves` | Scanned, vulnerable, critical, and high counts; bounded redacted warnings | Dependency and CVE identities |
+| `scan_dependency_cves` | `scanStatus`, recognized declaration count (`totalDeps`), and affected-dependency presence count (`vulnerableDeps`); `severityUnknown` when OSV omits severity. High/critical counts appear only when all returned severities are known. Failed or partial lookups return `scanStatus: incomplete` and no counts. | Dependency and CVE identities |
 
 These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
 
@@ -51,10 +51,12 @@ flowchart LR
     H --> F["🟢 First POM / KTS / Groovy file<br/>1 MiB + strict UTF-8"]
     F --> C{"🟠 Maven coordinate<br/>shape and length?"}
     C -- valid --> O["🟡 Typed OSV request<br/>coordinate fields only"]
-    O --> R["🟢 Aggregate MCP counts"]
+    O --> Q{"🟠 Complete OSV response?"}
+    Q -- yes --> R["🟢 Presence count + scan status<br/>severity claims only when known"]
+    Q -- no --> X
     H -- unsafe path --> X["🔴 Fixed local error<br/>zero OSV requests"]
     F -- invalid bytes or size --> X
-    C -- invalid --> S["🔴 Skip + aggregate warning"]
+    C -- invalid --> X
     classDef guard fill:#eee5ff,stroke:#7c3aed,color:#24114b
     classDef anchor fill:#dbeafe,stroke:#2563eb,color:#102a56
     classDef local fill:#dcfce7,stroke:#16a34a,color:#073b1e
@@ -65,11 +67,12 @@ flowchart LR
     class H anchor
     class F,R local
     class C decision
+    class Q decision
     class O outbound
-    class X,S stop
+    class X stop
 ```
 
-[OSV.dev](https://google.github.io/osv.dev/post-v1-querybatch/) receives dependency coordinates by design, so operators should treat the scan as an explicit network egress operation. The lexical gate cannot identify a secret deliberately encoded to resemble a valid Maven coordinate.
+[OSV.dev](https://google.github.io/osv.dev/post-v1-querybatch/) receives dependency coordinates by design, so operators should treat the scan as an explicit network egress operation. The lexical gate cannot identify a secret deliberately encoded to resemble a valid Maven coordinate. The scan reads direct literal declarations in the first supported POM dependency block or selected Gradle forms; it does not resolve the transitive graph. `totalDeps` counts recognized declarations, not all project dependencies. The batch API returns only vulnerability IDs and modification times, so a positive result increments `vulnerableDeps` without asserting that it meets the requested severity threshold. `severityUnknown: true` and `scanStatus: severity_unknown` identify that case; `highCount` and `criticalCount` are omitted. A complete empty response can show zero; invalid coordinates, HTTP failures, malformed or oversized responses, pagination, and more than 500 declarations produce a fixed incomplete result without counts. OSV responses are capped at 2 MiB, with a 10-second timeout per request and at most five 100-package batches. A clean result is a limited direct-declaration check, not a full project security audit.
 
 Build execution and output analysis return `diagnostics` as structured objects: `severity` (`error` or `warning`), `category` (`compilation`, `test`, `dependency`, `configuration`, `execution`, or `other`), per-result `diagnosticRef`, optional per-result `fileRef`, `fileType` (`java`, `kt`, `scala`, `xml`, `gradle`, `kts`, or `sbt`) and positive `line`, and a redacted message of at most 500 characters. At most 12 distinct source diagnostics are returned, errors first; `diagnosticsTruncated: true` signals omitted entries. Recognized failure phrases retain the cause (for example, `cannot find symbol`) but normalize arbitrary identifiers, values, and dependency coordinates to placeholders. Unknown or suspicious text receives a generic local-inspection message. `diagnosticRef` distinguishes errors whose public fields otherwise match; `fileRef` groups messages from one file within a result but reveals no path. This is a triage contract: the user must inspect local build output to map a reference to a file and symbol before editing. The parser's raw log and command are removed before serialization for the model-visible policy, preserving final structured errors even when the original build output was large. Neither source excerpts nor raw file or symbol identities are emitted.
 

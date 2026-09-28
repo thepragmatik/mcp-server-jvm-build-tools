@@ -52,7 +52,7 @@ def fixtures(root):
         "<groupId>test.user@example.invalid</groupId>"
         "<artifactId>SYNTHETIC_SECRET</artifactId><version>1</version>"
         "</dependency></dependencies></project>", encoding="utf-8")
-    cases["unsupported-coordinate"] = (project, SUMMARY)
+    cases["unsupported-coordinate"] = (project, None)
     return cases, outside
 
 
@@ -73,6 +73,8 @@ def assert_result(result, expected_summary, root, outside):
         if safe is not None and (safe.get("completed") is not True
                                  or safe.get("isError") is not True):
             raise AssertionError("Unsafe build file did not produce a fixed private error")
+        if safe is not None and safe.get("scanStatus") != "incomplete":
+            raise AssertionError("Incomplete OSV scan was not identified")
         if safe is not None and any(key in safe for key in SUMMARY):
             raise AssertionError("Unsafe build file was scanned")
     else:

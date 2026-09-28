@@ -156,10 +156,18 @@ public final class ModelOutputPolicy {
                         copyArrayCount(root, "importedBoms", "importedBomCount", safe);
                     }
                     if ("scan_dependency_cves".equals(toolName)) {
-                        copyCounts(
-                                root.get("scanSummary"),
-                                Set.of("totalDeps", "vulnerableDeps", "criticalCount", "highCount"),
-                                safe);
+                        safe.put("scanStatus", error != null && !error.isNull() ? "incomplete" : "complete");
+                        JsonNode scanStatus = root.get("scanStatus");
+                        if (error == null && scanStatus != null && "severity_unknown".equals(scanStatus.asText())) {
+                            safe.put("scanStatus", "severity_unknown");
+                            safe.put("severityUnknown", true);
+                        }
+                        if (error == null || error.isNull()) {
+                            copyCounts(
+                                    root.get("scanSummary"),
+                                    Set.of("totalDeps", "vulnerableDeps", "criticalCount", "highCount"),
+                                    safe);
+                        }
                     }
                     if ("profile_build".equals(toolName)) {
                         copyDuration(root, "durationSeconds", safe);

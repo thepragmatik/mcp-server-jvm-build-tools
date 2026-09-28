@@ -16,16 +16,25 @@
  */
 package com.pragmatik.buildtools.dependency.security;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +67,9 @@ public class CveLookupService {
     private static final int MAX_GROUP_ID_LENGTH = 256;
     private static final int MAX_ARTIFACT_ID_LENGTH = 128;
     private static final int MAX_VERSION_LENGTH = 128;
+    public static final int MAX_SCAN_PACKAGES = 500;
+    static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private final OsvTransport transport;
     private final Map<String, CacheEntry> cache;
@@ -81,11 +93,24 @@ public class CveLookupService {
         this((uri, payload) -> {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(uri)
+                    .timeout(REQUEST_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return new OsvResponse(response.statusCode(), response.body());
+            CompletableFuture<HttpResponse<byte[]>> exchange =
+                    httpClient.sendAsync(request, info -> new BoundedBodySubscriber());
+            try {
+                HttpResponse<byte[]> response = exchange.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                return new OsvResponse(response.statusCode(), new String(response.body(), StandardCharsets.UTF_8));
+            } catch (TimeoutException e) {
+                exchange.cancel(true);
+                throw new IOException("OSV query timed out", e);
+            } catch (ExecutionException e) {
+                throw new IOException("OSV query failed", e);
+            } catch (InterruptedException e) {
+                exchange.cancel(true);
+                throw e;
+            }
         });
     }
 
@@ -101,6 +126,48 @@ public class CveLookupService {
     }
 
     record OsvResponse(int statusCode, String body) {}
+
+    static final class BoundedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
+        private final CompletableFuture<byte[]> body = new CompletableFuture<>();
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+
+        @Override
+        public CompletionStage<byte[]> getBody() {
+            return body;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            subscription.request(1);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> buffers) {
+            for (ByteBuffer buffer : buffers) {
+                if (buffer.remaining() > MAX_RESPONSE_BYTES - bytes.size()) {
+                    subscription.cancel();
+                    body.completeExceptionally(new IOException("OSV response exceeds size limit"));
+                    return;
+                }
+                byte[] chunk = new byte[buffer.remaining()];
+                buffer.get(chunk);
+                bytes.writeBytes(chunk);
+            }
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            body.completeExceptionally(error);
+        }
+
+        @Override
+        public void onComplete() {
+            body.complete(bytes.toByteArray());
+        }
+    }
 
     private record OsvPackage(String name, String ecosystem) {}
 
@@ -159,11 +226,14 @@ public class CveLookupService {
         try {
             OsvResponse response = transport.post(URI.create(OSV_QUERY_URL), payload);
 
+            if (response.statusCode() != 200 || !bounded(response)) {
+                throw new IOException("OSV query incomplete");
+            }
             List<VulnerabilityEntry> entries;
-            if (response.statusCode() == 200) {
+            try {
                 entries = parseOsvResponse(response.body());
-            } else {
-                entries = List.of();
+            } catch (RuntimeException e) {
+                throw new IOException("OSV query response invalid", e);
             }
 
             // Store in cache
@@ -178,20 +248,27 @@ public class CveLookupService {
 
     static final int OSV_BATCH_SIZE = 100;
 
+    private static boolean bounded(OsvResponse response) {
+        return response.body() != null && response.body().getBytes(StandardCharsets.UTF_8).length <= MAX_RESPONSE_BYTES;
+    }
+
     /**
      * Bulk-lookup vulnerabilities for multiple dependencies using the OSV.dev
      * {@code /v1/querybatch} endpoint: packages are sent in chunks of
      * {@value #OSV_BATCH_SIZE} (OSV.dev's documented batch limit) so a scan of
      * N dependencies costs ceil(N/100) HTTP round-trips instead of N sequential
-     * ones. Packages whose batch result is missing or malformed fall back to
-     * the single-query {@link #lookup} path to preserve correctness. The LRU
-     * cache is checked and populated exactly as in {@link #lookup}.
+     * ones. Only verified, complete results are returned or cached. A missing
+     * package key means its lookup did not complete; callers must not treat it
+     * as a clean result. Failed batches are not retried sequentially.
      *
      * @param packages list of packages to scan
      * @return map of package key to vulnerability entries
      */
     public Map<String, List<VulnerabilityEntry>> bulkLookup(List<PackageRef> packages) {
         Map<String, List<VulnerabilityEntry>> results = new LinkedHashMap<>();
+        if (packages == null || packages.size() > MAX_SCAN_PACKAGES) {
+            return results;
+        }
 
         // Serve cache hits first; collect the rest for batching
         List<PackageRef> pending = new ArrayList<>();
@@ -226,54 +303,48 @@ public class CveLookupService {
         try {
             OsvResponse response = transport.post(URI.create(OSV_BATCH_URL), payload);
 
-            if (response.statusCode() != 200) {
-                logger.warn(
-                        "[CveLookupService] OSV batch query returned HTTP {}; falling back to sequential lookups",
-                        response.statusCode());
-                fallbackSequential(batch, results);
+            if (response.statusCode() != 200 || !bounded(response)) {
+                logger.warn("[CveLookupService] OSV batch query incomplete");
                 return;
             }
 
             JsonNode root = objectMapper.readTree(response.body());
+            if (root == null || !root.isObject() || root.has("next_page_token")) {
+                logger.warn("[CveLookupService] OSV batch response shape mismatch");
+                return;
+            }
             JsonNode resArr = root.get("results");
             if (resArr == null || !resArr.isArray() || resArr.size() != batch.size()) {
-                logger.warn("[CveLookupService] OSV batch response shape mismatch; falling back to sequential lookups");
-                fallbackSequential(batch, results);
+                logger.warn("[CveLookupService] OSV batch response shape mismatch");
                 return;
             }
 
+            Map<String, List<VulnerabilityEntry>> completeBatch = new LinkedHashMap<>();
             for (int i = 0; i < batch.size(); i++) {
                 PackageRef pkg = batch.get(i);
                 String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
                 JsonNode node = resArr.get(i);
-                JsonNode vulns = node == null ? null : node.get("vulns");
-                List<VulnerabilityEntry> entries;
-                if (node == null || node.isNull()) {
-                    entries = List.of();
-                } else {
-                    entries = parseVulnsArray(vulns);
+                if (node == null || !node.isObject() || node.has("next_page_token")) {
+                    logger.warn("[CveLookupService] OSV batch response incomplete");
+                    return;
                 }
+                JsonNode vulns = node.get("vulns");
+                if (vulns != null && !vulns.isArray()) {
+                    logger.warn("[CveLookupService] OSV batch response shape mismatch");
+                    return;
+                }
+                List<VulnerabilityEntry> entries = parseVulnsArray(vulns);
+                completeBatch.put(key, entries);
+            }
+            for (Map.Entry<String, List<VulnerabilityEntry>> entry : completeBatch.entrySet()) {
+                String key = entry.getKey();
+                List<VulnerabilityEntry> entries = entry.getValue();
                 putCache(key, entries);
                 results.put(key, entries);
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException | InterruptedException | RuntimeException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            logger.warn("[CveLookupService] OSV batch query failed; falling back to sequential lookups");
-            fallbackSequential(batch, results);
-        }
-    }
-
-    private void fallbackSequential(List<PackageRef> batch, Map<String, List<VulnerabilityEntry>> results) {
-        for (PackageRef pkg : batch) {
-            String key = pkg.groupId() + ":" + pkg.artifactId() + ":" + pkg.version();
-            try {
-                List<VulnerabilityEntry> vulns = lookup(pkg.groupId(), pkg.artifactId(), pkg.version());
-                results.put(key, vulns);
-            } catch (IOException e) {
-                // Partial results — mark as unknown with warning
-                results.put(key, List.of());
-                logger.warn("[CveLookupService] Could not scan a package after batch failure");
-            }
+            logger.warn("[CveLookupService] OSV batch query incomplete");
         }
     }
 
@@ -309,23 +380,36 @@ public class CveLookupService {
     // ── OSV response parsing (Jackson) ───────────────────────────────
 
     List<VulnerabilityEntry> parseOsvResponse(String json) {
-        List<VulnerabilityEntry> entries = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(json);
-            entries = parseVulnsArray(root.get("vulns"));
-        } catch (Exception e) {
-            // JSON parse error — return empty
+            if (root == null || !root.isObject() || root.has("next_page_token")) {
+                throw new IllegalArgumentException("OSV response incomplete");
+            }
+            JsonNode vulns = root.get("vulns");
+            if (vulns != null && !vulns.isArray()) {
+                throw new IllegalArgumentException("OSV response shape invalid");
+            }
+            return parseVulnsArray(vulns);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("OSV response shape invalid", e);
         }
-        return entries;
     }
 
     private List<VulnerabilityEntry> parseVulnsArray(JsonNode vulns) {
         List<VulnerabilityEntry> entries = new ArrayList<>();
-        if (vulns == null || !vulns.isArray()) return entries;
+        if (vulns == null) return entries;
+        if (!vulns.isArray()) throw new IllegalArgumentException("OSV vulnerabilities invalid");
         for (JsonNode vuln : vulns) {
+            if (vuln == null || !vuln.isObject()) {
+                throw new IllegalArgumentException("OSV vulnerability invalid");
+            }
             String id = vuln.has("id") ? vuln.get("id").asText() : null;
             String summary = vuln.has("summary") ? vuln.get("summary").asText() : null;
-            if (id == null) continue;
+            if (id == null || id.isBlank()) {
+                throw new IllegalArgumentException("OSV vulnerability identifier missing");
+            }
 
             String severity = classifySeverity(vuln);
             String fixedIn = extractFirstFixed(vuln);
@@ -340,7 +424,7 @@ public class CveLookupService {
 
     static String classifySeverity(JsonNode vuln) {
         double score = extractCvssScore(vuln);
-        return cvssToSeverity(score);
+        return score > 0.0 ? cvssToSeverity(score) : "UNKNOWN";
     }
 
     static double extractCvssScore(JsonNode vuln) {
@@ -351,7 +435,8 @@ public class CveLookupService {
         for (JsonNode sev : severity) {
             if (sev.has("type") && sev.has("score") && sev.get("type").asText().contains("CVSS_V3")) {
                 try {
-                    return Double.parseDouble(sev.get("score").asText());
+                    double score = Double.parseDouble(sev.get("score").asText());
+                    if (Double.isFinite(score) && score >= 0.0 && score <= 10.0) return score;
                 } catch (NumberFormatException e) {
                     // fall through
                 }
@@ -362,7 +447,8 @@ public class CveLookupService {
         for (JsonNode sev : severity) {
             if (sev.has("score")) {
                 try {
-                    return Double.parseDouble(sev.get("score").asText());
+                    double score = Double.parseDouble(sev.get("score").asText());
+                    if (Double.isFinite(score) && score >= 0.0 && score <= 10.0) return score;
                 } catch (NumberFormatException e) {
                     // fall through
                 }

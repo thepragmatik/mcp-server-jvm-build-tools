@@ -294,6 +294,29 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void osvPresenceAndIncompleteStatusStayVisibleWithoutPrivateIdentity() {
+        String raw = """
+                {"scanStatus":"severity_unknown","severityUnknown":true,
+                 "scanSummary":{"totalDeps":1,"vulnerableDeps":1},
+                 "vulnerabilities":[{"dependency":"private.user@example.invalid:secret:1",
+                 "cves":[{"id":"SYNTHETIC_SECRET","severity":"UNKNOWN"}]}]}
+                """;
+        String safe = policy.protect("scan_dependency_cves", raw);
+        assertTrue(safe.contains("\"scanStatus\":\"severity_unknown\""));
+        assertTrue(safe.contains("\"severityUnknown\":true"));
+        assertTrue(safe.contains("\"vulnerableDeps\":1"));
+        assertFalse(safe.contains("\"highCount\""));
+        assertFalse(safe.contains("SYNTHETIC_SECRET"));
+        assertFalse(safe.contains("private.user@example.invalid"));
+
+        String incomplete =
+                policy.protect("scan_dependency_cves", "{\"error\":\"Dependency vulnerability scan incomplete\"}");
+        assertTrue(incomplete.contains("\"scanStatus\":\"incomplete\""));
+        assertTrue(incomplete.contains("\"isError\":true"));
+        assertFalse(incomplete.contains("\"vulnerableDeps\""));
+    }
+
+    @Test
     void boundsLargeResultsAndKeepsFinalDiagnostic() {
         String output = "x".repeat(300_000) + "\nERROR /home/private-user/File.java";
         String safe = policy.protect("execute_build_command", output);

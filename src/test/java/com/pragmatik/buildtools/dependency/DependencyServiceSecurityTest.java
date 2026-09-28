@@ -162,6 +162,46 @@ class DependencyServiceSecurityTest {
         }
 
         @Test
+        void uncheckedDependencyReturnsFixedIncompleteErrorWithoutCounts() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), POM);
+            CveLookupService lookup = new CveLookupService() {
+                @Override
+                public Map<String, List<VulnerabilityEntry>> bulkLookup(List<PackageRef> packages) {
+                    return Map.of();
+                }
+            };
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(result)
+                    .contains("Dependency vulnerability scan incomplete")
+                    .doesNotContain("scanSummary", "vulnerableDeps", project.toString());
+        }
+
+        @Test
+        void defaultHighThresholdPreservesUnknownVulnerabilityPresence() throws Exception {
+            Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
+            Files.writeString(project.resolve("pom.xml"), POM);
+            CveLookupService lookup = new CveLookupService() {
+                @Override
+                public Map<String, List<VulnerabilityEntry>> bulkLookup(List<PackageRef> packages) {
+                    return Map.of(
+                            "org.example:safe:1.2.3",
+                            List.of(new VulnerabilityEntry("OSV-2026-1", null, "UNKNOWN", null, 0.0)));
+                }
+            };
+
+            String result = new DependencyService(new BuildToolProvider(), lookup)
+                    .scanDependencyCves(project.toString(), "HIGH");
+
+            assertThat(result)
+                    .contains("\"vulnerableDeps\":1", "\"scanStatus\":\"severity_unknown\"", "\"severityUnknown\":true")
+                    .doesNotContain("\"highCount\"", "\"criticalCount\"");
+        }
+
+        @Test
         void kotlinGradleMarkerPrecedesGroovyMarker() throws Exception {
             Path project = Files.createDirectory(temporary.toRealPath().resolve("project"));
             Files.writeString(project.resolve("build.gradle.kts"), "implementation(\"org.example:kts:2.0\")");

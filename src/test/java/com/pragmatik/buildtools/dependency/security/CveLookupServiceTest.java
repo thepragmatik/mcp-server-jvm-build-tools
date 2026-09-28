@@ -21,8 +21,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -185,8 +187,16 @@ class CveLookupServiceTest {
             List<CveLookupService.VulnerabilityEntry> entries = service.parseOsvResponse(json);
 
             assertThat(entries).hasSize(1);
-            assertThat(entries.get(0).severity()).isEqualTo("NONE");
+            assertThat(entries.get(0).severity()).isEqualTo("UNKNOWN");
             assertThat(entries.get(0).cvssScore()).isEqualTo(0.0);
+        }
+
+        @Test
+        void cvssVectorIsUnknownUntilValidatedScoringExists() {
+            var entries = service.parseOsvResponse("""
+                    {"vulns":[{"id":"OSV-2026-1","severity":[{"type":"CVSS_V3","score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}""");
+            assertThat(entries).hasSize(1);
+            assertThat(entries.get(0).severity()).isEqualTo("UNKNOWN");
         }
     }
 
@@ -286,7 +296,7 @@ class CveLookupServiceTest {
         }
 
         @Test
-        void batchAndSequentialFallbackExcludeInvalidCoordinates() {
+        void failedBatchDoesNotRetryOrTreatInvalidCoordinatesAsClean() {
             List<String> payloads = new ArrayList<>();
             CveLookupService client = new CveLookupService((uri, payload) -> {
                 payloads.add(payload);
@@ -300,16 +310,107 @@ class CveLookupServiceTest {
                     new CveLookupService.PackageRef("com.acme", "bad\"},\"email\":\"PRIVATE_EMAIL@example.com", "1"),
                     new CveLookupService.PackageRef("com.acme", "lib", "PRIVATE_SECRET\n1")));
 
-            assertThat(results).containsOnlyKeys("com.acme:safe-lib:2.0+build");
-            assertThat(payloads).hasSize(2);
+            assertThat(results).isEmpty();
+            assertThat(payloads).hasSize(1);
             var batch = json.readTree(payloads.get(0));
             assertThat(batch.get("queries")).hasSize(1);
             assertThat(batch.get("queries").get(0).get("package").get("name").asText())
                     .isEqualTo("com.acme:safe-lib");
             assertThat(payloads.get(0)).doesNotContain("PRIVATE_EMAIL", "PRIVATE_SECRET");
-            assertThat(payloads.get(1)).doesNotContain("PRIVATE_EMAIL", "PRIVATE_SECRET");
-            assertThat(json.readTree(payloads.get(1)).get("package").get("name").asText())
-                    .isEqualTo("com.acme:safe-lib");
+        }
+    }
+
+    @Nested
+    class LookupCompleteness {
+        private final CveLookupService.PackageRef pkg =
+                new CveLookupService.PackageRef("org.example", "library", "1.0");
+
+        @Test
+        void officialSparseBatchRetainsVulnerabilityPresenceWithUnknownSeverity() {
+            AtomicInteger requests = new AtomicInteger();
+            CveLookupService client = new CveLookupService((uri, payload) -> {
+                requests.incrementAndGet();
+                return new CveLookupService.OsvResponse(
+                        200,
+                        "{\"results\":[{\"vulns\":[{\"id\":\"OSV-2026-1\",\"modified\":\"2026-01-01T00:00:00Z\"}]}]}");
+            });
+            var first = client.bulkLookup(List.of(pkg));
+            assertThat(first.get("org.example:library:1.0")).hasSize(1);
+            assertThat(first.get("org.example:library:1.0").get(0).severity()).isEqualTo("UNKNOWN");
+            assertThat(client.bulkLookup(List.of(pkg))).isEqualTo(first);
+            assertThat(requests).hasValue(1);
+        }
+
+        @Test
+        void emptyBatchIsVerifiedClean() {
+            CveLookupService client =
+                    new CveLookupService((uri, payload) -> new CveLookupService.OsvResponse(200, "{\"results\":[{}]}"));
+            assertThat(client.bulkLookup(List.of(pkg))).containsEntry("org.example:library:1.0", List.of());
+        }
+
+        @Test
+        void failuresNeverBecomeCleanOrCached() {
+            List<CveLookupService.OsvResponse> responses = List.of(
+                    new CveLookupService.OsvResponse(500, "{}"),
+                    new CveLookupService.OsvResponse(200, "not-json"),
+                    new CveLookupService.OsvResponse(200, "x".repeat(CveLookupService.MAX_RESPONSE_BYTES + 1)),
+                    new CveLookupService.OsvResponse(200, "{\"results\":[{\"vulns\":\"bad\"}]}"),
+                    new CveLookupService.OsvResponse(
+                            200, "{\"results\":[{\"vulns\":[],\"next_page_token\":\"more\"}]}"));
+            for (var response : responses) {
+                CveLookupService client = new CveLookupService((uri, payload) -> response);
+                assertThat(client.bulkLookup(List.of(pkg))).isEmpty();
+                assertThat(client.cacheSize()).isZero();
+            }
+            CveLookupService timedOut = new CveLookupService((uri, payload) -> {
+                throw new java.net.http.HttpTimeoutException("synthetic timeout");
+            });
+            assertThat(timedOut.bulkLookup(List.of(pkg))).isEmpty();
+            assertThat(timedOut.cacheSize()).isZero();
+        }
+
+        @Test
+        void singleQueryFailuresThrowWithoutCaching() {
+            for (var response : List.of(
+                    new CveLookupService.OsvResponse(500, "{}"),
+                    new CveLookupService.OsvResponse(200, "not-json"),
+                    new CveLookupService.OsvResponse(200, "{\"next_page_token\":\"more\"}"),
+                    new CveLookupService.OsvResponse(200, "x".repeat(CveLookupService.MAX_RESPONSE_BYTES + 1)))) {
+                CveLookupService client = new CveLookupService((uri, payload) -> response);
+                assertThatThrownBy(() -> client.lookup(pkg.groupId(), pkg.artifactId(), pkg.version()))
+                        .isInstanceOf(IOException.class);
+                assertThat(client.cacheSize()).isZero();
+            }
+        }
+
+        @Test
+        void packageCapFailsWithoutEgress() {
+            AtomicInteger requests = new AtomicInteger();
+            CveLookupService client = new CveLookupService((uri, payload) -> {
+                requests.incrementAndGet();
+                return new CveLookupService.OsvResponse(200, "{}");
+            });
+            assertThat(client.bulkLookup(java.util.Collections.nCopies(CveLookupService.MAX_SCAN_PACKAGES + 1, pkg)))
+                    .isEmpty();
+            assertThat(requests).hasValue(0);
+        }
+
+        @Test
+        void responseSubscriberCancelsBeforeRetainingOversizedBody() {
+            CveLookupService.BoundedBodySubscriber subscriber = new CveLookupService.BoundedBodySubscriber();
+            AtomicInteger cancels = new AtomicInteger();
+            subscriber.onSubscribe(new Flow.Subscription() {
+                @Override
+                public void request(long n) {}
+
+                @Override
+                public void cancel() {
+                    cancels.incrementAndGet();
+                }
+            });
+            subscriber.onNext(List.of(ByteBuffer.wrap(new byte[CveLookupService.MAX_RESPONSE_BYTES + 1])));
+            assertThat(cancels).hasValue(1);
+            assertThat(subscriber.getBody().toCompletableFuture()).isCompletedExceptionally();
         }
     }
 }
