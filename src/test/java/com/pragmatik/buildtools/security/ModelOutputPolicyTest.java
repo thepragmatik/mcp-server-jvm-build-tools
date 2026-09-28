@@ -68,8 +68,7 @@ class ModelOutputPolicyTest {
     @Test
     void unknownPluginExitStatusPreservesExplicitToolError() {
         String safe = policy.protect(
-                "execute_build_command",
-                "{\"error\":\"failed at /synthetic/private alice@example.invalid\"}");
+                "execute_build_command", "{\"error\":\"failed at /synthetic/private alice@example.invalid\"}");
 
         assertTrue(safe.contains("\"isError\":true"));
         assertFalse(safe.contains("\"success\""));
