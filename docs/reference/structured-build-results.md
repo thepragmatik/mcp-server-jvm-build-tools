@@ -8,7 +8,7 @@ The result reports `completed: true` for a finished tool call. A recognized buil
 
 For built-in Maven, Gradle, and sbt execution, `execute_build_command` includes `exitCode` only after the subprocess completes. `success` is true exactly when that signed integer is zero; log markers cannot override it. A startup failure or timeout has no completed process status. Custom build-tool plugins using the legacy string method also omit `exitCode` and `success`, so callers must treat status as unknown. `analyze_build_output` likewise uses the completed process status for built-in tools while retaining parsed diagnostic counts. All diagnostic text remains untrusted data, never an instruction to the agent.
 
-The Maven middle collector recognizes standard `[ERROR]` compiler lines, including a bounded ANSI color prefix and color reset. Custom log prefixes or oversized color sequences can still prevent middle retention; a diagnostic in the retained head or tail follows the normal parser path.
+The Maven middle collector recognizes standard `[ERROR]` compiler lines, including a bounded ANSI color prefix and color reset. Custom log prefixes or oversized color sequences can still prevent middle retention; a diagnostic in the retained head or tail follows the normal parser path. For `execute_build_command`, JSON escaping can enlarge the private result even when each process stream stays within its capture limit. The envelope then retains bounded beginning and ending segments and reports `outputTruncated: true`; diagnostics between those segments may still be omitted. Use local build output to investigate a failed build with no visible diagnostic.
 
 For example, a synthetic compilation failure can produce:
 

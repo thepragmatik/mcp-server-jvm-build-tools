@@ -180,7 +180,7 @@ public class BuildToolsService {
         return new ResolvedExecution(tool, validatedHome, validatedProject.toString(), command);
     }
 
-    private static String boundedMcpExecutionResult(BuildExecutionResult result) {
+    static String boundedMcpExecutionResult(BuildExecutionResult result) {
         String output = result.output();
         boolean truncated = result.outputTruncated();
         if (output.length() > BuildResultLimits.MAX_PRIVATE_PROJECTION_INPUT_CHARS) {
@@ -200,7 +200,8 @@ public class BuildToolsService {
             if (json.length() <= BuildResultLimits.MAX_PRIVATE_EXECUTION_ENVELOPE_CHARS) {
                 return json;
             }
-            output = output.substring(output.length() / 2);
+            int edgeLength = Math.max(1, output.length() / 4);
+            output = output.substring(0, edgeLength) + "\n" + output.substring(output.length() - edgeLength);
             truncated = true;
         }
     }
