@@ -72,6 +72,21 @@ class HttpMcpProtocolDispatchTest {
     }
 
     @Test
+    void listBuildToolsReturnsRegisteredNamesThroughMcp() {
+        String response = new RestTemplate()
+                .postForObject(
+                        "http://127.0.0.1:" + port + "/mcp",
+                        rpc("tools/call", "{\"name\":\"list_build_tools\",\"arguments\":{}}"),
+                        String.class);
+        assertThat(response).contains("maven", "gradle", "sbt").doesNotContain(System.getProperty("user.home"));
+        assertThat(response).doesNotContain("clean, compile", "deploy", "install");
+        var json = new tools.jackson.databind.json.JsonMapper().readTree(response);
+        var content = json.get("result").get("content").get(0).get("text").asText();
+        var result = new tools.jackson.databind.json.JsonMapper().readTree(content);
+        assertThat(result.get("tools").size()).isEqualTo(3);
+    }
+
+    @Test
     void deniedPathDoesNotEchoPrivateInput() {
         String canary = "/private/tmp/alice@example.invalid/secret-canary";
         String result = new RestTemplate()
