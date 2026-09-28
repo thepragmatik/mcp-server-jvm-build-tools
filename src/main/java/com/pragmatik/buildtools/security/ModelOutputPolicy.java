@@ -273,7 +273,6 @@ public final class ModelOutputPolicy {
                 }
             } else {
                 safe.remove("success");
-                safe.remove("isError");
             }
         }
         if (safe.size() == 1) {

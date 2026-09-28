@@ -66,6 +66,19 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void unknownPluginExitStatusPreservesExplicitToolError() {
+        String safe = policy.protect(
+                "execute_build_command",
+                "{\"error\":\"failed at /synthetic/private alice@example.invalid\"}");
+
+        assertTrue(safe.contains("\"isError\":true"));
+        assertFalse(safe.contains("\"success\""));
+        assertFalse(safe.contains("\"exitCode\""));
+        assertFalse(safe.contains("/synthetic/private"));
+        assertFalse(safe.contains("alice@example.invalid"));
+    }
+
+    @Test
     void preservesOnlyApprovedAggregateFields() {
         String output = """
                 {"success":false,"errorCount":2,"testSummary":{"total":4,"failed":1},
