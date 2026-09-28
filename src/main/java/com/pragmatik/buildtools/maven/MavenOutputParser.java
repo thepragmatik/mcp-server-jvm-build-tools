@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.maven;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +39,8 @@ public class MavenOutputParser implements BuildOutputParser {
     // Test summary: "Tests run: 42, Failures: 1, Errors: 0, Skipped: 0"
     private static final Pattern TEST_SUMMARY_PATTERN = Pattern.compile(
             "Tests run:\\s*(\\d+),\\s*Failures:\\s*(\\d+),\\s*Errors:\\s*(\\d+),\\s*Skipped:\\s*(\\d+)");
+    private static final Pattern TEST_CLASS_SUFFIX_PATTERN = Pattern.compile("\\s-+\\s+in\\s+\\S+");
+    private static final Pattern PLUGIN_BOUNDARY_PATTERN = Pattern.compile("^\\[INFO]\\s+---\\s+.+\\s+---\\s*$");
 
     // Error line with file:line: "[ERROR] /path/to/File.java:[45,12] message"
     private static final Pattern ERROR_FILE_LINE_PATTERN =
@@ -79,24 +82,35 @@ public class MavenOutputParser implements BuildOutputParser {
         String[] lines = rawOutput.split("\\r?\\n");
 
         boolean success = exitCode == 0;
-        Map<String, Object> testSummary = null;
         List<Map<String, Object>> errors = new ArrayList<>();
         List<Map<String, Object>> warnings = new ArrayList<>();
         String duration = null;
 
-        // For aggregating multiple test module results
-        int aggTotal = 0, aggFailures = 0, aggErrors = 0, aggSkipped = 0;
+        TestCounts completedTests = new TestCounts();
+        TestCounts perClassFallback = new TestCounts();
 
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
 
-            // Parse test summary — aggregate across multiple modules
+            // A plugin boundary closes an execution that emitted class results
+            // but no final Results total (for example, interrupted output).
+            if (PLUGIN_BOUNDARY_PATTERN.matcher(line).matches()) {
+                completedTests.add(perClassFallback);
+                perClassFallback.clear();
+            }
+
+            // Surefire/Failsafe print each class and then a final total. Use the
+            // final total once; retain class counts only when it is absent.
             Matcher testMatcher = TEST_SUMMARY_PATTERN.matcher(line);
             if (testMatcher.find()) {
-                aggTotal += Integer.parseInt(testMatcher.group(1));
-                aggFailures += Integer.parseInt(testMatcher.group(2));
-                aggErrors += Integer.parseInt(testMatcher.group(3));
-                aggSkipped += Integer.parseInt(testMatcher.group(4));
+                if (TEST_CLASS_SUFFIX_PATTERN
+                        .matcher(line.substring(testMatcher.end()))
+                        .find()) {
+                    perClassFallback.add(testMatcher);
+                } else {
+                    completedTests.add(testMatcher);
+                    perClassFallback.clear();
+                }
             }
 
             // Parse BUILD SUCCESS / BUILD FAILURE
@@ -139,16 +153,10 @@ public class MavenOutputParser implements BuildOutputParser {
             }
         }
 
-        // Build test summary from aggregated values
-        testSummary = new LinkedHashMap<>();
-        testSummary.put("total", aggTotal);
-        testSummary.put("passed", aggTotal - aggFailures - aggErrors - aggSkipped);
-        testSummary.put("failed", aggFailures);
-        testSummary.put("errors", aggErrors);
-        testSummary.put("skipped", aggSkipped);
+        completedTests.add(perClassFallback);
 
         result.put("success", success);
-        result.put("testSummary", testSummary);
+        result.put("testSummary", completedTests.toSummary());
         result.put("errors", errors);
         result.put("warnings", warnings);
         result.put("duration", duration != null ? duration : "0s");
@@ -167,5 +175,73 @@ public class MavenOutputParser implements BuildOutputParser {
         summary.put("errors", 0);
         summary.put("skipped", 0);
         return summary;
+    }
+
+    private static final class TestCounts {
+        private int total;
+        private int failures;
+        private int errors;
+        private int skipped;
+        private boolean capped;
+
+        void add(Matcher matcher) {
+            total = cappedAdd(total, boundedCount(matcher.group(1)));
+            failures = cappedAdd(failures, boundedCount(matcher.group(2)));
+            errors = cappedAdd(errors, boundedCount(matcher.group(3)));
+            skipped = cappedAdd(skipped, boundedCount(matcher.group(4)));
+        }
+
+        void add(TestCounts other) {
+            total = cappedAdd(total, other.total);
+            failures = cappedAdd(failures, other.failures);
+            errors = cappedAdd(errors, other.errors);
+            skipped = cappedAdd(skipped, other.skipped);
+            capped |= other.capped;
+        }
+
+        void clear() {
+            total = 0;
+            failures = 0;
+            errors = 0;
+            skipped = 0;
+            capped = false;
+        }
+
+        Map<String, Object> toSummary() {
+            int boundedFailures = Math.min(failures, total);
+            int boundedErrors = Math.min(errors, total - boundedFailures);
+            int boundedSkipped = Math.min(skipped, total - boundedFailures - boundedErrors);
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("total", total);
+            summary.put("passed", total - boundedFailures - boundedErrors - boundedSkipped);
+            summary.put("failed", boundedFailures);
+            summary.put("errors", boundedErrors);
+            summary.put("skipped", boundedSkipped);
+            if (capped || boundedFailures != failures || boundedErrors != errors || boundedSkipped != skipped) {
+                summary.put("countsCapped", true);
+            }
+            return summary;
+        }
+
+        private int boundedCount(String digits) {
+            int value = 0;
+            for (int i = 0; i < digits.length(); i++) {
+                int digit = digits.charAt(i) - '0';
+                if (value > (BuildResultLimits.MAX_VISIBLE_COUNTER - digit) / 10) {
+                    capped = true;
+                    return BuildResultLimits.MAX_VISIBLE_COUNTER;
+                }
+                value = value * 10 + digit;
+            }
+            return value;
+        }
+
+        private int cappedAdd(int left, int right) {
+            if (left > BuildResultLimits.MAX_VISIBLE_COUNTER - right) {
+                capped = true;
+                return BuildResultLimits.MAX_VISIBLE_COUNTER;
+            }
+            return left + right;
+        }
     }
 }
