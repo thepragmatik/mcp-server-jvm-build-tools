@@ -55,7 +55,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pomXml);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"tool\":\"maven\"");
             assertThat(result).contains("pom.xml");
@@ -74,7 +74,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pomXml);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("artifactId");
         }
@@ -85,7 +85,7 @@ class BuildConfigurationValidationTest {
             String pomXml = "\"not valid xml at all$$$";
             Files.writeString(projectDir.resolve("pom.xml"), pomXml);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("Malformed pom.xml");
         }
@@ -94,7 +94,7 @@ class BuildConfigurationValidationTest {
         @DisplayName("detects missing pom.xml")
         void detectsMissingPomXml() {
             // Empty dir with no build files
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             // No build files found, valid=true, issueCount=0
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"issueCount\":0");
@@ -117,7 +117,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pomXml);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             // Validator finds groupId and version inside parent block — passes basic check
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"issueCount\":0");
@@ -131,7 +131,7 @@ class BuildConfigurationValidationTest {
                     </project></dependencies>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false").contains("Malformed pom.xml");
             assertThat(result).doesNotContain("private.example", "secret-project", projectDir.toString());
         }
@@ -144,7 +144,7 @@ class BuildConfigurationValidationTest {
                     <artifactId>demo</artifactId><version>1</version></project>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false").contains("Malformed pom.xml");
             assertThat(result).doesNotContain("root:", "file:///etc/passwd");
         }
@@ -154,7 +154,7 @@ class BuildConfigurationValidationTest {
             String padding = " ".repeat(1_100_000);
             Files.writeString(projectDir.resolve("pom.xml"), "<project>" + padding + "</project>");
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false").contains("too large");
         }
 
@@ -167,9 +167,25 @@ class BuildConfigurationValidationTest {
                     """);
             Files.createSymbolicLink(projectDir.resolve("pom.xml"), target);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":false").contains("Cannot read pom.xml");
+        }
+
+        @Test
+        @DisplayName("does not re-resolve a project directory swapped after access validation")
+        void rejectsSwappedProjectDirectoryAtOpenTime() throws Exception {
+            Path root = projectDir.toRealPath();
+            Path allowed = Files.createDirectory(root.resolve("allowed"));
+            Path outside = Files.createDirectory(root.resolve("outside"));
+            Files.writeString(outside.resolve("pom.xml"), "<project><artifactId>SYNTHETIC_PRIVATE_CANARY</artifactId>");
+            Path validated = allowed.toRealPath();
+            Files.move(allowed, root.resolve("moved"));
+            Files.createSymbolicLink(allowed, outside);
+
+            String result = service.validateBuildConfiguration(validated.toString());
+            assertThat(result).contains("\"valid\":false").contains("Cannot read pom.xml");
+            assertThat(result).doesNotContain("SYNTHETIC_PRIVATE_CANARY").doesNotContain("Malformed pom.xml");
         }
 
         @Test
@@ -184,7 +200,7 @@ class BuildConfigurationValidationTest {
                     </project>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":true").contains("\"issueCount\":0");
         }
 
@@ -199,7 +215,7 @@ class BuildConfigurationValidationTest {
                     </dependencies></project>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"issueCount\":0").doesNotContain("Duplicate dependency");
         }
 
@@ -212,7 +228,7 @@ class BuildConfigurationValidationTest {
                     </project>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false").contains("Missing required element: <artifactId>");
         }
 
@@ -224,7 +240,7 @@ class BuildConfigurationValidationTest {
                     <version>1</version></project>
                     """);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false").contains("Missing required element: <artifactId>");
             assertThat(result).doesNotContain("hidden");
         }
@@ -254,7 +270,7 @@ class BuildConfigurationValidationTest {
                 Files.writeString(target, "plugins { id 'java' }");
                 Files.createSymbolicLink(project.resolve(name), target);
 
-                String result = service.validateBuildConfiguration(project.toString());
+                String result = service.validateBuildConfiguration(canonical(project));
 
                 assertThat(result).contains("\"valid\":false").contains("Cannot read build file");
             }
@@ -264,7 +280,7 @@ class BuildConfigurationValidationTest {
         void rejectsOversizedGradleFileBeforeDecoding() throws Exception {
             Files.writeString(projectDir.resolve("build.gradle"), "plugins { id 'java' }" + " ".repeat(1_100_000));
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":false").contains("too large");
         }
@@ -288,7 +304,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle"), buildGradle);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"tool\":\"gradle\"");
             assertThat(result).contains("\"valid\":true");
         }
@@ -303,7 +319,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle"), buildGradle);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("Unbalanced braces");
         }
@@ -327,7 +343,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle.kts"), buildGradleKts);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"tool\":\"gradle\"");
         }
 
@@ -336,7 +352,7 @@ class BuildConfigurationValidationTest {
         void detectsEmptyBuildGradle() throws Exception {
             Files.writeString(projectDir.resolve("build.gradle"), "");
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("Build file is empty");
         }
@@ -344,7 +360,7 @@ class BuildConfigurationValidationTest {
         @Test
         @DisplayName("detects missing build.gradle")
         void detectsMissingBuildGradle() {
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             // No build files at all - valid since nothing to check
             assertThat(result).contains("\"valid\":true");
         }
@@ -359,7 +375,7 @@ class BuildConfigurationValidationTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle"), buildGradle);
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             assertThat(result).contains("No plugin declarations found");
         }
     }
@@ -386,9 +402,17 @@ class BuildConfigurationValidationTest {
             Files.writeString(projectDir.resolve("pom.xml"), pomXml);
             Files.writeString(projectDir.resolve("build.gradle"), "// Gradle build file");
 
-            String result = service.validateBuildConfiguration(projectDir.toString());
+            String result = service.validateBuildConfiguration(canonical(projectDir));
             // Maven is auto-detected first, but validation covers all build files
             assertThat(result).contains("\"tool\":\"maven\"");
+        }
+    }
+
+    private static String canonical(Path path) {
+        try {
+            return path.toRealPath().toString();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
         }
     }
 }

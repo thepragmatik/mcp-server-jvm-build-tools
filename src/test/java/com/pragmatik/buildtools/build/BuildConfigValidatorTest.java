@@ -73,7 +73,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pom);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"tool\":\"maven\"");
@@ -91,7 +91,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pom);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("groupId");
@@ -124,7 +124,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("pom.xml"), pom);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("Duplicate dependency");
             assertThat(result).doesNotContain("guava", "com.google.guava");
@@ -133,7 +133,7 @@ class BuildConfigValidatorTest {
         @Test
         @DisplayName("handles empty project directory gracefully")
         void handlesEmptyProjectDir(@TempDir Path emptyDir) {
-            String result = buildToolsService.validateBuildConfiguration(emptyDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(emptyDir));
 
             // No build config files found - the valid field should be true (nothing to validate)
             assertThat(result).contains("\"valid\":true");
@@ -171,7 +171,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle"), gradle);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"tool\":\"gradle\"");
@@ -191,7 +191,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle"), gradle);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("Unbalanced braces");
@@ -202,7 +202,7 @@ class BuildConfigValidatorTest {
         void flagsEmptyBuildGradle() throws Exception {
             Files.writeString(projectDir.resolve("build.gradle"), "");
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":false");
             assertThat(result).contains("empty");
@@ -226,7 +226,7 @@ class BuildConfigValidatorTest {
                     """;
             Files.writeString(projectDir.resolve("build.gradle.kts"), gradleKts);
 
-            String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
+            String result = buildToolsService.validateBuildConfiguration(canonical(projectDir));
 
             assertThat(result).contains("\"valid\":true");
         }
@@ -257,6 +257,14 @@ class BuildConfigValidatorTest {
             String result = buildToolsService.validateBuildConfiguration(aFile.toString());
 
             assertThat(result).contains("\"error\"");
+        }
+    }
+
+    private static String canonical(Path path) {
+        try {
+            return path.toRealPath().toString();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
         }
     }
 }

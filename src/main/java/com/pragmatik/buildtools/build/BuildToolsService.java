@@ -564,8 +564,10 @@ public class BuildToolsService {
 
         Path dir;
         try {
-            dir = Path.of(projectDir).toRealPath();
-        } catch (IOException e) {
+            // The guarded callback already supplied a canonical allowed path. Resolving it
+            // again after authorization would follow a newly swapped project symlink.
+            dir = Path.of(projectDir).toAbsolutePath().normalize();
+        } catch (java.nio.file.InvalidPathException e) {
             return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(dir)) {
