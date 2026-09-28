@@ -34,6 +34,8 @@ For a failed Maven Surefire/Failsafe run, `testSummary.failed` gives the failed-
 
 For Gradle and sbt, a parsed test summary with failed tests also yields a fixed generic `test` diagnostic when no useful test diagnostic was already parsed. `testSummary.failed` remains the number of failed cases; the new diagnostic adds one entry to `errorCount`, not one entry per failed case. sbt summaries that distinguish test execution errors can add a second generic diagnostic. The generic entry takes a visible slot when unrelated errors fill the 12-item result limit. Names, assertion values, and raw output stay local; inspect the local report for details.
 
+All three parsers bound test counters at 1,000,000 and set `testSummary.countsCapped: true` if a number exceeds that limit or reported categories are inconsistent. The summary stays nonnegative; use the local test report for exact counts when that marker appears.
+
 The server forms both MCP result fields from the same result after the shared model-output privacy policy removes raw logs, source symbols, credentials, email addresses, and absolute paths. The adapter checks the advertised schema before sending either structured build result; an out-of-contract result becomes a generic error. This contract is shared by the stdio and HTTP transports.
 
 ```mermaid
