@@ -6,7 +6,7 @@
 > and misses parsed from a local execution log, but that is not this gauge.
 > Remove `buildtools_cache_hit_rate` dashboard queries and alerts. The
 > `buildtools.cache.score` gauge remains available as the last cache
-> cache health score (0-100) per tool; it is not a hit-rate metric.
+> health score (0-100) per tool; it is not a hit-rate metric.
 
 This is the first 2.0 release candidate. It is a breaking prerelease: existing
 1.x clients must update their configuration and refresh `tools/list` before
