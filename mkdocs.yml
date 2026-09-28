@@ -128,8 +128,10 @@ nav:
   - Reference:
       - Architecture: reference/architecture.md
       - Design 2.0: reference/design-v2.md
-      - Tools / MCP API: reference/tools.md
-      - Configuration Reference: reference/configuration.md
+      - Current Tool Catalog: reference/tool-catalog.md
+      - Configuration 2.0: reference/configuration-v2.md
+      - Legacy Tools (1.x): reference/tools.md
+      - Legacy Configuration (1.x): reference/configuration.md
       - Security: reference/security.md
       - Design v1.1.0: reference/design-v1.1.0.md
       - Design v1.2.0: reference/design-v1.2.0.md
@@ -140,12 +142,13 @@ nav:
       - Protocol Evidence: EVIDENCE.md
   - Testing:
       - Test Results: reference/test-results.md
-      - Test Plan: reference/test-plan.md
+      - Historical Test Plan (1.x): reference/test-plan.md
       - Test Tools: reference/test-tools-recommendations.md
   - FAQ: FAQ.md
   - Project:
       - Mission: MISSION.md
       - Roadmap: ROADMAP.md
+      - Migration to 2.0: user-guide/migration-v2.md
       - Workflow: WORKFLOW.md
       - Agent Guide: AGENTS.md
       - Release Notes: RELEASE_NOTES.md
