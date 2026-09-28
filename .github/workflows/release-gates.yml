@@ -34,6 +34,8 @@ jobs:
           path: ~/.npm
           key: conformance-npm-${{ runner.os }}-0.2.0-alpha.11-${{ github.run_id }}
           restore-keys: conformance-npm-${{ runner.os }}-0.2.0-alpha.11-
+      - name: Test release tag guard
+        run: python3 tests/test_release_tag.py
       - name: Package server
         run: ./mvnw -B package -DskipTests --no-transfer-progress
       - name: Run pinned official scenarios and adversarial requests

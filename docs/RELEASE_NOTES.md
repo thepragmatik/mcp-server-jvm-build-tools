@@ -1,3 +1,37 @@
+# Release Notes — v2.0.0-rc.1
+
+This is the first 2.0 release candidate. It is a breaking prerelease: existing
+1.x clients must update their configuration and refresh `tools/list` before
+using it. Publication is gated by the [release evidence
+matrix](ROADMAP.md#release-candidate-gate-v200-rc1), the packaged
+[protocol and adversarial checks](reference/release-gates.md), and two
+independent PR reviews.
+
+## Changes from 1.x
+
+- The public MCP catalog contains 24 explicitly scoped tools. Sensitive
+  credential, audit, stored-plan, and raw resource operations are withheld.
+  The [runtime-derived catalog](reference/tool-catalog.md) is checked in CI.
+- Path-bearing calls require an explicitly configured project root. Relative
+  aliases keep absolute host paths out of model conversations.
+- HTTP binds to loopback and requires a configured bearer key with the
+  requested tool's scope. Origin and Host validation reduce DNS-rebinding
+  exposure.
+- Build results provide bounded, redacted structured diagnostics instead of
+  raw logs or commands. Unknown free-form text gets a safe fallback.
+- Maven, Gradle, and sbt output capture is bounded; timeout and cancellation
+  terminate process descendants.
+- The bundled Java SDK advertises MCP `2025-11-25`. The inactive 2026 draft
+  discovery experiment is not a supported protocol claim.
+
+Follow the [migration guide](user-guide/migration-v2.md) and
+[configuration reference](reference/configuration-v2.md). This prerelease
+does not claim that arbitrary build scripts are sandboxed; use container or
+OS isolation for untrusted workspaces. The selected official conformance
+scenarios do not constitute a full MCP conformance certification.
+
+---
+
 # Release Notes — v0.2.0
 
 > **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.

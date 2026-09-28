@@ -2,7 +2,7 @@
 
 A Java 21+ MCP server for Maven, Gradle, and sbt. It exposes 24 tools over stdio and Streamable HTTP. The 2.0 development line puts project boundaries, scoped HTTP access, and privacy controls on every model-visible tool call.
 
-> Version: `2.0.0-SNAPSHOT`. The next proposed release is `v2.0.0-rc.1`. Older 1.x tool lists and examples live in [the changelog](CHANGELOG.md).
+> Source version: `2.0.0-rc.1`. Tag `v2.0.0-rc.1` only after the release gates pass. Older 1.x tool lists and examples live in [the changelog](CHANGELOG.md).
 
 ## Quick start
 
