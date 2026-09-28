@@ -87,7 +87,7 @@ class BuildConfigurationValidationTest {
 
             String result = service.validateBuildConfiguration(projectDir.toString());
             assertThat(result).contains("\"valid\":false");
-            assertThat(result).contains("Missing <project> root element");
+            assertThat(result).contains("Malformed pom.xml");
         }
 
         @Test
@@ -121,6 +121,98 @@ class BuildConfigurationValidationTest {
             // Validator finds groupId and version inside parent block — passes basic check
             assertThat(result).contains("\"valid\":true");
             assertThat(result).contains("\"issueCount\":0");
+        }
+
+        @Test
+        void rejectsMalformedNestingWithoutEchoingXml() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <project><modelVersion>4.0.0</modelVersion><groupId>private.example</groupId>
+                    <artifactId>secret-project</artifactId><version>1</version><dependencies>
+                    </project></dependencies>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":false").contains("Malformed pom.xml");
+            assertThat(result).doesNotContain("private.example", "secret-project", projectDir.toString());
+        }
+
+        @Test
+        void rejectsDoctypeWithoutResolvingExternalEntities() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <!DOCTYPE project [<!ENTITY private SYSTEM "file:///etc/passwd">]>
+                    <project><modelVersion>4.0.0</modelVersion><groupId>&private;</groupId>
+                    <artifactId>demo</artifactId><version>1</version></project>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":false").contains("Malformed pom.xml");
+            assertThat(result).doesNotContain("root:", "file:///etc/passwd");
+        }
+
+        @Test
+        void rejectsOversizedPomBeforeParsing() throws Exception {
+            String padding = " ".repeat(1_100_000);
+            Files.writeString(projectDir.resolve("pom.xml"), "<project>" + padding + "</project>");
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":false").contains("too large");
+        }
+
+        @Test
+        void doesNotMistakeProjectAndPluginArtifactIdsForDuplicateDependencies() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId>
+                    <artifactId>same</artifactId><version>1</version>
+                    <build><plugins><plugin><groupId>example</groupId><artifactId>same</artifactId>
+                    <version>1</version></plugin></plugins></build>
+                    <dependencies><dependency><groupId>example</groupId>
+                    <artifactId>same</artifactId><version>1</version></dependency></dependencies>
+                    </project>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":true").contains("\"issueCount\":0");
+        }
+
+        @Test
+        void allowsSameArtifactIdFromDifferentDependencyGroups() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId>
+                    <artifactId>demo</artifactId><version>1</version>
+                    <dependencies>
+                      <dependency><groupId>first.example</groupId><artifactId>same</artifactId></dependency>
+                      <dependency><groupId>second.example</groupId><artifactId>same</artifactId></dependency>
+                    </dependencies></project>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"issueCount\":0").doesNotContain("Duplicate dependency");
+        }
+
+        @Test
+        void rejectsMissingProjectCoordinatesEvenIfDependenciesContainThem() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <project><modelVersion>4.0.0</modelVersion>
+                    <dependencies><dependency><groupId>example</groupId>
+                    <artifactId>dependency</artifactId><version>1</version></dependency></dependencies>
+                    </project>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":false").contains("Missing required element: <artifactId>");
+        }
+
+        @Test
+        void ignoresForeignNamespaceCoordinates() throws Exception {
+            Files.writeString(projectDir.resolve("pom.xml"), """
+                    <project xmlns:private="urn:private"><modelVersion>4.0.0</modelVersion>
+                    <groupId>example</groupId><private:artifactId>hidden</private:artifactId>
+                    <version>1</version></project>
+                    """);
+
+            String result = service.validateBuildConfiguration(projectDir.toString());
+            assertThat(result).contains("\"valid\":false").contains("Missing required element: <artifactId>");
+            assertThat(result).doesNotContain("hidden");
         }
 
         @Test

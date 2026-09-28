@@ -127,7 +127,7 @@ class BuildConfigValidatorTest {
             String result = buildToolsService.validateBuildConfiguration(projectDir.toString());
 
             assertThat(result).contains("Duplicate dependency");
-            assertThat(result).contains("guava");
+            assertThat(result).doesNotContain("guava", "com.google.guava");
         }
 
         @Test

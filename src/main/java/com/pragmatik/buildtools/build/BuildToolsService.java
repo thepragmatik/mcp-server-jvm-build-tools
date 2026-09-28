@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.ai.tool.annotation.Tool;
@@ -259,14 +258,14 @@ public class BuildToolsService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("projectDir", dir.toString());
+        result.put("projectDir", "[REDACTED_PATH]");
         result.put("status", "success");
 
         List<Map<String, Object>> detections = new ArrayList<>();
@@ -425,10 +424,10 @@ public class BuildToolsService {
         try {
             validatedProject = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(validatedProject)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid");
         }
 
         // Resolve the build tool
@@ -562,10 +561,10 @@ public class BuildToolsService {
         try {
             dir = Path.of(projectDir).toRealPath();
         } catch (IOException e) {
-            return JsonUtils.errorJson("Cannot resolve project directory: " + e.getMessage());
+            return JsonUtils.errorJson("Cannot resolve project directory");
         }
         if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid: " + projectDir);
+            return JsonUtils.errorJson("Project directory is not valid");
         }
 
         List<Map<String, Object>> allIssues = new ArrayList<>();
@@ -598,7 +597,7 @@ public class BuildToolsService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valid", allIssues.stream().noneMatch(i -> "ERROR".equals(i.get("severity"))));
         result.put("tool", detectedTool);
-        result.put("projectDir", dir.toString());
+        result.put("projectDir", "[REDACTED_PATH]");
 
         if (detectedTool != null) {
             result.put("file", "maven".equals(detectedTool) ? "pom.xml" : "build.gradle");
@@ -634,129 +633,7 @@ public class BuildToolsService {
      * Validate a pom.xml file for structural and content issues.
      */
     private List<Map<String, Object>> validatePomXml(Path pomXml) {
-        List<Map<String, Object>> issues = new ArrayList<>();
-
-        try {
-            String content = Files.readString(pomXml);
-
-            // Check XML well-formedness with basic heuristics
-            // Check for unmatched tags
-            if (!content.contains("<project") || !content.contains("</project>")) {
-                Map<String, Object> issue = new LinkedHashMap<>();
-                issue.put("severity", "ERROR");
-                issue.put("path", "pom.xml");
-                issue.put("message", "Missing <project> root element");
-                issue.put("suggestion", "Add <project> root element with correct namespace");
-                issues.add(issue);
-                return issues;
-            }
-
-            // Check required elements, accounting for parent POM inheritance
-            // Extract the parent block if present
-            String contentOutsideParent = content;
-            boolean hasParentBlock = content.contains("<parent>") && content.contains("</parent>");
-            if (hasParentBlock) {
-                int parentStart = content.indexOf("<parent>");
-                int parentEnd = content.indexOf("</parent>") + "</parent>".length();
-                contentOutsideParent = content.substring(0, parentStart) + content.substring(parentEnd);
-            }
-
-            String[] requiredElements = {"modelVersion", "groupId", "artifactId", "version"};
-            for (String element : requiredElements) {
-                boolean hasOpen = contentOutsideParent.contains("<" + element + ">");
-                boolean hasClose = contentOutsideParent.contains("</" + element + ">");
-
-                // groupId and version can be inherited from parent POM
-                boolean canBeInherited = element.equals("groupId") || element.equals("version");
-
-                if (!hasOpen && canBeInherited && hasParentBlock) {
-                    // Check if it's present in the parent block
-                    String parentBlock = content.substring(
-                            content.indexOf("<parent>"), content.indexOf("</parent>") + "</parent>".length());
-                    if (parentBlock.contains("<" + element + ">")) {
-                        // Inherited from parent — valid
-                        continue;
-                    }
-                }
-
-                if (!hasOpen) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "ERROR");
-                    issue.put("path", "pom.xml");
-                    issue.put("message", "Missing required element: <" + element + ">");
-                    issue.put("suggestion", "Add <" + element + "> element inside <project>");
-                    issues.add(issue);
-                } else if (!hasClose) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "ERROR");
-                    issue.put("path", "pom.xml");
-                    issue.put("message", "Unclosed element: <" + element + ">");
-                    issue.put("suggestion", "Add closing </" + element + "> tag");
-                    issues.add(issue);
-                }
-            }
-
-            // Check for duplicate dependency declarations
-            Map<String, Integer> depCounts = new LinkedHashMap<>();
-            Pattern depPattern = Pattern.compile("<artifactId>([^<]+)</artifactId>");
-            Matcher depMatcher = depPattern.matcher(content);
-            while (depMatcher.find()) {
-                String artifactId = depMatcher.group(1);
-                depCounts.merge(artifactId, 1, Integer::sum);
-            }
-            for (Map.Entry<String, Integer> entry : depCounts.entrySet()) {
-                if (entry.getValue() > 1) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "WARNING");
-                    issue.put("path", "pom.xml");
-                    issue.put(
-                            "message",
-                            "Duplicate dependency declaration: " + entry.getKey() + " (declared " + entry.getValue()
-                                    + " times)");
-                    issue.put("suggestion", "Remove duplicate <dependency> entry for " + entry.getKey());
-                    issues.add(issue);
-                }
-            }
-
-            // Check plugin version consistency (warn if multiple versions of same plugin)
-            Map<String, Set<String>> pluginVersions = new LinkedHashMap<>();
-            Pattern pluginPattern = Pattern.compile(
-                    "<plugin>\\s*<groupId>([^<]+)</groupId>\\s*<artifactId>([^<]+)</artifactId>\\s*(?:<version>([^<]+)</version>)?",
-                    Pattern.DOTALL);
-            Matcher pluginMatcher = pluginPattern.matcher(content);
-            while (pluginMatcher.find()) {
-                String groupId = pluginMatcher.group(1);
-                String artifactId = pluginMatcher.group(2);
-                String version = pluginMatcher.group(3) != null ? pluginMatcher.group(3) : "UNSPECIFIED";
-                String key = groupId + ":" + artifactId;
-                pluginVersions.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(version);
-            }
-            for (Map.Entry<String, Set<String>> entry : pluginVersions.entrySet()) {
-                if (entry.getValue().size() > 1) {
-                    Map<String, Object> issue = new LinkedHashMap<>();
-                    issue.put("severity", "WARNING");
-                    issue.put("path", "pom.xml");
-                    issue.put(
-                            "message",
-                            "Inconsistent plugin versions for " + entry.getKey() + ": "
-                                    + String.join(", ", entry.getValue()));
-                    issue.put(
-                            "suggestion",
-                            "Use <pluginManagement> to centralize plugin version for "
-                                    + entry.getKey().split(":")[1]);
-                    issues.add(issue);
-                }
-            }
-
-        } catch (IOException e) {
-            Map<String, Object> issue = new LinkedHashMap<>();
-            issue.put("severity", "ERROR");
-            issue.put("path", "pom.xml");
-            issue.put("message", "Cannot read pom.xml: " + e.getMessage());
-            issues.add(issue);
-        }
-
-        return issues;
+        return PomXmlValidator.validate(pomXml);
     }
 
     /**
@@ -852,7 +729,7 @@ public class BuildToolsService {
             Map<String, Object> issue = new LinkedHashMap<>();
             issue.put("severity", "ERROR");
             issue.put("path", filename);
-            issue.put("message", "Cannot read build file: " + e.getMessage());
+            issue.put("message", "Cannot read build file");
             issues.add(issue);
         }
 
