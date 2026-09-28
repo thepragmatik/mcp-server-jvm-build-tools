@@ -123,7 +123,8 @@ public class DependencyService {
                     + "Returns a JSON object with latest version, all versions, "
                     + "stability classification, and upgrade type (major/minor/patch). "
                     + "Provide projectDir to get build-tool-specific dependency syntax. "
-                    + "Set includeSecurityInfo=true to include CVE vulnerability data from OSV.dev.")
+                    + "includeSecurityInfo opts into sending the supplied coordinates to OSV.dev for local enrichment; "
+                    + "the public MCP result withholds those security details.")
     public String checkDependencyVersion(
             @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
                     String groupId,
@@ -146,7 +147,7 @@ public class DependencyService {
             @ToolParam(
                             required = false,
                             description =
-                                    "Include CVE/security vulnerability information from OSV.dev. Default false for backward compatibility.")
+                                    "Opt in to an OSV.dev coordinate lookup for local integrations. MCP withholds its security details; use scan_dependency_cves for aggregate vulnerability presence. Default false.")
                     boolean includeSecurityInfo) {
 
         VersionPreference filter = parseVersionPreference(versionPreference);

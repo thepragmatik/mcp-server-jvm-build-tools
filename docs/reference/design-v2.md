@@ -37,10 +37,12 @@ The public tool descriptions state the result contract after the output policy, 
 
 | Tool | Model-visible result | Retained locally |
 |---|---|---|
+| `check_dependency_version` | Version and upgrade status; optional `includeSecurityInfo` does not expose security findings through MCP | Dependency identity and optional OSV findings |
 | `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
 | `scan_dependency_cves` | `scanStatus`, recognized declaration count (`totalDeps`), and affected-dependency presence count (`vulnerableDeps`); `severityUnknown` when OSV omits severity. High/critical counts appear only when all returned severities are known. Failed or partial lookups return `scanStatus: incomplete` and no counts. | Dependency and CVE identities |
 
 These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
+For `check_dependency_version`, `includeSecurityInfo=true` still sends the supplied coordinates to OSV.dev but the current MCP projection withholds the findings. Agents should use `scan_dependency_cves` for aggregate presence until that optional lookup has a separately tested public result contract.
 
 The [configuration validator](configuration-validation.md) illustrates the same boundary for files: bounded local XML parsing creates local issues, then a finite template projection exposes only fixed configuration diagnostics and the aggregate count. The model receives neither parser exception text nor values read from the POM.
 Its build-file reads use `SecureDirectoryStream` to resist path-component replacement races. The central project guard checks its build markers through one held project directory handle where supported. The CVE scan applies a held-directory read across POM, Gradle Kotlin, and Gradle Groovy marker priority, then admits only bounded coordinate-shaped values into typed OSV requests. On providers without secure directory streams, the guard retains canonical-path marker checks, which are not race-free; configuration validation and the CVE scan fail closed. Later tool reads and subprocess paths can still encounter replacements after the guard closes its handle and need a separate audit before stable 2.0.
