@@ -50,6 +50,14 @@ class PublicDataScannerTest(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertIn("secret assignment", SCANNER.issues(key + "=" + "syntheticcredential123456", "settings.properties"))
 
+    def test_gradle_and_env_variants_receive_config_credential_rules(self):
+        for path in ("settings.gradle", "build.gradle.kts", ".env", ".env.production"):
+            with self.subTest(path=path):
+                self.assertIn(
+                    "secret assignment",
+                    SCANNER.issues("github_token=" + "syntheticcredential123456", path),
+                )
+
     def test_common_private_key_headers_are_detected(self):
         for variant in ("ENCRYPTED PRIVATE KEY", "DSA PRIVATE KEY", "PGP PRIVATE KEY BLOCK"):
             with self.subTest(variant=variant):

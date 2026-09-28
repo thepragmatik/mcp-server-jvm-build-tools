@@ -22,7 +22,12 @@ CONFIG_SECRET_ASSIGNMENT = re.compile(
     r"secret(?:[_-]?access)?[_-]?key|private[_-]?key|secret|token))"
     r"\s*[:=]\s*['\"]?([A-Za-z0-9+/_-]{16,})(?![A-Za-z0-9+/_-])"
 )
-CONFIG_SUFFIXES = (".properties", ".yaml", ".yml", ".env", ".json", ".toml", ".xml", ".ini")
+CONFIG_SUFFIXES = (".properties", ".yaml", ".yml", ".json", ".toml", ".xml", ".ini", ".gradle", ".gradle.kts")
+
+
+def is_config_path(path: str) -> bool:
+    filename = pathlib.Path(path).name
+    return path.endswith(CONFIG_SUFFIXES) or filename == ".env" or filename.startswith(".env.")
 SAFE_EMAIL_SUFFIXES = (".invalid", ".example", "@example.com", "@example.org")
 SAFE_HOME_NAMES = {"private-user", "test-user", "user", "buildtools"}
 SAFE_VALUES = {"synthetic-value", "integration-test-only"}
@@ -43,7 +48,7 @@ def issues(line: str, path: str = "") -> list[str]:
         found.append("home path")
     if PRIVATE_KEY.search(line):
         found.append("private key")
-    secret_pattern = CONFIG_SECRET_ASSIGNMENT if path.endswith(CONFIG_SUFFIXES) else SECRET_ASSIGNMENT
+    secret_pattern = CONFIG_SECRET_ASSIGNMENT if is_config_path(path) else SECRET_ASSIGNMENT
     if any(
         match.group(1) not in SAFE_VALUES
         and not (
