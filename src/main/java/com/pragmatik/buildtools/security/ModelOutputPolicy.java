@@ -231,9 +231,21 @@ public final class ModelOutputPolicy {
             }
         }
         if ("list_build_tools".equals(toolName) && output != null) {
+            // String-returning callbacks can reach this boundary as a JSON
+            // string literal. Decode that wrapper before matching line starts;
+            // still emit only names from the fixed public allowlist.
+            String listing = output;
+            try {
+                JsonNode value = mapper.readTree(output);
+                if (value != null && value.isTextual()) {
+                    listing = value.asText();
+                }
+            } catch (tools.jackson.core.JacksonException ignored) {
+                // A direct, unquoted tool response remains valid input.
+            }
             List<String> names = new ArrayList<>();
             for (String name : BUILD_TOOLS) {
-                if (output.lines().anyMatch(line -> line.startsWith(name + ":"))) {
+                if (listing.lines().anyMatch(line -> line.startsWith(name + ":"))) {
                     names.add(name);
                 }
             }

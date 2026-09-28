@@ -69,6 +69,17 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void decodesJsonQuotedToolListingIntoAllowlistedNamesOnly() {
+        String callback =
+                "\"maven: validate, install\\ngradle: build\\nsbt: compile\\nprivate-tool: SYNTHETIC SECRET\"";
+        String safe = policy.protect("list_build_tools", callback);
+        assertTrue(safe.contains("\"tools\":[\"maven\",\"gradle\",\"sbt\"]"));
+        assertFalse(safe.contains("install"));
+        assertFalse(safe.contains("SYNTHETIC SECRET"));
+        assertFalse(safe.contains("private-tool"));
+    }
+
+    @Test
     void extractsVersionWithoutRuntimeEnvironmentDetails() {
         String output = "Apache Maven 3.9.16\nJava home: /home/private-user/jdk";
         String safe = policy.protect("get_build_tool_version", output);
