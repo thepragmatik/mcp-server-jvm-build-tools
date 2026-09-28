@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.sbt;
 
 import com.pragmatik.buildtools.build.BuildOutputParser;
+import com.pragmatik.buildtools.build.BuildResultLimits;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -228,6 +229,22 @@ public class SbtOutputParser implements BuildOutputParser {
             }
         }
 
+        int firstTestDiagnosticIndex = firstUsefulTestDiagnosticIndex(errors);
+        if ((failedTests > 0 || errorTests > 0) && firstTestDiagnosticIndex < 0) {
+            List<Map<String, Object>> testErrors = new ArrayList<>(2 + errors.size());
+            if (failedTests > 0) {
+                testErrors.add(testDiagnostic("Test assertion failed"));
+            }
+            if (errorTests > 0) {
+                testErrors.add(testDiagnostic("Test failed during execution"));
+            }
+            testErrors.addAll(errors);
+            errors = testErrors;
+        } else if ((failedTests > 0 || errorTests > 0)
+                && firstTestDiagnosticIndex >= BuildResultLimits.MAX_VISIBLE_DIAGNOSTICS) {
+            // Keep a real test failure visible when earlier diagnostics fill the model cap.
+            errors.addFirst(errors.remove(firstTestDiagnosticIndex));
+        }
         result.put("success", success);
         result.put("testSummary", buildTestSummary(totalTests, passedTests, failedTests, errorTests, skippedTests));
         result.put("errors", errors);
@@ -238,6 +255,31 @@ public class SbtOutputParser implements BuildOutputParser {
         result.put("warningCount", warnings.size());
 
         return result;
+    }
+
+    private static int firstUsefulTestDiagnosticIndex(List<Map<String, Object>> errors) {
+        for (int i = 0; i < errors.size(); i++) {
+            Map<String, Object> error = errors.get(i);
+            Object message = error.get("message");
+            if (message instanceof String text) {
+                String lower = text.toLowerCase(java.util.Locale.ROOT);
+                if (lower.contains("assertionerror")
+                        || lower.contains("assertion failed")
+                        || lower.contains("test failed")
+                        || lower.contains("tests failed")
+                        || lower.contains("() in ")) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static Map<String, Object> testDiagnostic(String message) {
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("severity", "ERROR");
+        diagnostic.put("message", message);
+        return diagnostic;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────

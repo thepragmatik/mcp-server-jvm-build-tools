@@ -170,6 +170,11 @@ assertion values, and raw reports stay local. Up to 13 middle-stream test totals
 per captured stream are retained separately from compiler diagnostics. Repeated
 module totals count as distinct executions; when `diagnosticsTruncated`
 is true, inspect the local report for exact counts.
+For Gradle and sbt, a failed test summary adds a generic `test` diagnostic when
+the parsed output has no useful test diagnostic. sbt can add a separate generic
+execution-error diagnostic when its summary distinguishes that failure kind.
+These add at most two entries to `errorCount`; `testSummary.failed` still counts
+failed cases. Test names, assertion values, and raw reports stay local.
 When a count exceeds the model-visible limit of 1,000,000, or Maven reports
 inconsistent categories, the summary remains nonnegative and includes
 `countsCapped: true`; treat its numbers as bounded approximations.
