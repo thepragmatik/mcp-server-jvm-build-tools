@@ -104,7 +104,7 @@ These checks do not prove that an arbitrary build script is safe. A filesystem
 symlink can change after Java validates its path and before a child process uses
 it; run untrusted workspaces in a container or equivalent OS sandbox without
 network and with minimal mounts. The isolated `scripts/docker-verify.sh`
-checks a clean build but does not turn
+verifies committed `HEAD` from a tracked-source snapshot and a read-only Maven cache; it does not turn
 the server itself into a sandbox.
 
 The normal CI `Privacy and docs` job scans changed lines without printing

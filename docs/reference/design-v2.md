@@ -72,7 +72,7 @@ The hot path parses each tool argument once, checks canonical paths, runs the to
 
 The Docker image builds with a persistent BuildKit Maven cache, verifies Gradle and sbt archive checksums, excludes local secrets from the build context, and runs as a nonroot user. For adversarial tests, copy source into a disposable writable container workspace, mount the local Maven repository read-only, disable the network, and set CPU, memory, process, and time limits. Keep the Docker socket and host secret directories outside the container. A read-only Maven cache may need a disposable writable copy when dependencies are missing; do not mount the host cache writable for untrusted builds.
 
-Build the image with `DOCKER_BUILDKIT=1 docker build -t jvm-build-tools:2.0-local .`, then run `./scripts/docker-verify.sh`. The helper copies the checkout into tmpfs, mounts `~/.m2/repository` read-only, runs Maven offline, and discards the container on exit.
+Build the image with `DOCKER_BUILDKIT=1 docker build -t jvm-build-tools:2.0-local .`, then run `./scripts/docker-verify.sh`. The helper stages a private temporary archive of committed `HEAD`, streams it into tmpfs, and removes the archive on exit. Ignored worktrees, generated files, and uncommitted local data stay out; `~/.m2/repository` is mounted read-only, Maven runs offline, and the container is discarded on exit. Commit intended changes before using this release gate.
 
 ## Review and release gates
 
