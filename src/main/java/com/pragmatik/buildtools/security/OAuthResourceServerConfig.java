@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,22 +26,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Single source of truth for this server's <b>OAuth 2.1 resource-server</b> profile, as
- * required by the MCP authorization spec (RFC9728 Protected Resource Metadata + RFC6750
- * {@code WWW-Authenticate} challenges).
+ * Single source of truth for HTTP bearer authentication and optional OAuth discovery.
  *
- * <p>The HTTP transport advertises itself as an OAuth 2.1 resource server in an
- * <b>additive, backward-compatible</b> way:
+ * <p>The HTTP transport accepts locally configured opaque API keys. OAuth Protected Resource
+ * Metadata is meaningful only with active enforcement and an authorization-server issuer:
  *
  * <ul>
- *   <li>The Protected Resource Metadata document is served unconditionally at
- *       {@link #PROTECTED_RESOURCE_METADATA_PATH} ({@link OAuthProtectedResourceMetadataController})
- *       so OAuth-capable clients can discover the resource server; this is a new, purely
- *       additive endpoint that existing clients simply ignore.</li>
+ *   <li>The Protected Resource Metadata document is served at
+ *       {@link #PROTECTED_RESOURCE_METADATA_PATH} only with a configured issuer.</li>
  *   <li>Bearer-token <b>enforcement</b> on {@code /mcp/**} ({@link OAuthResourceServerFilter})
- *       is <b>opt-in</b> via {@code buildtools.oauth.resource-server.enabled} (default
- *       {@code false}). With enforcement off — the default — no client behaviour changes;
- *       requests pass through exactly as before.</li>
+ *       is controlled by {@code buildtools.oauth.resource-server.enabled}. The HTTP profile
+ *       enables it by default; stdio does not start a servlet container.</li>
  * </ul>
  *
  * <p>The advertised {@code scopes_supported} are this server's fine-grained
@@ -65,13 +61,14 @@ public class OAuthResourceServerConfig {
 
     private final boolean enabled;
     private final String configuredResource;
+    private final URI configuredResourceUri;
     private final List<String> authorizationServers;
 
     /**
      * Spring injection point.
      *
      * @param enabled whether bearer-token enforcement on {@code /mcp/**} is active (default
-     *     {@code false}; metadata is published regardless)
+     *     {@code false} in the base properties, {@code true} in the HTTP profile)
      * @param configuredResource the canonical resource identifier this server protects; when blank
      *     it is derived per-request from the incoming request URL plus the {@code /mcp} suffix
      * @param authorizationServers comma-separated OAuth authorization-server issuer URLs that may
@@ -84,6 +81,9 @@ public class OAuthResourceServerConfig {
             @Value("${buildtools.oauth.authorization-servers:}") String authorizationServers) {
         this.enabled = enabled;
         this.configuredResource = configuredResource == null ? "" : configuredResource.trim();
+        this.configuredResourceUri = this.configuredResource.isEmpty()
+                ? null
+                : validatedHttpUrl(this.configuredResource, "buildtools.oauth.resource");
         this.authorizationServers = parseCsv(authorizationServers);
     }
 
@@ -97,13 +97,20 @@ public class OAuthResourceServerConfig {
     public OAuthResourceServerConfig(boolean enabled, String configuredResource, List<String> authorizationServers) {
         this.enabled = enabled;
         this.configuredResource = configuredResource == null ? "" : configuredResource.trim();
-        this.authorizationServers = authorizationServers == null ? List.of() : List.copyOf(authorizationServers);
+        this.configuredResourceUri = this.configuredResource.isEmpty()
+                ? null
+                : validatedHttpUrl(this.configuredResource, "buildtools.oauth.resource");
+        this.authorizationServers = authorizationServers == null
+                ? List.of()
+                : authorizationServers.stream()
+                        .map(value -> validatedHttpUrl(value, "buildtools.oauth.authorization-servers")
+                                .toString())
+                        .toList();
     }
 
     /**
      * @return {@code true} when bearer-token enforcement on {@code /mcp/**} is active. When
-     *     {@code false} (the default), the server is fully backward compatible: it still publishes
-     *     Protected Resource Metadata but never challenges or rejects a request for a missing token.
+     *     {@code false}, the filter does not challenge requests.
      */
     public boolean enforcementEnabled() {
         return enabled;
@@ -116,6 +123,11 @@ public class OAuthResourceServerConfig {
      */
     public List<String> authorizationServers() {
         return authorizationServers;
+    }
+
+    /** OAuth discovery requires active bearer enforcement and a configured issuer. */
+    public boolean oauthDiscoveryEnabled() {
+        return enabled && !authorizationServers.isEmpty();
     }
 
     /**
@@ -166,13 +178,18 @@ public class OAuthResourceServerConfig {
      * @return the absolute metadata URL
      */
     public String metadataUrl(HttpServletRequest request) {
+        if (configuredResourceUri != null) {
+            // RFC9728 root well-known URI. Never derive a public discovery URL from
+            // untrusted Forwarded/X-Forwarded headers or the internal proxy connection.
+            return configuredResourceUri.resolve("/") + PROTECTED_RESOURCE_METADATA_PATH.substring(1);
+        }
         return baseUrl(request) + PROTECTED_RESOURCE_METADATA_PATH;
     }
 
     /**
      * Builds the scheme/host/port/context-path prefix of the current request. Behind a
-     * TLS-terminating reverse proxy, set {@code buildtools.oauth.resource} explicitly (or enable
-     * Spring's {@code ForwardedHeaderFilter}) so the advertised URLs reflect the external origin.
+     * TLS-terminating reverse proxy, configure {@code buildtools.oauth.resource} explicitly;
+     * request forwarding headers are not trusted by this component.
      *
      * @param request the current request
      * @return the request's origin prefix, without a trailing slash
@@ -201,6 +218,39 @@ public class OAuthResourceServerConfig {
         return Arrays.stream(csv.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
+                .map(value -> validatedHttpUrl(value, "buildtools.oauth.authorization-servers")
+                        .toString())
                 .toList();
+    }
+
+    private static URI validatedHttpUrl(String value, String property) {
+        URI uri;
+        try {
+            uri = URI.create(value);
+        } catch (IllegalArgumentException invalid) {
+            throw invalidUrl(property);
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (host == null
+                || host.isBlank()
+                || uri.getRawUserInfo() != null
+                || uri.getRawQuery() != null
+                || uri.getRawFragment() != null
+                || uri.getPort() == 0
+                || uri.getPort() > 65535
+                || !("https".equalsIgnoreCase(scheme) || ("http".equalsIgnoreCase(scheme) && isLoopbackHost(host)))) {
+            throw invalidUrl(property);
+        }
+        return uri;
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "[::1]".equals(host);
+    }
+
+    private static IllegalArgumentException invalidUrl(String property) {
+        return new IllegalArgumentException(
+                property + " must be an absolute HTTPS URL (or loopback HTTP) without user info, query, or fragment");
     }
 }

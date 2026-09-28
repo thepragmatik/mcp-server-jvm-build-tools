@@ -1,125 +1,22 @@
-# Authorization Model — MCP OAuth 2.1 resource-server alignment
+# HTTP authentication and OAuth discovery
 
-> **1.x reference:** This page documents earlier behavior and may list tools that are not public in the 2.0 development line. Use the [2.0 quickstart](user-guide/quickstart-v2.md) and [2.0 design review](reference/design-v2.md) for the current public contract.
+The HTTP profile binds to loopback and requires a configured, scoped **opaque API key** by default. Set `BUILDTOOLS_API_KEY_<NAME>` and `BUILDTOOLS_API_KEY_<NAME>_SCOPES` in the server environment, then send the key in `Authorization: Bearer` on each MCP request. A missing key receives `401` and a plain `WWW-Authenticate: Bearer` challenge. A key without the required tool scope receives `403`.
 
-This document is the **recorded decision** (ADR) for how this server's HTTP transport
-relates to the MCP authorization spec, which profiles an MCP server as an **OAuth 2.1
-resource server** (RFC9728 Protected Resource Metadata, RFC6750 `WWW-Authenticate`
-challenges, access-token validation).
+The stdio transport has no HTTP authorization exchange. Project allowlisted roots and model-visible output redaction apply on both transports. For the current configuration and diagrams, see [HTTP authentication 2.0](reference/http-authentication.md), [configuration 2.0](reference/configuration-v2.md), and the [current tool catalog](reference/tool-catalog.md).
 
-- Spec: <https://modelcontextprotocol.io/specification/draft/basic/authorization>
-- RFC9728 (OAuth 2.0 Protected Resource Metadata)
-- RFC6750 (Bearer Token Usage)
-- RFC9207 (`iss` in authorization responses — a **client-side** validation obligation)
+## Optional protected-resource metadata
 
-> Note: the **stdio** transport (the default) has no network surface — no HTTP, no
-> port, no tokens. Everything below applies only to the **opt-in Streamable HTTP
-> transport** (`--http` / the `http` Spring profile).
+The OAuth metadata endpoint `GET /.well-known/oauth-protected-resource` returns **404** in default local-key mode. Configure at least one issuer with `buildtools.oauth.authorization-servers` while keeping `buildtools.oauth.resource-server.enabled=true` to enable RFC 9728 metadata containing `authorization_servers`. A 401 challenge then points to that metadata with `resource_metadata`. Metadata lists the server's public tool scopes, excluding `offline_access` and the internal wildcard.
 
-## Decision
+Set `buildtools.oauth.resource` to the canonical **external** resource URL when a reverse proxy terminates TLS. The configured URL supplies the public origin of the metadata link; the proxy must route `/.well-known/oauth-protected-resource` at that origin to this server. The resource URL and issuer URLs must be absolute HTTPS URLs, except loopback HTTP for local development. URLs with user information, query strings, or fragments are rejected at startup. Untrusted forwarding headers do not override the configured public URL.
 
-The HTTP transport adopts the **server-side obligations of the OAuth 2.1
-resource-server model additively and without breaking existing clients**, and keeps a
-documented, deliberate divergence for token *issuance*:
+Issuer configuration enables discovery only; **the built-in filter does not validate OAuth-issued JWTs or remote opaque tokens**. It checks locally configured key digests and tool scopes. For an OAuth deployment, a trusted gateway must validate the issuer, signature or introspection result, audience, expiry, and scopes; prevent direct bypass; and map verified requests to locally recognized credentials. A JWT forwarded unchanged to this server receives 401. Test that complete path before advertising an issuer.
 
-1. **Serve RFC9728 Protected Resource Metadata** at
-   `/.well-known/oauth-protected-resource` (always available under the HTTP profile).
-   This is a new, additive discovery surface — OAuth-capable clients can discover the
-   resource server; clients that do not speak OAuth simply never request it.
-2. **Emit RFC6750 `WWW-Authenticate: Bearer resource_metadata="..."` challenges** and
-   **validate access tokens** when bearer-token enforcement is enabled. Enforcement is
-   **opt-in** (`buildtools.oauth.resource-server.enabled`, default `false`), so the
-   default behaviour is byte-for-byte unchanged for existing clients.
-3. **Tokens are opaque bearer credentials validated locally** against the configured
-   credential store (`BUILDTOOLS_API_KEY_*`), i.e. RFC7662-style local introspection
-   over RFC6750 bearer transport. **Full authorization-server integration** (JWT/JWKS
-   verification, audience binding, `iss` checks, dynamic client registration) is
-   **deliberately delegated to a fronting OAuth-aware gateway / reverse proxy** in the
-   production deployment topology — see *Divergence & threat model* below. This is a
-   legitimate, RFC9728-blessed topology: the resource server advertises its metadata
-   and accepts validated bearer tokens; the gateway performs the heavyweight AS work.
-4. `scopes_supported` is derived from the server's fine-grained `ToolPermission`
-   scopes. Per the spec, **`offline_access` is never advertised** (nor is the internal
-   `*` wildcard).
-5. The unsafe **`dev-key-unsafe-do-not-use-in-production` default is guarded**: it is
-   never created under a production profile (`prod`/`production`) or when
-   `buildtools.auth.mode=enforcing` (complements #83).
+## Security boundary
 
-## OAuth/OIDC mapping
+- Keep keys in a secret manager or local environment. Never place them in a repository, prompt, URL, or log. Rotate a leaked key and restart the server; keys have no built-in expiry.
+- Grant only the tool scopes needed. `build:execute` can run project build scripts with the server process's permissions; isolate untrusted projects and withhold publishing credentials.
+- Use TLS and a trusted gateway for network exposure. The server's default loopback bind is deliberately narrow; changing it requires explicit protections.
+- Treat the configured resource and authorization server URLs as deployment configuration, not model or request input.
 
-| MCP / OAuth 2.1 requirement | Implementation in this server |
-|---|---|
-| Resource server advertises Protected Resource Metadata (RFC9728) | `GET /.well-known/oauth-protected-resource` (`OAuthProtectedResourceMetadataController`) |
-| `WWW-Authenticate: Bearer resource_metadata="..."` on 401 (RFC6750/RFC9728) | `OAuthResourceServerFilter` (opt-in) |
-| Resource server validates access tokens | Local validation against `BUILDTOOLS_API_KEY_*` (`ToolAuthorizationService#isAccessTokenValid`); full AS/JWT validation delegated to a fronting gateway |
-| Bearer token transport | `Authorization: Bearer <token>` header (`bearer_methods_supported: ["header"]`) |
-| Scopes | 12 fine-grained `ToolPermission` scopes (`build:read`, `dependency:read`, …) |
-| `offline_access` NOT advertised | Excluded from `scopes_supported` by construction |
-| Audit logging | `ToolAuditLogger` (OWASP MCP06) |
-| `iss` validation (RFC9207) | **Client-side** obligation; out of scope for a resource server |
-
-## Configuration
-
-```properties
-# Protected Resource Metadata is ALWAYS served at /.well-known/oauth-protected-resource
-# under the HTTP profile (additive). Bearer-token ENFORCEMENT is opt-in:
-buildtools.oauth.resource-server.enabled=false
-# Canonical resource identifier; blank => derived per-request as <scheme>://<host>[:<port>]/mcp.
-# Behind a reverse proxy set this to the external URL, e.g. https://mcp.example.com/mcp
-buildtools.oauth.resource=
-# Optional OAuth authorization-server issuer URLs (RFC9728 authorization_servers):
-buildtools.oauth.authorization-servers=
-```
-
-Example metadata document:
-
-```json
-{
-  "resource": "https://mcp.example.com/mcp",
-  "authorization_servers": ["https://auth.example.com"],
-  "scopes_supported": ["build:read", "build:execute", "dependency:read", "..."],
-  "bearer_methods_supported": ["header"],
-  "resource_name": "MCP Server - Build Tools for the JVM",
-  "resource_documentation": "https://github.com/thepragmatik/mcp-server-jvm-build-tools/blob/main/docs/AUTHORIZATION.md"
-}
-```
-
-Challenge on a missing/invalid token (enforcement enabled):
-
-```
-HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Bearer error="invalid_token", error_description="The access token is invalid or expired", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"
-```
-
-## Divergence & threat model (local opaque-token scheme)
-
-For local / trusted deployments the server validates opaque bearer tokens locally
-rather than integrating a full authorization server. This is a deliberate divergence
-from the "validate JWTs minted by an external AS" reading of the spec. Its threat model:
-
-- **In scope (mitigated):** unauthenticated access to `/mcp/**` (when enforcement is
-  enabled), token presence/validity, scope-gated tool authorization, audit logging,
-  and never shipping a usable default credential in production.
-- **Out of scope (delegate to the deployment):**
-  - **Token issuance, rotation, revocation, and expiry** — opaque keys are minted out
-    of band; there is no built-in expiry. Rotate via `BUILDTOOLS_API_KEY_*` and a
-    redeploy, or front the server with an OAuth gateway that issues short-lived tokens.
-  - **JWT/JWKS verification, audience binding, `iss`/`aud` validation** — performed by
-    the fronting gateway, not the server.
-  - **Transport confidentiality** — terminate TLS at a reverse proxy; the server
-    speaks plaintext HTTP by default.
-  - **Replay protection / mTLS / sender-constrained tokens** — gateway concern.
-- **Residual risk:** a leaked opaque key grants its scopes until rotated. Keep keys
-  out of source control, scope them minimally (least privilege), prefer a fronting
-  OAuth gateway for untrusted exposure, and enable enforcement
-  (`buildtools.oauth.resource-server.enabled=true`) whenever the HTTP transport faces
-  anything other than a trusted local caller.
-
-## Recommended production topology
-
-```
-Untrusted client ──TLS──> Reverse proxy / OAuth gateway ──> this MCP server (resource server)
-                          (validates AS-issued tokens,        (advertises RFC9728 metadata,
-                           terminates TLS, rate-limits)         enforces bearer presence,
-                                                                scope-gates tools)
-```
+The [MCP 2025-11-25 authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) requires `authorization_servers` and audience-bound token validation when claiming an OAuth protected-resource flow. This server's default local API-key mode intentionally does not claim that flow. Issuer metadata is an integration point, not a claim of complete OAuth conformance.

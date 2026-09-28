@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.pragmatik.buildtools.application.McpServerIdentity;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Tests for {@link OAuthProtectedResourceMetadataController} — the RFC9728 Protected Resource
@@ -35,7 +37,7 @@ class OAuthProtectedResourceMetadataControllerTest {
     private final McpServerIdentity identity = new McpServerIdentity("test-server", "9.9.9");
 
     private OAuthProtectedResourceMetadataController controller(String resource, List<String> authorizationServers) {
-        OAuthResourceServerConfig config = new OAuthResourceServerConfig(false, resource, authorizationServers);
+        OAuthResourceServerConfig config = new OAuthResourceServerConfig(true, resource, authorizationServers);
         return new OAuthProtectedResourceMetadataController(config, identity);
     }
 
@@ -48,9 +50,10 @@ class OAuthProtectedResourceMetadataControllerTest {
     }
 
     @Test
-    @DisplayName("derives the resource identifier and core fields from the request")
+    @DisplayName("derives the resource identifier and core fields when an issuer is configured")
     void coreFields() {
-        Map<String, Object> metadata = controller("", List.of()).protectedResourceMetadata(request());
+        Map<String, Object> metadata =
+                controller("", List.of("https://as.example.com")).protectedResourceMetadata(request());
 
         assertThat(metadata).containsEntry("resource", "http://localhost:8080/mcp");
         assertThat(metadata).containsEntry("resource_name", "test-server");
@@ -62,7 +65,8 @@ class OAuthProtectedResourceMetadataControllerTest {
     @DisplayName("scopes_supported lists the ToolPermission scopes and never offline_access")
     @SuppressWarnings("unchecked")
     void scopesSupported() {
-        Map<String, Object> metadata = controller("", List.of()).protectedResourceMetadata(request());
+        Map<String, Object> metadata =
+                controller("", List.of("https://as.example.com")).protectedResourceMetadata(request());
 
         List<String> scopes = (List<String>) metadata.get("scopes_supported");
         assertThat(scopes)
@@ -72,10 +76,21 @@ class OAuthProtectedResourceMetadataControllerTest {
     }
 
     @Test
-    @DisplayName("omits authorization_servers when none are configured")
-    void omitsAuthorizationServersWhenEmpty() {
-        Map<String, Object> metadata = controller("", List.of()).protectedResourceMetadata(request());
-        assertThat(metadata).doesNotContainKey("authorization_servers");
+    @DisplayName("returns 404 instead of advertising unusable OAuth discovery without an issuer")
+    void noOAuthDiscoveryWithoutIssuer() {
+        assertThatThrownBy(() -> controller("", List.of()).protectedResourceMetadata(request()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+    }
+
+    @Test
+    @DisplayName("returns 404 when bearer enforcement is disabled even with an issuer")
+    void noOAuthDiscoveryWithoutEnforcement() {
+        OAuthResourceServerConfig config = new OAuthResourceServerConfig(false, "", List.of("https://as.example.com"));
+        assertThatThrownBy(() -> new OAuthProtectedResourceMetadataController(config, identity)
+                        .protectedResourceMetadata(request()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
     }
 
     @Test
@@ -89,8 +104,8 @@ class OAuthProtectedResourceMetadataControllerTest {
     @Test
     @DisplayName("honours an explicitly configured resource identifier")
     void honoursConfiguredResource() {
-        Map<String, Object> metadata =
-                controller("https://mcp.example.com/mcp", List.of()).protectedResourceMetadata(request());
+        Map<String, Object> metadata = controller("https://mcp.example.com/mcp", List.of("https://as.example.com"))
+                .protectedResourceMetadata(request());
         assertThat(metadata).containsEntry("resource", "https://mcp.example.com/mcp");
     }
 }

@@ -112,31 +112,18 @@ silently widen the attack surface:
   is added and roles are configured. Set it to `always` only for trusted local
   debugging.
 
-### OAuth 2.1 resource-server posture
+### HTTP authentication and OAuth discovery
 
-The MCP authorization spec profiles a protected MCP server as an **OAuth 2.1 resource
-server** (RFC9728 Protected Resource Metadata, RFC6750 `WWW-Authenticate` challenges,
-access-token validation). This server aligns with those **server-side** obligations
-**additively and backward-compatibly** (see `docs/AUTHORIZATION.md` for the full
-recorded decision and threat model):
+The HTTP profile requires a configured, scoped opaque API key by default. A missing
+key receives `401` with a plain `WWW-Authenticate: Bearer` challenge. Protected
+Resource Metadata at `/.well-known/oauth-protected-resource` returns 404 until
+`buildtools.oauth.authorization-servers` names an issuer. Once configured, metadata
+contains `authorization_servers` and 401 challenges link to it.
 
-- **Protected Resource Metadata (RFC9728)** is served at
-  `/.well-known/oauth-protected-resource` under the HTTP profile — a new, additive
-  discovery surface. `scopes_supported` lists the fine-grained `ToolPermission`
-  scopes; per the spec, **`offline_access` is never advertised**.
-- **Bearer-token enforcement is opt-in** via
-  `buildtools.oauth.resource-server.enabled` (default `false`). When enabled, a
-  missing/invalid `Authorization: Bearer` token on `/mcp/**` is answered `401` with
-  `WWW-Authenticate: Bearer resource_metadata="..."`. `server/discover` stays open so
-  clients can learn how to authenticate. With it disabled (the default), behaviour is
-  unchanged for existing clients.
-- **Tokens are validated locally** against the configured `BUILDTOOLS_API_KEY_*`
-  credentials (opaque bearer tokens). Full authorization-server / JWT-JWKS validation
-  is deliberately delegated to a fronting OAuth gateway in production.
-- **The `dev-key-unsafe-do-not-use-in-production` default is guarded**: it is never
-  created under a production profile (`prod`/`production`) or when
-  `buildtools.auth.mode=enforcing`, so the unsafe default can never be live in a
-  hardened deployment.
+This application validates only locally configured opaque keys; issuer configuration
+does not add JWT/JWKS, audience, or remote-token validation. A production OAuth gateway
+must validate tokens, prevent bypass, and map validated requests to locally recognized
+credentials. See the [current HTTP authentication guide](docs/reference/http-authentication.md).
 
 ## Configuration Hardening
 
@@ -146,7 +133,7 @@ recorded decision and threat model):
 - spring.jackson.deserialization.fail-on-unknown-properties=false (MCP forward-compat)
 - mcp.transport.cors.allowed-origins=http://localhost:8080,http://127.0.0.1:8080 (restricted CORS; no wildcard by default)
 - management.endpoint.health.show-details=when-authorized (no health internals to unauthenticated callers; hidden from everyone until Spring Security is added)
-- buildtools.oauth.resource-server.enabled=false (bearer-token enforcement is opt-in; RFC9728 Protected Resource Metadata is served additively)
+- buildtools.oauth.resource-server.enabled=true in the HTTP profile (scoped bearer keys required); OAuth discovery requires a configured issuer
 - dev-key-unsafe-do-not-use-in-production default key is never created under a `prod`/`production` profile or `buildtools.auth.mode=enforcing`
 
 ## Dependency & Supply-Chain Scanning

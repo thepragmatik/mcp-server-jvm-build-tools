@@ -17,6 +17,7 @@
 package com.pragmatik.buildtools.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -112,6 +113,40 @@ class OAuthResourceServerConfigTest {
             OAuthResourceServerConfig config = new OAuthResourceServerConfig(false, "", List.of());
             assertThat(config.metadataUrl(request("http", "localhost", 8080)))
                     .isEqualTo("http://localhost:8080" + OAuthResourceServerConfig.PROTECTED_RESOURCE_METADATA_PATH);
+        }
+
+        @Test
+        @DisplayName("external resource determines metadata origin behind a proxy")
+        void externalResourceDeterminesMetadataOrigin() {
+            OAuthResourceServerConfig config = new OAuthResourceServerConfig(
+                    true, "https://mcp.example.com:8443/public/mcp", List.of("https://as.example.com"));
+            MockHttpServletRequest internal = request("http", "127.0.0.1", 8080);
+            internal.addHeader("X-Forwarded-Host", "untrusted.example.net");
+
+            assertThat(config.metadataUrl(internal))
+                    .isEqualTo("https://mcp.example.com:8443/.well-known/oauth-protected-resource");
+            assertThat(config.resourceIdentifier(internal)).isEqualTo("https://mcp.example.com:8443/public/mcp");
+        }
+
+        @Test
+        @DisplayName("rejects malformed or unsafe configured URLs without echoing them")
+        void rejectsUnsafeConfiguredUrls() {
+            for (String value : List.of(
+                    "relative/mcp",
+                    "http://public.example.com/mcp",
+                    "https://" + String.join("@", "user", "host.example.com") + "/mcp",
+                    "https://host.example.com/mcp?credential=synthetic",
+                    "https://host.example.com/mcp#fragment",
+                    "https://host.example.com:65536/mcp")) {
+                assertThatThrownBy(() -> new OAuthResourceServerConfig(true, value, List.of()))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("buildtools.oauth.resource")
+                        .hasMessageNotContaining(value);
+            }
+            assertThatThrownBy(() -> new OAuthResourceServerConfig(
+                            true, "https://mcp.example.com/mcp", List.of("http://public.example.com")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("buildtools.oauth.authorization-servers");
         }
 
         @Test
