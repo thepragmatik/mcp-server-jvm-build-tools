@@ -570,35 +570,44 @@ public class BuildToolsService {
         } catch (java.nio.file.InvalidPathException e) {
             return JsonUtils.errorJson("Cannot resolve project directory");
         }
-        if (!Files.isDirectory(dir)) {
-            return JsonUtils.errorJson("Project directory is not valid");
-        }
-
         List<Map<String, Object>> allIssues = new ArrayList<>();
         String detectedTool = null;
+        // Marker checks and reads must share the same held handle. A path-based
+        // existence check could follow a project symlink swapped after access control.
+        try (AnchoredProjectFileReader.ProjectDirectory project = AnchoredProjectFileReader.open(dir)) {
+            try {
+                byte[] pom = project.readIfPresent("pom.xml", PomXmlValidator.MAX_POM_BYTES);
+                if (pom != null) {
+                    detectedTool = "maven";
+                    allIssues.addAll(validatePomXml(pom));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("pom.xml", "Cannot read pom.xml"));
+            }
 
-        // Validate pom.xml if present
-        Path pomXml = dir.resolve("pom.xml");
-        if (Files.exists(pomXml)) {
-            detectedTool = "maven";
-            List<Map<String, Object>> issues = validatePomXml(pomXml);
-            allIssues.addAll(issues);
-        }
+            try {
+                byte[] gradle = project.readIfPresent("build.gradle", MAX_GRADLE_CONFIG_BYTES);
+                if (gradle != null) {
+                    if (detectedTool == null) detectedTool = "gradle";
+                    allIssues.addAll(validateBuildGradle("build.gradle", gradle, false));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("build.gradle", "Cannot read build file"));
+            }
 
-        // Validate build.gradle if present
-        Path buildGradle = dir.resolve("build.gradle");
-        if (Files.exists(buildGradle)) {
-            if (detectedTool == null) detectedTool = "gradle";
-            List<Map<String, Object>> issues = validateBuildGradle(buildGradle, false);
-            allIssues.addAll(issues);
-        }
-
-        // Validate build.gradle.kts if present
-        Path buildGradleKts = dir.resolve("build.gradle.kts");
-        if (Files.exists(buildGradleKts)) {
-            if (detectedTool == null) detectedTool = "gradle";
-            List<Map<String, Object>> issues = validateBuildGradle(buildGradleKts, true);
-            allIssues.addAll(issues);
+            try {
+                byte[] gradleKts = project.readIfPresent("build.gradle.kts", MAX_GRADLE_CONFIG_BYTES);
+                if (gradleKts != null) {
+                    if (detectedTool == null) detectedTool = "gradle";
+                    allIssues.addAll(validateBuildGradle("build.gradle.kts", gradleKts, true));
+                }
+            } catch (IOException e) {
+                allIssues.add(validationIssue("build.gradle.kts", "Cannot read build file"));
+            }
+        } catch (UnsupportedOperationException e) {
+            return validationFailure("Validation unavailable on this filesystem");
+        } catch (IOException e) {
+            return validationFailure("Cannot access project directory");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -639,12 +648,10 @@ public class BuildToolsService {
     /**
      * Validate a pom.xml file for structural and content issues.
      */
-    private List<Map<String, Object>> validatePomXml(Path pomXml) {
+    private List<Map<String, Object>> validatePomXml(byte[] pomXml) {
         try {
-            return PomXmlValidator.validate(readValidationBytes(pomXml, PomXmlValidator.MAX_POM_BYTES));
-        } catch (UnsupportedOperationException e) {
-            return List.of(validationIssue("pom.xml", "Validation unavailable on this filesystem"));
-        } catch (IOException | IllegalArgumentException e) {
+            return PomXmlValidator.validate(pomXml);
+        } catch (IllegalArgumentException e) {
             return List.of(validationIssue("pom.xml", "Cannot read pom.xml"));
         }
     }
@@ -657,18 +664,24 @@ public class BuildToolsService {
         return issue;
     }
 
+    private static String validationFailure(String message) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("valid", false);
+        result.put("tool", null);
+        result.put("projectDir", "[REDACTED_PATH]");
+        result.put("error", message);
+        result.put("issueCount", 1);
+        result.put("issues", List.of(validationIssue("projectDir", message)));
+        return JsonUtils.toJson(result);
+    }
+
     /**
      * Validate a build.gradle or build.gradle.kts file for basic syntax.
      */
-    private List<Map<String, Object>> validateBuildGradle(Path buildFile, boolean isKotlin) {
+    private List<Map<String, Object>> validateBuildGradle(String filename, byte[] bytes, boolean isKotlin) {
         List<Map<String, Object>> issues = new ArrayList<>();
-        String filename = buildFile.getFileName().toString();
 
         try {
-            byte[] bytes;
-            // Authorize the final file at open time too: a symlink can be swapped
-            // after the project-root policy checked its real path.
-            bytes = readValidationBytes(buildFile, MAX_GRADLE_CONFIG_BYTES);
             if (bytes.length > MAX_GRADLE_CONFIG_BYTES) {
                 Map<String, Object> issue = new LinkedHashMap<>();
                 issue.put("severity", "ERROR");
@@ -762,8 +775,6 @@ public class BuildToolsService {
                 }
             }
 
-        } catch (UnsupportedOperationException e) {
-            issues.add(validationIssue(filename, "Validation unavailable on this filesystem"));
         } catch (IOException | IllegalArgumentException e) {
             Map<String, Object> issue = new LinkedHashMap<>();
             issue.put("severity", "ERROR");
@@ -773,10 +784,5 @@ public class BuildToolsService {
         }
 
         return issues;
-    }
-
-    private byte[] readValidationBytes(Path buildFile, int maxBytes) throws IOException {
-        return AnchoredProjectFileReader.read(
-                buildFile.getParent(), buildFile.getFileName().toString(), maxBytes);
     }
 }

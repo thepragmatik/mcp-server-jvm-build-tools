@@ -21,6 +21,7 @@ import java.nio.channels.Channels;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SecureDirectoryStream;
 import java.nio.file.StandardOpenOption;
@@ -28,21 +29,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/** Opens a bounded build file relative to an allowed root's live directory handle. */
+/** Opens bounded build files relative to one live, no-follow project directory handle. */
 public final class AnchoredProjectFileReader {
-
     private AnchoredProjectFileReader() {}
 
-    public static byte[] read(Path project, String filename, int maxBytes) throws IOException {
+    public static ProjectDirectory open(Path project) throws IOException {
         Path root = project.getRoot();
-        if (root == null
-                || maxBytes < 1
-                || filename.isEmpty()
-                || ".".equals(filename)
-                || "..".equals(filename)
-                || filename.contains("/")
-                || filename.contains("\\")) {
-            throw new IOException("Invalid project file request");
+        if (root == null) {
+            throw new IOException("Invalid project path");
         }
         Path relativeProject = root.relativize(project);
         for (Path segment : relativeProject) {
@@ -50,29 +44,100 @@ public final class AnchoredProjectFileReader {
                 throw new IOException("Invalid project path component");
             }
         }
-        try (DirectoryStream<Path> rootStream = Files.newDirectoryStream(root)) {
-            if (!(rootStream instanceof SecureDirectoryStream<?>)) {
-                throw new UnsupportedOperationException("Race-free project file access is unavailable");
+
+        DirectoryStream<Path> rootStream = Files.newDirectoryStream(root);
+        if (!(rootStream instanceof SecureDirectoryStream<?>)) {
+            rootStream.close();
+            throw new UnsupportedOperationException("Race-free project file access is unavailable");
+        }
+        @SuppressWarnings("unchecked")
+        SecureDirectoryStream<Path> rootDirectory = (SecureDirectoryStream<Path>) rootStream;
+        SecureDirectoryStream<Path> directory = rootDirectory;
+        List<SecureDirectoryStream<Path>> children = new ArrayList<>();
+        try {
+            for (Path segment : relativeProject) {
+                directory = directory.newDirectoryStream(segment, LinkOption.NOFOLLOW_LINKS);
+                children.add(directory);
             }
-            @SuppressWarnings("unchecked")
-            SecureDirectoryStream<Path> rootDirectory = (SecureDirectoryStream<Path>) rootStream;
-            SecureDirectoryStream<Path> directory = rootDirectory;
-            List<SecureDirectoryStream<Path>> children = new ArrayList<>();
-            try {
-                for (Path segment : relativeProject) {
-                    directory = directory.newDirectoryStream(segment, LinkOption.NOFOLLOW_LINKS);
-                    children.add(directory);
-                }
-                try (var channel = directory.newByteChannel(
-                                Path.of(filename), Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
-                        var input = Channels.newInputStream(channel)) {
-                    return input.readNBytes(maxBytes + 1);
-                }
-            } finally {
-                for (int i = children.size() - 1; i >= 0; i--) {
+            return new ProjectDirectory(rootDirectory, children, directory);
+        } catch (IOException | RuntimeException e) {
+            for (int i = children.size() - 1; i >= 0; i--) {
+                try {
                     children.get(i).close();
+                } catch (IOException closeFailure) {
+                    e.addSuppressed(closeFailure);
                 }
             }
+            try {
+                rootDirectory.close();
+            } catch (IOException closeFailure) {
+                e.addSuppressed(closeFailure);
+            }
+            throw e;
+        }
+    }
+
+    /** Preserves the authorized directory identity across marker checks and file reads. */
+    public static final class ProjectDirectory implements AutoCloseable {
+        private final SecureDirectoryStream<Path> root;
+        private final List<SecureDirectoryStream<Path>> children;
+        private final SecureDirectoryStream<Path> directory;
+
+        private ProjectDirectory(
+                SecureDirectoryStream<Path> root,
+                List<SecureDirectoryStream<Path>> children,
+                SecureDirectoryStream<Path> directory) {
+            this.root = root;
+            this.children = children;
+            this.directory = directory;
+        }
+
+        /** Returns null for an absent marker; symlinks and read failures throw. */
+        public byte[] readIfPresent(String filename, int maxBytes) throws IOException {
+            if (maxBytes < 1
+                    || filename == null
+                    || filename.isEmpty()
+                    || ".".equals(filename)
+                    || "..".equals(filename)
+                    || filename.contains("/")
+                    || filename.contains("\\")) {
+                throw new IOException("Invalid project file request");
+            }
+            try (var channel = directory.newByteChannel(
+                            Path.of(filename), Set.of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
+                    var input = Channels.newInputStream(channel)) {
+                return input.readNBytes(maxBytes + 1);
+            } catch (NoSuchFileException e) {
+                return null;
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            IOException failure = null;
+            for (int i = children.size() - 1; i >= 0; i--) {
+                try {
+                    children.get(i).close();
+                } catch (IOException e) {
+                    if (failure == null) failure = e;
+                    else failure.addSuppressed(e);
+                }
+            }
+            try {
+                root.close();
+            } catch (IOException e) {
+                if (failure == null) failure = e;
+                else failure.addSuppressed(e);
+            }
+            if (failure != null) throw failure;
+        }
+    }
+
+    public static byte[] read(Path project, String filename, int maxBytes) throws IOException {
+        try (ProjectDirectory directory = open(project)) {
+            byte[] bytes = directory.readIfPresent(filename, maxBytes);
+            if (bytes == null) throw new NoSuchFileException(filename);
+            return bytes;
         }
     }
 }

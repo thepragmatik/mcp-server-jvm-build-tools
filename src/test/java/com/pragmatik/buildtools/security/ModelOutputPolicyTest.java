@@ -277,6 +277,23 @@ class ModelOutputPolicyTest {
     }
 
     @Test
+    void inaccessibleProjectUsesFixedValidationDiagnostic() {
+        String output = """
+                {"valid":false,"tool":null,"projectDir":"/synthetic/private/user@example.invalid",
+                 "error":"Cannot access project directory","issueCount":1,
+                 "issues":[{"severity":"ERROR","path":"projectDir",
+                            "message":"Cannot access project directory"}]}
+                """;
+
+        String safe = policy.protect("validate_build_configuration", output);
+
+        assertTrue(safe.contains("Project directory cannot be accessed locally."));
+        assertTrue(safe.contains("\"issueCount\":1"));
+        assertFalse(safe.contains("user@example.invalid"));
+        assertFalse(safe.contains("/synthetic/private"));
+    }
+
+    @Test
     void boundsLargeResultsAndKeepsFinalDiagnostic() {
         String output = "x".repeat(300_000) + "\nERROR /home/private-user/File.java";
         String safe = policy.protect("execute_build_command", output);

@@ -471,6 +471,7 @@ public final class ModelOutputPolicy {
             case "Secure XML parser is unavailable" -> "Secure XML parser is unavailable in the local runtime.";
             case "Validation unavailable on this filesystem" ->
                 "Race-free validation is unavailable on this local filesystem or JDK.";
+            case "Cannot access project directory" -> "Project directory cannot be accessed locally.";
             case "Duplicate dependency declaration" -> "POM repeats a dependency declaration.";
             case "Inconsistent plugin versions" -> "POM declares inconsistent plugin versions.";
             case "Build file is empty" -> "Build file is empty.";

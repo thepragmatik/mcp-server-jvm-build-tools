@@ -183,9 +183,14 @@ class BuildConfigurationValidationTest {
             Files.move(allowed, root.resolve("moved"));
             Files.createSymbolicLink(allowed, outside);
 
-            String result = service.validateBuildConfiguration(validated.toString());
-            assertThat(result).contains("\"valid\":false").contains("Cannot read pom.xml");
-            assertThat(result).doesNotContain("SYNTHETIC_PRIVATE_CANARY").doesNotContain("Malformed pom.xml");
+            String withMarker = service.validateBuildConfiguration(validated.toString());
+            Files.delete(outside.resolve("pom.xml"));
+            String withoutMarker = service.validateBuildConfiguration(validated.toString());
+
+            assertThat(withMarker).isEqualTo(withoutMarker);
+            assertThat(withMarker)
+                    .contains("\"valid\":false", "\"tool\":null", "Cannot access project directory")
+                    .doesNotContain("SYNTHETIC_PRIVATE_CANARY", "Malformed pom.xml");
         }
 
         @Test
