@@ -74,6 +74,10 @@ public class DependencyService {
 
     private static final String MAVEN_CENTRAL_BASE = "https://repo1.maven.org/maven2";
     private static final int MAX_SCAN_BUILD_FILE_BYTES = 1024 * 1024;
+    private static final HttpClient MAVEN_CENTRAL_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
     private static final int SCAN_READ_TIMEOUT_SECONDS = 5;
     // Zero queue and one daemon keep a blocked native file-open race from creating
     // an unbounded number of threads or stalling request threads indefinitely.
@@ -95,10 +99,7 @@ public class DependencyService {
     }
 
     DependencyService(BuildToolProvider buildToolProvider, CveLookupService cveLookup) {
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(java.time.Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+        this.httpClient = MAVEN_CENTRAL_HTTP_CLIENT;
         this.buildToolProvider = buildToolProvider;
         this.pomResolver = new PomDependencyResolver();
         this.cveLookup = Objects.requireNonNull(cveLookup);

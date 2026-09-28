@@ -72,6 +72,10 @@ public class CveLookupService {
     public static final int MAX_SCAN_PACKAGES = 500;
     static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final HttpClient DEFAULT_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
     private final OsvTransport transport;
     private final Map<String, CacheEntry> cache;
@@ -82,10 +86,7 @@ public class CveLookupService {
 
     public CveLookupService() {
         // A redirect must not forward dependency coordinates to another host.
-        this(HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build());
+        this(DEFAULT_HTTP_CLIENT);
     }
 
     /**
