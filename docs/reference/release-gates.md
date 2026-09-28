@@ -25,6 +25,13 @@ synthetic path/email/secret suppression.
 
 The packaged configuration-validation probe runs on HTTP and stdio. Synthetic Maven POMs cover a missing required coordinate, malformed XML, a rejected external entity, the 1 MiB input limit, and inherited parent coordinates. It checks fixed `configuration` diagnostics, aggregate validity, and suppression of project paths, email addresses, and secret canaries.
 
+The packaged OSV privacy probe also runs on both transports. Synthetic projects
+cover a symlinked POM, a POM beyond the 1 MiB scan limit, invalid UTF-8, and a
+coordinate rejected by the local OSV allowlist. Each case ends before any OSV
+network lookup; the probe checks fixed private errors or aggregate-only counts,
+structured/text parity when available, and suppression of paths, email
+addresses, and secret canaries. It never sends fixture coordinates to OSV.
+
 The official scenarios selected for this product are `server-initialize`,
 `ping`, `tools-list`, `resources-list`, `prompts-list`, and
 `dns-rebinding-protection`. The official runner's frozen `--requirements
@@ -145,6 +152,7 @@ python3 scripts/release-gate.py
 python3 scripts/maven-middle-protocol-gate.py
 python3 scripts/gradle-sbt-middle-protocol-gate.py
 python3 scripts/config-validation-protocol-gate.py
+python3 scripts/osv-privacy-protocol-gate.py
 ```
 
 For any build-output capture change, test a synthetic root cause in the discarded

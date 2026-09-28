@@ -44,3 +44,5 @@ jobs:
         run: python3 scripts/gradle-sbt-middle-protocol-gate.py
       - name: Verify configuration validation on both transports
         run: python3 scripts/config-validation-protocol-gate.py
+      - name: Verify OSV scan privacy on both transports
+        run: python3 scripts/osv-privacy-protocol-gate.py
