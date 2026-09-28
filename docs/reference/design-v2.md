@@ -37,12 +37,12 @@ The public tool descriptions state the result contract after the output policy, 
 
 | Tool | Model-visible result | Retained locally |
 |---|---|---|
-| `check_dependency_version` | Version and upgrade status; optional `includeSecurityInfo` does not expose security findings through MCP | Dependency identity and optional OSV findings |
+| `check_dependency_version` | Version and upgrade status; optional `securityStatus`, bounded `cveCount`, and `highestSeverity` | Dependency identity and individual OSV findings |
 | `analyze_pom_dependencies` | Dependency, managed-dependency, and imported-BOM counts | Coordinates and per-dependency classifications |
 | `scan_dependency_cves` | `scanStatus`, recognized declaration count (`totalDeps`), and affected-dependency presence count (`vulnerableDeps`); `severityUnknown` when OSV omits severity. High/critical counts appear only when all returned severities are known. Failed or partial lookups return `scanStatus: incomplete` and no counts. | Dependency and CVE identities |
 
 These aggregate results support triage but cannot identify a particular dependency to edit. A user who needs that detail must inspect the local build report outside the MCP result channel. The tool metadata and protocol tests pin this contract so a future implementation cannot advertise details that the model never receives.
-For `check_dependency_version`, `includeSecurityInfo=true` still sends the supplied coordinates to OSV.dev but the current MCP projection withholds the findings. Agents should use `scan_dependency_cves` for aggregate presence until that optional lookup has a separately tested public result contract.
+For `check_dependency_version`, `includeSecurityInfo=true` sends the supplied coordinates and version to OSV.dev. A successful lookup exposes only a bounded aggregate count and known/unknown highest severity; a failed or malformed lookup exposes `securityStatus: incomplete` without a count. An oversized or malformed private version result returns `metadataStatus: incomplete` and an error. Individual advisories, summaries, and package identities stay local. The option has no OSV effect unless `currentVersion` is supplied.
 
 The Maven Central metadata lookup is another explicit egress boundary. It admits bounded Maven coordinate syntax before constructing a fixed-host URL, rejects redirects, imposes a ten-second request deadline and 1 MiB body cap, then parses strict UTF-8 XML with DTD and external-entity access disabled. Errors use fixed text; the shared output policy exposes only safe version and count fields. The optional OSV query is a separate outbound operation.
 

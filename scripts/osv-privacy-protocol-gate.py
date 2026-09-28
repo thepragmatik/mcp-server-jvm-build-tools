@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check packaged OSV scan privacy without making an outbound OSV request."""
+"""Check packaged OSV scan and optional version-check privacy without outbound requests."""
 
 import importlib.util
 import json
@@ -89,6 +89,26 @@ def assert_result(result, expected_summary, root, outside):
         raise AssertionError("A synthetic private value escaped the OSV scan")
 
 
+def version_arguments():
+    return {"groupId": "test.user@example.invalid", "artifactId": "SYNTHETIC_SECRET",
+            "currentVersion": "1.0.0", "includeSecurityInfo": True}
+
+
+def assert_version_result(result):
+    content = result.get("content", [])
+    if not content or not isinstance(content[0].get("text"), str):
+        raise AssertionError("Version check has no text content")
+    safe = json.loads(content[0]["text"])
+    if safe.get("completed") is not True or safe.get("isError") is not True:
+        raise AssertionError("Invalid coordinate did not fail privately")
+    if "securityStatus" in safe or "cveCount" in safe or "highestSeverity" in safe:
+        raise AssertionError("Invalid coordinate returned security data")
+    if "structuredContent" in result and result["structuredContent"] != safe:
+        raise AssertionError("Version check text and structured result differ")
+    if any(value in json.dumps(result) for value in CANARIES):
+        raise AssertionError("A synthetic private value escaped the version check")
+
+
 def main():
     if not JAR.is_file():
         raise RuntimeError("Packaged server jar is missing")
@@ -117,6 +137,14 @@ def main():
                     raise AssertionError("HTTP OSV scan request failed")
                 assert_result(release.json_rpc_reply(response, 1).get("result", {}), expected, root, outside)
                 print(f"PASS packaged HTTP OSV privacy {name}")
+            body = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                               "params": {"name": "check_dependency_version",
+                                          "arguments": version_arguments()}}).encode()
+            status, response = release.request(port, body)
+            if status != 200:
+                raise AssertionError("HTTP version check request failed")
+            assert_version_result(release.json_rpc_reply(response, 2).get("result", {}))
+            print("PASS packaged HTTP optional version security privacy")
         finally:
             server.terminate()
             try:
@@ -135,6 +163,10 @@ def main():
                                                        "arguments": {"projectDir": str(project)}})
                 assert_result(result, expected, root, outside)
                 print(f"PASS packaged stdio OSV privacy {name}")
+            result, _ = client.call("tools/call", {"name": "check_dependency_version",
+                                                   "arguments": version_arguments()})
+            assert_version_result(result)
+            print("PASS packaged stdio optional version security privacy")
         finally:
             client.close()
 

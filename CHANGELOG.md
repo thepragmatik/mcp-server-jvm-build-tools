@@ -2,6 +2,7 @@
 
 ## [Unreleased] - toward 2.0.0-rc.2
 
+- Opt-in Maven version security checks now expose only bounded aggregate OSV status, CVE count, and known/unknown highest severity through MCP; advisory and package identities stay local.
 - Reuse default Maven Central and OSV HTTP clients across service instances to avoid selector-thread growth under repeated construction; the Docker process limit remains a resource gate.
 - CVE scan extraction now selects only project-level POM dependencies using a secure XML parser and ignores commented or quoted Gradle code. Inherited POM versions and dynamic supported Gradle calls fail incomplete before OSV egress instead of producing a misleading clean count.
 - The central project guard now checks build markers through one held, no-symlink project directory handle where Java `SecureDirectoryStream` is available. Providers without it keep canonical-path compatibility checks; those checks still have a path-swap race, so untrusted projects require isolation.

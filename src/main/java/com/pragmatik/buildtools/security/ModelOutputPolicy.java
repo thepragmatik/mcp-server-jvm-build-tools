@@ -112,8 +112,12 @@ public final class ModelOutputPolicy {
 
     public String protect(String toolName, String output) {
         boolean cveScan = "scan_dependency_cves".equals(toolName);
+        boolean versionCheck = "check_dependency_version".equals(toolName);
         if (cveScan && (output == null || output.length() > MAX_RESULT_CHARS)) {
             return incompleteCveScan();
+        }
+        if (versionCheck && (output == null || output.length() > MAX_RESULT_CHARS)) {
+            return incompleteVersionCheck();
         }
         Map<String, Object> safe = new LinkedHashMap<>();
         safe.put("completed", true);
@@ -154,6 +158,9 @@ public final class ModelOutputPolicy {
                     copyVersion(root, "latestStable", safe);
                     copyVersion(root, "scalaVersion", safe);
                     copyVersion(root, "sbtVersion", safe);
+                    if ("check_dependency_version".equals(toolName)) {
+                        copyVersionSecurity(root.get("security"), safe);
+                    }
                     if ("analyze_pom_dependencies".equals(toolName)) {
                         copyArrayCount(root, "dependencies", "dependencyCount", safe);
                         copyArrayCount(root, "managedDependencies", "managedDependencyCount", safe);
@@ -308,6 +315,9 @@ public final class ModelOutputPolicy {
                 safe.remove("success");
             }
         }
+        if (versionCheck && (parsed == null || !parsed.isObject())) {
+            return incompleteVersionCheck();
+        }
         if (cveScan) {
             Object scanStatus = safe.get("scanStatus");
             if (parsed == null
@@ -330,6 +340,10 @@ public final class ModelOutputPolicy {
 
     private String incompleteCveScan() {
         return mapper.writeValueAsString(Map.of("completed", true, "isError", true, "scanStatus", "incomplete"));
+    }
+
+    private String incompleteVersionCheck() {
+        return mapper.writeValueAsString(Map.of("completed", true, "isError", true, "metadataStatus", "incomplete"));
     }
 
     private static void copySafeField(JsonNode source, String key, Set<String> allowed, Map<String, Object> target) {
@@ -435,6 +449,25 @@ public final class ModelOutputPolicy {
                 && value.longValue() <= BuildResultLimits.MAX_VISIBLE_COUNTER) {
             target.put(key, value.longValue());
         }
+    }
+
+    private static void copyVersionSecurity(JsonNode security, Map<String, Object> target) {
+        if (security == null) return;
+        if (!security.isObject()
+                || !"complete".equals(security.path("lookupStatus").asText())) {
+            target.put("securityStatus", "incomplete");
+            return;
+        }
+        Map<String, Object> aggregate = new LinkedHashMap<>();
+        copyCounter(security, "cveCount", aggregate);
+        copySafeField(
+                security, "highestSeverity", Set.of("NONE", "UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"), aggregate);
+        if (!aggregate.containsKey("cveCount") || !aggregate.containsKey("highestSeverity")) {
+            target.put("securityStatus", "incomplete");
+            return;
+        }
+        target.put("securityStatus", "complete");
+        target.putAll(aggregate);
     }
 
     private static boolean copyDiagnostics(

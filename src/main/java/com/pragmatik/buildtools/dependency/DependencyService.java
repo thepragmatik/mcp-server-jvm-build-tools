@@ -125,7 +125,7 @@ public class DependencyService {
                             + "Sends bounded Maven group and artifact coordinates to Maven Central; redirects are refused. "
                             + "The model receives safe version/count fields, not the full metadata or coordinates. "
                             + "Provide projectDir for local build-tool context. Set includeSecurityInfo=true to query OSV.dev "
-                            + "for the supplied currentVersion; coordinates leave the host, while MCP withholds security findings.")
+                            + "for the supplied currentVersion; coordinates leave the host, while MCP returns aggregate count, status, and known severity only.")
     public String checkDependencyVersion(
             @ToolParam(required = true, description = "Maven group ID (e.g., 'org.springframework.boot')")
                     String groupId,
@@ -148,7 +148,7 @@ public class DependencyService {
             @ToolParam(
                             required = false,
                             description =
-                                    "Opt in to an OSV.dev coordinate lookup for local integrations. MCP withholds its security details; use scan_dependency_cves for aggregate vulnerability presence. Default false.")
+                                    "Opt in to an OSV.dev coordinate lookup. MCP returns aggregate vulnerability count and status, never CVE or package identities. Default false.")
                     boolean includeSecurityInfo) {
 
         VersionPreference filter = parseVersionPreference(versionPreference);
@@ -523,6 +523,7 @@ public class DependencyService {
                 }
             }
             security.put("highestSeverity", highest);
+            security.put("lookupStatus", "complete");
 
             List<Map<String, Object>> vulnList = new ArrayList<>();
             for (VulnerabilityEntry v : vulns) {
