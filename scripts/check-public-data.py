@@ -67,22 +67,32 @@ def issues(line: str, path: str = "") -> list[str]:
 
 
 def added_lines(base: str):
-    command = ["git", "diff", "--unified=0", "--no-ext-diff", base]
-    diff = subprocess.run(command, check=True, capture_output=True, text=True).stdout
-    path = None
-    line_number = 0
-    for line in diff.splitlines():
-        if line.startswith("+++ b/"):
-            path = line[6:]
-        elif line.startswith("@@"):
-            match = re.search(r"\+(\d+)", line)
-            if match:
-                line_number = int(match.group(1))
-        elif line.startswith("+") and not line.startswith("+++"):
-            yield path, line_number, line[1:]
-            line_number += 1
-        elif line.startswith(" "):
-            line_number += 1
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", "-z", "--no-ext-diff", base, "--"],
+        check=True, capture_output=True,
+    ).stdout.split(b"\0")
+    for raw_path in changed:
+        if not raw_path:
+            continue
+        path = os.fsdecode(raw_path)
+        diff = subprocess.run(
+            ["git", "diff", "--unified=0", "--no-ext-diff", base,
+             "--", ":(literal)" + path],
+            check=True, capture_output=True, text=True, errors="replace",
+        ).stdout
+        line_number = 0
+        in_hunk = False
+        for line in diff.splitlines():
+            if line.startswith("@@"):
+                match = re.search(r"\+(\d+)", line)
+                if match:
+                    line_number = int(match.group(1))
+                    in_hunk = True
+            elif in_hunk and line.startswith("+"):
+                yield path, line_number, line[1:]
+                line_number += 1
+            elif in_hunk and line.startswith(" "):
+                line_number += 1
 
     if base == "HEAD":
         files = subprocess.run(

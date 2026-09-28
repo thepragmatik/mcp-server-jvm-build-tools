@@ -109,6 +109,35 @@ class PublicDataScannerTest(unittest.TestCase):
             self.assertNotIn("::error::", scan.stdout)
             self.assertNotIn("syntheticcredential123456", scan.stdout)
 
+    def test_changed_lines_handle_newline_filename_without_leaking_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            filename = "person@" + "private.example.net\n::error::flag"
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid",
+                 "commit", "-q", "--allow-empty", "-m", "baseline"],
+                cwd=repo, check=True,
+            )
+            (repo / filename).write_text("password=" + "syntheticcredential123456\n")
+            subprocess.run(["git", "add", "--", filename], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid",
+                 "commit", "-q", "-m", "synthetic finding"],
+                cwd=repo, check=True,
+            )
+            scan = subprocess.run(
+                ["python3", str(Path(__file__).resolve().with_name("check-public-data.py")),
+                 "--base", "HEAD~1"],
+                cwd=repo, capture_output=True, text=True,
+            )
+            self.assertEqual(1, scan.returncode)
+            self.assertEqual("", scan.stderr)
+            self.assertIn("file:" + SCANNER.file_ref(filename) + ":1:", scan.stdout)
+            self.assertNotIn("person@", scan.stdout)
+            self.assertNotIn("::error::", scan.stdout)
+            self.assertNotIn("syntheticcredential123456", scan.stdout)
+
     def test_reference_resolution_requires_human_terminal(self):
         class TerminalOutput(io.StringIO):
             def isatty(self):
