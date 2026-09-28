@@ -10,7 +10,7 @@ annotations in the source.
 !!! info "Scope of this reference"
     Only tools wired into `BuildToolsApplication.buildTools(...)` are documented here, because those
     are the tools an MCP client actually discovers. See the
-    [Architecture reference](architecture.md#the-mcp-tool-surface-28-tools-12-services) for the
+    [Architecture reference](tool-catalog.md) for the
     note about additional services that exist in the source but are not currently registered.
 
 Common conventions:

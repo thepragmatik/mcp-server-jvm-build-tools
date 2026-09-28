@@ -1,270 +1,159 @@
 # Architecture
 
-This server gives AI agents a single, unified interface to JVM build tools — Maven, Gradle, and
-SBT — over the Model Context Protocol. It is built with **Spring Boot 4.1.0** and **Spring AI
-2.0.0**, which auto-configures the MCP server and discovers tools from annotations.
+This page describes the **2.0 release-candidate design**. The supported
+Java SDK speaks MCP `2025-11-25` over stdio or stateless Streamable HTTP.
+The public [runtime-derived catalog](tool-catalog.md) contains 24 tools.
+The 1.x tool list and 2026 draft protocol notes are historical records,
+not this server's current wire contract.
 
-## High-level view
+## Trust boundaries
 
-```text
-┌───────────────────────────────────────────────────────────────────────────┐
-│                       MCP client (e.g. Claude Desktop)                      │
-│                    stdio transport  OR  Streamable HTTP                      │
-└───────────────────────────────┬───────────────────────────────────────────┘
-                                 │ JSON-RPC (MCP protocol)
-┌───────────────────────────────▼───────────────────────────────────────────┐
-│                  Spring AI MCP server (auto-configured)                      │
-│                                                                             │
-│   BuildToolsApplication  (@SpringBootApplication)                           │
-│     └─ @Bean ToolCallbackProvider → MethodToolCallbackProvider              │
-│          registers 12 service beans → 28 MCP tools                          │
-│                                                                             │
-│   BuildToolProvider (@Component): registry + auto-detection                  │
-│        ┌──────────────┬──────────────┬──────────────┐                       │
-│        ▼              ▼              ▼                                        │
-│   MavenBuildTool  GradleBuildTool  SbtBuildTool                              │
-│   (invoker +      (CLI via         (CLI via                                  │
-│    embedder)       ProcessBuilder)  ProcessBuilder)                          │
-│                                                                             │
-│   Servlet filter chain (Streamable HTTP profile only, runs first):          │
-│     (1) OAuthResourceServerFilter   (2) McpHeaderValidationFilter           │
-│                                                                             │
-│   REST controllers (Streamable HTTP profile only):                          │
-│     ServerCardController        (.well-known/mcp-server + health)           │
-│     McpDiscoverController       (server/discover: GET probe + POST)         │
-│     OAuthProtectedResourceMetadataController (RFC9728 metadata)             │
-│     BuildEventController        (supplementary SSE telemetry feed)          │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    A["🟣 MCP client<br/>model-visible input"] --> T{"🔵 Transport"}
+    T -->|stdio| S["🔵 SDK stdio session"]
+    T -->|HTTP /mcp| H["🟠 Host + Origin check<br/>body cap + bearer scope"]
+    H --> Q["🔵 SDK servlet<br/>MCP 2025-11-25"]
+    S --> C["🟢 Guarded tool callback"]
+    Q --> C
+    C --> P{"🟠 Canonical project root?"}
+    P -->|deny| X["🔴 Safe error"]
+    P -->|allow| B["🟢 Build-tool service<br/>Maven · Gradle · sbt"]
+    B --> O["🟡 Bounded process capture"]
+    O --> R["🟡 Privacy projection<br/>counts + redacted diagnostics"]
+    R --> C
+    C --> T
+    classDef client fill:#eee5ff,stroke:#7c3aed,color:#24114b
+    classDef transport fill:#dbeafe,stroke:#2563eb,color:#102a56
+    classDef decision fill:#ffedd5,stroke:#ea580c,color:#512600
+    classDef work fill:#dcfce7,stroke:#16a34a,color:#073b1e
+    classDef output fill:#fef9c3,stroke:#ca8a04,color:#443400
+    classDef reject fill:#fee2e2,stroke:#dc2626,color:#520909
+    class A client
+    class T,S,Q transport
+    class H,P decision
+    class C,B work
+    class O,R output
+    class X reject
 ```
+
+The purple side is outside the server's control: a client may send prompts
+and arguments to a model provider before MCP sees them. Relative
+`projectDir` aliases avoid placing absolute host paths in routine tool
+calls. The orange checks guard the server boundary; the yellow stages
+bound and redact results before they return to the model. A project root
+restricts paths but does **not** sandbox build scripts. Run untrusted
+workspaces with OS or container isolation, minimal mounts, and restricted
+network access.
 
 ## Core components
 
-### Application entry point — `BuildToolsApplication`
+| Layer | Active implementation | Responsibility |
+|-------|-----------------------|----------------|
+| Application wiring | `BuildToolsApplication` | Registers the annotated tool service beans once. |
+| Tool catalog | `MethodToolCallbackProvider` → `DeterministicToolCallbackProvider` → `GuardedToolCallbackProvider` | Discovers tools, sorts names, limits the public surface to known permissions, substitutes safe descriptions, validates path arguments, and applies output projection. |
+| Project boundary | `ProjectAccessPolicy` | Resolves existing paths with `toRealPath()` against configured allowed roots; ambiguous or markerless build-tool detection requires an explicit choice. |
+| Build-tool selection | `BuildToolProvider` and `BuildTool` implementations | Selects Maven, Gradle, or sbt and delegates execution or analysis. |
+| Process lifetime | `SyncProcessRunner`, `BoundedProcessOutput`, and async build handling | Drains stdout and stderr concurrently, retains bounded head/tail bytes, applies timeouts, and terminates descendants on timeout or cancellation. |
+| Result boundary | `ModelOutputPolicy` and `PrivacySafeMcpJsonMapper` | Selects safe fields and normalized diagnostics for tool results; replaces caller-derived JSON-RPC error detail with generic text on both transports. |
+| HTTP transport | `HttpMcpServerConfiguration` and servlet filters | Exposes `/mcp` through the SDK's stateless servlet when the `http` profile is active. |
+| Stdio transport | `McpServerTransportConfiguration` | Keeps stdout reserved for SDK JSON-RPC and serves the same guarded callbacks. |
 
-- A `@SpringBootApplication` whose `main` starts Spring and then **blocks the main thread** so the
-  JVM stays alive for the stdio transport.
-- Declares a single `@Bean ToolCallbackProvider buildTools(...)` that wires the MCP tool surface
-  via `MethodToolCallbackProvider.builder().toolObjects(...)`.
-- The Streamable HTTP transport is activated with the `http` Spring profile, which starts an
-  embedded servlet container.
-
-### Build tool SPI — `BuildTool`
-
-Every build tool implementation satisfies one interface:
-
-| Method | Purpose |
-|--------|---------|
-| `getName()` | Canonical name — `"maven"`, `"gradle"`, `"sbt"`. |
-| `version()` | Query the installed version. |
-| `executeCommand(home, dir, cmd)` | Run a build command in a project directory. |
-| `isProject(dir)` | Detect this tool's project markers. |
-| `getSupportedCommands()` | List the allowlisted lifecycle commands/tasks. |
-| `getExecutionPrompt()` | An LLM prompt describing the tool's syntax and security rules. |
-
-New build tools (Bazel, Ant, Mill, …) are added by implementing this interface and registering it.
-
-### Build tool implementations
-
-=== "MavenBuildTool"
-
-    - Executes out-of-process via the **Maven Shared Invoker** (3.3.0).
-    - Version queries use the **Maven Embedder** (3.9.16), in-process — no external process.
-    - Requires a `buildToolHome` pointing at a Maven installation.
-    - Detects projects via `pom.xml`.
-    - Commands: `clean, compile, test, package, install, deploy, validate`.
-    - Safe flags: `-D` (any key), `-f`, `-P`, `-q`, `-X`, `-T`, `-B`, `-U`,
-      `--batch-mode`, `--non-recursive`.
-
-=== "GradleBuildTool"
-
-    - Executes via `ProcessBuilder` with `--no-daemon --console=plain`.
-    - Auto-detects the `gradlew` wrapper; falls back to `gradle` on `PATH`.
-    - Detects projects via `build.gradle`, `build.gradle.kts`, `settings.gradle`,
-      `settings.gradle.kts`.
-    - Commands: `clean, build, test, compileJava, compileTestJava, jar, assemble, check,
-      publishToMavenLocal, dependencies, projects, tasks`.
-    - Blocked flags: `--init-script`/`-I`, `--build-file`/`-b`, `--project-dir`/`-p`,
-      `--include-build`, `--system-prop`/`-D`.
-
-=== "SbtBuildTool"
-
-    - Executes via `ProcessBuilder` with `--no-colors`.
-    - Auto-detects an `sbt` wrapper; falls back to `sbt` on `PATH`.
-    - Detects projects via `build.sbt`.
-    - Commands: `compile, test, run, package, clean, assembly, publishLocal, publish, update, doc,
-      console`.
-    - Same three-layer security model as Gradle, plus blocked `-D`, `-J`, and launcher flags.
-
-### Tool registry — `BuildToolProvider`
-
-- A `@Component` holding a `LinkedHashMap<String, BuildTool>` in insertion order.
-- Registration order (Maven → Gradle → SBT) sets the **auto-detection priority**.
-- `resolve(name, projectDir)` performs an explicit lookup or auto-detection by scanning markers.
-
-## The MCP tool surface (28 tools, 12 services)
-
-Tools are registered by passing service beans to `MethodToolCallbackProvider.toolObjects(...)` in
-`BuildToolsApplication`. Spring AI scans each bean's `@Tool` and `@ToolParam` annotations at
-startup and generates the JSON schemas exposed via `tools/list`. The generated `inputSchema`
-for every tool is **JSON Schema 2020-12** (stamped with the 2020-12 `$schema`); a build-time
-guard, `ToolJsonSchemaComplianceTest`, validates every tool schema against the official 2020-12
-meta-schema (SEP-2106 — see the [Tools reference](tools.md#json-schema-2020-12-and-deterministic-ordering)).
-
-!!! note "Deterministic `tools/list` ordering (SEP-2549)"
-    The provider bean is wrapped by `DeterministicToolCallbackProvider`, which returns the
-    catalogue **sorted by tool name** on every call. `MethodToolCallbackProvider` discovers
-    `@Tool` methods reflectively, and `Class.getDeclaredMethods()` has no ordering guarantee
-    across JVMs/restarts; sorting at the provider boundary makes `tools/list` order a stable
-    function of the (unique) tool names, improving client-side and LLM prompt-cache hit rates.
-    No tool is added, removed, renamed, or changed — only the iteration order is normalised.
-
-| Service | Tools | Responsibility |
-|---------|:-----:|----------------|
-| `BuildToolsService` | 6 | Version, execution, detection, output analysis, config validation |
-| `DependencyService` | 1 | Maven Central version lookups |
-| `PromptService` | 3 | Build/test/diagnosis prompt templates |
-| `BuildResourceService` | 2 | List/read build resources (`build://` URIs) |
-| `DependencyResourceService` | 2 | List/read dependency resources |
-| `ResourceTemplateService` | 2 | Parameterised URI template resources |
-| `SbtProjectService` | 3 | SBT module/test-framework detection, build analysis |
-| `BuildAuthService` | 1 | Maven/Gradle credential-configuration scanning |
-| `DependencyConflictService` | 1 | Dependency version-conflict detection |
-| `BuildPerformanceService` | 2 | Build profiling and performance analysis |
-| `JavaVersionService` | 1 | Java/JDK compatibility checking |
-| `ToolAuthorizationService` | 4 | Scope-based authorization, audit reads, token validation |
-| **Total** | **28** | |
-
-Full per-tool inputs and outputs are in the [Tools / MCP API reference](tools.md).
-
-!!! info "Services present in the source but not currently registered"
-    The codebase also contains `AsyncBuildService`, `BuildCacheService`, `TestFlakinessService`,
-    and `SupplyChainService`. These `@Service` beans are **not** passed to
-    `MethodToolCallbackProvider.toolObjects(...)` in `BuildToolsApplication`, so their `@Tool`
-    methods are **not** exposed over MCP. This documentation describes the **28 tools that an MCP
-    client actually discovers** via `tools/list`. If those services are wired in later, this
-    reference should be updated to match.
-
-## Output parsers
-
-`analyze_build_output` delegates to a `BuildOutputParser` per build tool:
-
-| Parser | Extracts |
-|--------|----------|
-| `MavenOutputParser` | `BUILD SUCCESS`/`FAILURE`, test counts, compile errors with `file:line`, warnings |
-| `GradleOutputParser` | `BUILD SUCCESSFUL`/`FAILED`, test summaries, error references, warnings |
-| `SbtOutputParser` | ScalaTest/JUnit pass/fail, `file:line` errors, structured results |
-
-All produce a common JSON shape:
-`{ success, tool, command, testSummary, errors, warnings, errorCount, warningCount, duration }`.
-
-## Maven invoker — `MavenInvoker`
-
-Low-level Maven execution with two modes plus security parsing:
-
-- `executeCommandUsingMavenInvoker()` — out-of-process via the Maven Shared Invoker API.
-- `executeUsingMavenEmbedder()` — in-process via the Maven Embedder API (used for version queries).
-- `getCommands()` — command parsing that enforces the allowlist and rejects shell metacharacters.
-  Maven `-D` system properties are passed through verbatim (no key deny-list).
-
-## Streamable HTTP transport components
-
-The Streamable HTTP transport is **stateless** (MCP 2026-07-28 RC): no protocol-level sessions,
-no `Mcp-Session-Id` header, and no SSE-stream resumability, so any replica can serve any request
-and cross-call state is carried by explicit server-minted handles (e.g. an async build `taskId`)
-passed as ordinary tool arguments. The following components are active only when the `http`
-profile is enabled.
-
-### Servlet filters (run before the controllers)
-
-A short filter chain guards `/mcp/**`, ordered by `@Order`:
-
-- **`OAuthResourceServerFilter`** (`@Order(1)`) — the OAuth 2.1 resource-server gate. **Inert by
-  default**; when `buildtools.oauth.resource-server.enabled=true` it requires an
-  `Authorization: Bearer <token>` on `/mcp/**`, validating the opaque token locally via
-  `ToolAuthorizationService`. A missing/invalid token yields `401` with an RFC6750
-  `WWW-Authenticate: Bearer … resource_metadata="…"` challenge. The `server/discover` probe is
-  exempt so clients can always learn how to authenticate.
-- **`McpHeaderValidationFilter`** (`@Order(2)`) — validates the 2026-07-28 RC request headers
-  `Mcp-Method` / `Mcp-Name` (SEP-2243) against the JSON-RPC body on `POST /mcp/**`. It is purely
-  additive: **absent** headers pass through (older clients are unaffected) and **matching**
-  headers pass through; only a genuine self-contradiction is rejected with `400` + a JSON-RPC
-  `HeaderMismatchError`.
-
-### REST controllers
-
-- **`ServerCardController`** — `GET /.well-known/mcp-server` (server metadata for discoverability),
-  `GET /health`, `GET /health/ready`, `GET /health/live`.
-- **`McpDiscoverController`** — `server/discover` at `GET /mcp/discover` (probe) and
-  `POST /mcp/discover` (JSON-RPC), advertising server identity, supported protocol versions
-  (`2024-11-05`, `2025-03-26`, `2026-07-28`), capabilities, stateless-transport characteristics,
-  and the `cacheHints` block. The payload is identical on every call (no per-connection variance).
-- **`OAuthProtectedResourceMetadataController`** — `GET /.well-known/oauth-protected-resource`
-  (RFC9728 Protected Resource Metadata). **Always served** under the HTTP profile (additive
-  discovery surface) regardless of whether bearer enforcement is enabled.
-- **`BuildEventController`** — `GET /mcp/build-events/stream` (a supplementary, **non-protocol**
-  Server-Sent Events telemetry feed for dashboards; it carries no MCP JSON-RPC traffic and has no
-  resumability).
-
-`McpServerIdentity` is the single source of truth that every discovery surface reads — the server
-card, `server/discover`, and the `Mcp-Name` header check — so server name, protocol versions,
-capabilities, and `cacheHints` cannot drift between them. `TransportConfig` configures CORS for the
-`/mcp/**` paths (advertising the standard `Mcp-Method` / `Mcp-Name` request headers and no longer
-the removed `Mcp-Session-Id`).
-
-## W3C Trace Context propagation
-
-For distributed tracing (W3C Trace Context / OpenTelemetry, SEP-414), a dependency-free trace
-layer spans build execution:
-
-| Component | Role |
-|-----------|------|
-| `W3CTraceContext` | Parse/format `traceparent` / `tracestate` / `baggage` values. |
-| `McpTraceContext` | Read the exact SEP-414 `_meta` keys and continue an inbound trace. |
-| `BuildTracer` | Open a `TraceSpan` around every build in `BuildToolsService` / `AsyncBuildService`. |
-| `TraceSpan` / `TraceScope` | Span lifecycle and scoped activation. |
-| `TraceContextHolder` | Thread-scoped active context; stamps `TRACEPARENT` / `TRACESTATE` / `BAGGAGE` onto each build subprocess's environment. |
-
-Span parentage is resolved in order: an active (nested) span → the request `_meta` context → a
-`TRACEPARENT` already present in the server's own environment (e.g. a CI runner) → otherwise a
-fresh, sampled root span. An inbound trace is *continued* only when a request (or the server's
-environment) carries one; an untraced build simply gets a fresh root span and is **never
-reparented** onto an unrelated trace — so a host/CI trace is preserved and there is **no regression
-for untraced builds**. See the [Security reference](security.md#w3c-trace-context-propagation).
+The callback provider is the public catalog's source of truth. It currently
+serves 24 sorted tools; `ToolScopeCoverageTest` compares the committed
+[tool catalog](tool-catalog.md) with those runtime callbacks and their
+`ToolPermission` scopes. Adding a method annotation alone does not make a
+tool safe or public.
 
 ## Request flow
 
-```text
-tools/call ─▶ Spring AI MCP SDK ─▶ @Tool method on a service bean
-                                      │
-                                      ├─ validate inputs (length, characters, path canonicalisation)
-                                      ├─ resolve build tool (explicit or auto-detect)
-                                      ├─ apply allowlist + flag checks
-                                      ├─ open trace span (BuildTracer; continues inbound context)
-                                      ▼
-                              spawn isolated build process
-                                      │   (active span's TRACEPARENT/TRACESTATE/BAGGAGE
-                                      │    stamped on the subprocess env)
-                                      ├─ (analyze_build_output) parse output → JSON
-                                      ▼
-                              return result to the client
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as 🟣 Client
+    participant HTTP as 🟠 HTTP guards
+    participant SDK as 🔵 MCP SDK
+    participant Callback as 🟢 Guarded callback
+    participant Build as 🟢 Build service
+    participant Local as 🟡 Local output
+    Client->>HTTP: POST /mcp (HTTP profile)
+    HTTP->>HTTP: Validate Host, Origin, size, bearer + tool scope
+    HTTP->>SDK: Bounded request
+    SDK->>Callback: tools/call
+    Callback->>Callback: Resolve and check project path
+    Callback->>Build: Validated arguments
+    Build->>Local: Spawn Maven / Gradle / sbt
+    Local-->>Build: Bounded stdout + stderr
+    Build-->>Callback: Local result
+    Callback->>Callback: Redact and project safe fields
+    Callback-->>SDK: Counts + ≤12 diagnostics
+    SDK-->>Client: MCP result
 ```
 
-## Technology stack
+For stdio, the SDK session replaces the HTTP guard stage. The same
+callback and output policy still run, but there is no HTTP bearer filter;
+local process access and the allowed project roots are the primary
+boundaries. A supplementary build-events SSE feed is not the MCP
+Streamable HTTP transport. The experimental 2026 `server/discover`
+handler is disabled in the supported profile; clients should negotiate
+with `initialize` and enumerate tools with `tools/list`.
 
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| Java | 21+ | Runtime |
-| Spring Boot | 4.1.0 | Application framework |
-| Spring AI | 2.0.0 | MCP server framework |
-| Maven Embedder | 3.9.16 | In-process Maven (version queries) |
-| Maven Shared Invoker | 3.3.0 | Out-of-process Maven (builds) |
+### HTTP guard order
+
+`McpOriginHostFilter` runs first (`@Order(0)`) and rejects untrusted
+Origin and loopback Host values. `OAuthResourceServerFilter` (`@Order(1)`)
+requires a configured bearer key in the HTTP profile and checks the
+requested tool's scope. `McpHeaderValidationFilter` (`@Order(2)`) applies
+the 1 MiB request-body cap and validates optional MCP routing headers.
+The SDK servlet then handles the JSON-RPC request. Invalid Origin and
+Host requests receive 403 before reaching a tool. HTTP scope checks do
+not depend on the older `buildtools.auth.enabled` switch.
+
+## Privacy and performance budgets
+
+| Boundary | Current limit | Effect |
+|----------|---------------|--------|
+| MCP HTTP POST body | 1 MiB by default | Oversized requests receive 413 before SDK dispatch. |
+| Process stdout and stderr | 32 KiB head + 96 KiB tail **per stream** | Readers keep draining large or unterminated output without retaining whole logs. |
+| Tool-result projection input | final 256,000 characters | The projector never parses an unbounded returned string. |
+| Model-visible diagnostics | at most 12; messages at most 500 characters | Includes severity, category, and per-result references; raw logs, commands, file paths, and symbols remain local. |
+
+These are retained-data limits, not a CPU, memory, disk, network, or
+subprocess sandbox. Redaction is strongest for recognized diagnostics;
+arbitrary text can contain private information that patterns cannot
+prove absent. Keep raw logs local and use synthetic privacy canaries in
+tests. The [release gates](release-gates.md) measure real workloads
+instead of inferring latency improvements from source inspection.
+
+## Architecture review findings
+
+| Finding | Evidence and consequence | Release treatment |
+|---------|--------------------------|-------------------|
+| A current tool can lose useful projected output | Dogfood found an empty `list_build_tools` result through `ModelOutputPolicy`. A separate fix and end-to-end retest are required. | **Release blocker** until the fix is merged and both transports pass final dogfood. |
+| Cross-tool result projection is highly coupled | `ModelOutputPolicy` interprets tool-specific JSON and plain text centrally. Adding a tool requires synchronized changes to its projection, metadata, permissions, and docs; silent field loss is possible. | After the candidate, split projections into typed, per-tool contracts with characterization tests. |
+| Construction and selection are coupled to concrete classes | `BuildToolsService` and `DependencyService` construct parser/resolver implementations, while `BuildToolProvider` constructs build-tool instances. This makes substitutions and focused tests harder. | Roadmap refactor: inject interfaces or factories and preserve behavior with contract tests. |
+| Filesystem checks cannot prevent all races | A symlink or build file can change after canonical validation and before a child process opens it. Build scripts can execute arbitrary project code. | Document the limitation now; require external isolation for untrusted projects. |
+
+These findings are based on the current code and synthetic dogfood.
+They are not claims that a broader refactor has already shipped. The
+[2.0 design review](design-v2.md) records the security decisions and
+[roadmap](../ROADMAP.md) tracks release evidence and follow-up work.
 
 ## Extending the server
 
-**Add a build tool:** implement `BuildTool`, register it in `BuildToolProvider`, add a
-`BuildOutputParser`, register the parser in `BuildToolsService`, add detection hints in
-`detect_build_tool`, add dependency syntax in `DependencyService`, and add tests.
+1. Add a focused `@Tool` method to the appropriate service and register
+   that service in `BuildToolsApplication` if it is new.
+2. Assign exactly one public scope in `ToolPermission`. Add a safe public
+   description and an explicit output projection; unknown private fields
+   must not pass through by default.
+3. Test the input schema, project-root behavior, authorization, redaction,
+   and bounded errors with synthetic data.
+4. Regenerate the runtime [tool catalog](tool-catalog.md), run
+   `./mvnw -B verify --no-transfer-progress`, strict docs, and the
+   privacy scan. Follow the [agent PR workflow](../AGENTS.md) for two
+   independent reviews.
 
-**Add an MCP tool:** create a `@Service` with `@Tool`-annotated methods, define parameters with
-`@ToolParam`, **register the bean in `BuildToolsApplication.buildTools(...)`** (this last step is
-what actually exposes the tool), and add tests.
+The Java baseline is 21. The candidate uses Spring Boot 4.1.1,
+Spring AI 2.0.1, and the MCP Java SDK 2.0.1. The Maven wrapper,
+container verification, JDK matrix, and packaged protocol gates are
+described in the [release guide](release-gates.md).
