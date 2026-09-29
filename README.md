@@ -2,7 +2,9 @@
 
 A Java 21+ MCP server for Maven, Gradle, and sbt. It exposes 24 tools and three native build-workflow prompts over stdio and Streamable HTTP. The 2.0 development line puts project boundaries, scoped HTTP access, and privacy controls on every model-visible tool call.
 
-> Current prerelease: [v2.0.0-rc.2](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2). The release tag identifies the tested artifact; `main` may gain later changes. Older 1.x tool lists and examples live in [the changelog](CHANGELOG.md).
+> **Current 2.0 prerelease:** [v2.0.0-rc.2](https://github.com/thepragmatik/mcp-server-jvm-build-tools/releases/tag/v2.0.0-rc.2) · [Project website and documentation](https://thepragmatik.github.io/mcp-server-jvm-build-tools/)
+>
+> GitHub labels v1.3.3 as the latest stable release; v2.0.0-rc.2 is a prerelease. The release tag identifies the tested artifact; `main` may gain later changes. Older 1.x tool lists and examples live in [the changelog](CHANGELOG.md).
 
 ## Quick start
 
