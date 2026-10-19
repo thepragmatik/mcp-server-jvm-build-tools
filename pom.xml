@@ -44,7 +44,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <spring-ai.version>2.0.1</spring-ai.version>
-        <mcp-sdk.version>2.0.1</mcp-sdk.version>
+        <mcp-sdk.version>2.1.0</mcp-sdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacoco.version>0.8.15</jacoco.version>
         <spotless.version>3.10.2</spotless.version>
