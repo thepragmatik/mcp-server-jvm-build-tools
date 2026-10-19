@@ -47,10 +47,10 @@
         <mcp-sdk.version>2.0.1</mcp-sdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jacoco.version>0.8.15</jacoco.version>
-        <spotless.version>3.10.2</spotless.version>
+        <spotless.version>3.10.4</spotless.version>
         <palantir-java-format.version>2.96.0</palantir-java-format.version>
-        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
-        <spotbugs.version>4.10.4</spotbugs.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+        <spotbugs.version>4.10.5</spotbugs.version>
         <dependency-check-maven.version>13.0.0</dependency-check-maven.version>
         <!--
             CVSS score at/above which the OWASP scan fails the build (issue #78).
