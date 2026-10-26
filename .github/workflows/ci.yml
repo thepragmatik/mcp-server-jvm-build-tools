@@ -90,7 +90,7 @@ jobs:
         run: python3 scripts/check-public-data.py --tracked
       - name: Verify privacy scanner rules
         run: python3 -m unittest -v scripts/test_check_public_data.py
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
           cache: pip
